@@ -1,0 +1,8 @@
+.next/
+node_modules/
+npm-debug.log*
+tsconfig.tsbuildinfo
+workspace/data/*.db
+workspace/data/*.db-*
+.env
+.env.local
