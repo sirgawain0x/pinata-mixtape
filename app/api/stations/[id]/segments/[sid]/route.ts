@@ -25,8 +25,18 @@ export async function PATCH(request: Request, context: Context) {
   return withCreator(async (creator) => {
     const result = await loadOwned(context, creator.id);
     if ("error" in result) return Response.json({ error: result.error }, { status: result.status });
-    const body = await request.json().catch(() => null);
-    const updated = updateSegment(result.segment.id, body ?? {});
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    const patch: Parameters<typeof updateSegment>[1] = {};
+    if (typeof body?.title === "string") patch.title = body.title;
+    if (typeof body?.body === "string") patch.body = body.body;
+    if (typeof body?.audioCid === "string") patch.audioCid = body.audioCid;
+    if (typeof body?.audioUrl === "string") patch.audioUrl = body.audioUrl;
+    if (body?.durationSeconds === null || typeof body?.durationSeconds === "number") {
+      patch.durationSeconds = body.durationSeconds as number | null;
+    }
+    if (typeof body?.ttsVoice === "string") patch.ttsVoice = body.ttsVoice;
+    if (typeof body?.ttsProvider === "string") patch.ttsProvider = body.ttsProvider;
+    const updated = updateSegment(result.segment.id, patch);
     return Response.json({ segment: updated });
   });
 }

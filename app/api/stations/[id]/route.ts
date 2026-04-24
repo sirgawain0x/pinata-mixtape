@@ -23,8 +23,16 @@ export async function PATCH(request: Request, context: Context) {
     const station = getStation(id);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
-    const body = await request.json().catch(() => null);
-    const updated = updateStation(id, body ?? {});
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    const patch: Parameters<typeof updateStation>[1] = {};
+    if (typeof body?.name === "string") patch.name = body.name;
+    if (typeof body?.tagline === "string") patch.tagline = body.tagline;
+    if (typeof body?.coverUrl === "string") patch.coverUrl = body.coverUrl;
+    if (typeof body?.isPublic === "boolean") patch.isPublic = body.isPublic;
+    if (body?.seedMixId === null || typeof body?.seedMixId === "number") {
+      patch.seedMixId = body.seedMixId as number | null;
+    }
+    const updated = updateStation(id, patch);
     return Response.json({ station: updated });
   });
 }

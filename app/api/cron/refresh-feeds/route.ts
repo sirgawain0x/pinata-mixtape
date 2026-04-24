@@ -6,11 +6,12 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const expected = process.env.CRON_SECRET;
-  if (expected) {
-    const provided = request.headers.get("x-cron-secret");
-    if (provided !== expected) {
-      return Response.json({ error: "Forbidden." }, { status: 403 });
-    }
+  if (!expected) {
+    return Response.json({ error: "CRON_SECRET is not configured." }, { status: 500 });
+  }
+  const provided = request.headers.get("x-cron-secret");
+  if (provided !== expected) {
+    return Response.json({ error: "Forbidden." }, { status: 403 });
   }
   const feeds = listAllFeeds();
   const results: { feedId: number; ok: boolean; error?: string }[] = [];

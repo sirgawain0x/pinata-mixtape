@@ -4,6 +4,7 @@ import {
   addSegment,
   getPodcastFeed,
   listPodcastEpisodes,
+  listStationSegments,
   touchPodcastFeed,
   upsertPodcastEpisode,
   type PodcastEpisode,
@@ -62,8 +63,14 @@ export async function materializeEpisodesAsSegments(
   options: { limit?: number } = {}
 ): Promise<number> {
   const episodes = listPodcastEpisodes(feed.id, options.limit ?? 5);
+  const alreadyMaterialized = new Set(
+    listStationSegments(feed.stationId)
+      .filter((segment) => segment.kind === "podcast" && segment.podcastEpisodeId !== null)
+      .map((segment) => segment.podcastEpisodeId as number)
+  );
   let added = 0;
   for (const episode of episodes) {
+    if (alreadyMaterialized.has(episode.id)) continue;
     addSegment({
       stationId: feed.stationId,
       kind: "podcast",
