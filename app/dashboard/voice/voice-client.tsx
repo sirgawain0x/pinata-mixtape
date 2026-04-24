@@ -147,11 +147,13 @@ export default function VoiceClient({
     setError("");
     try {
       const provider = voiceId.startsWith("mosi:") ? "mosi" : "kokoro";
-      await fetch(`${APP_BASE}/api/creators/me`, {
+      const response = await fetch(`${APP_BASE}/api/creators/me`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ttsProvider: provider, ttsVoiceId: voiceId })
       });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? "Failed to save default voice.");
       setDefaultVoiceId(voiceId);
     } catch (err) {
       setError((err as Error).message);

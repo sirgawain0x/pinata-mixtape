@@ -22,11 +22,13 @@ type Segment = {
 type Props = {
   stationName: string;
   segments: Segment[];
+  /** From the incoming request so YouTube embed `src` matches SSR and client (avoids hydration mismatch). */
+  embedOrigin?: string;
 };
 
 const TEXT_CARD_DURATION_MS = 12000;
 
-export default function StationPlayer({ stationName, segments }: Props) {
+export default function StationPlayer({ stationName, segments, embedOrigin = "" }: Props) {
   const [index, setIndex] = useState(0);
   const [started, setStarted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -86,6 +88,8 @@ export default function StationPlayer({ stationName, segments }: Props) {
       pauseYoutube();
       const audio = audioRef.current;
       if (!audio) return;
+      audio.muted = false;
+      audio.volume = 1;
       audio.src = audioPlayableUrl(current);
       void audio.play().catch(() => undefined);
       return;
@@ -106,14 +110,11 @@ export default function StationPlayer({ stationName, segments }: Props) {
 
   function start() {
     setStarted(true);
-    // Prime the audio element so subsequent `.play()` calls aren't blocked
     const audio = audioRef.current;
     if (audio) {
-      audio.muted = true;
-      void audio.play().then(() => {
-        audio.pause();
-        audio.muted = false;
-      }).catch(() => undefined);
+      // Do not use muted "priming": play() with no src rejects and leaves muted=true, so listeners hear nothing.
+      audio.muted = false;
+      audio.volume = 1;
     }
   }
 
@@ -130,7 +131,7 @@ export default function StationPlayer({ stationName, segments }: Props) {
     isYoutube && current?.song
       ? youtubeEmbedUrl(current.song.youtubeUrl, {
           jsApi: true,
-          origin: typeof window === "undefined" ? undefined : window.location.origin
+          origin: embedOrigin || undefined
         })
       : "";
 
@@ -159,6 +160,8 @@ export default function StationPlayer({ stationName, segments }: Props) {
             referrerPolicy="strict-origin-when-cross-origin"
             src={embedSrc}
             title="station video"
+            // Extensions (e.g. “mega-iframe”) inject attributes on iframes and trigger hydration warnings.
+            suppressHydrationWarning
           />
         ) : null}
         <audio ref={audioRef} onEnded={advance} controls={!isYoutube} />
@@ -213,6 +216,6 @@ function segmentIsPlayable(segment: Segment): boolean {
     if (segment.audioUrl) return true;
     return false;
   }
-  if (segment.kind === "text") return true;
+  if (segment.kind === "text") return Boolean(segment.audioUrl);
   return Boolean(segment.audioUrl);
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import StationPlayer from "../../components/StationPlayer";
 import { getStationByHandle, listStationSegments } from "../../../lib/stations";
 import { getSong } from "../../../lib/mixtapes";
@@ -7,8 +8,23 @@ export const dynamic = "force-dynamic";
 
 type PageProps = { params: Promise<{ handle: string }> };
 
+async function requestOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return "";
+  const rawProto = h.get("x-forwarded-proto");
+  const proto =
+    rawProto
+      ?.split(",")[0]
+      ?.trim()
+      .replace(/\/$/, "") ||
+    (process.env.NODE_ENV === "production" ? "https" : "http");
+  return `${proto}://${host}`;
+}
+
 export default async function StationListenPage({ params }: PageProps) {
   const { handle } = await params;
+  const embedOrigin = await requestOrigin();
   const station = getStationByHandle(handle);
 
   if (!station || !station.isPublic) {
@@ -54,7 +70,7 @@ export default async function StationListenPage({ params }: PageProps) {
       </section>
 
       <section className="workspace dashboard-stations">
-        <StationPlayer stationName={station.name} segments={segments} />
+        <StationPlayer stationName={station.name} segments={segments} embedOrigin={embedOrigin} />
       </section>
     </main>
   );
