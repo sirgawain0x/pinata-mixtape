@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { youtubeEmbedUrl, youtubePlaylistEmbed, youtubeVideoId } from "../lib/youtube";
+import SignInButton from "./components/SignInButton";
 
 export type Track = {
   title: string;
@@ -50,10 +53,18 @@ export type Song = Track & {
   mixIds: number[];
 };
 
+export type Station = {
+  id: number;
+  handle: string;
+  name: string;
+  tagline: string;
+};
+
 type MixtapeAppProps = {
   initialMixes: Mix[];
   initialMoments: MixMoment[];
   initialSongs: Song[];
+  initialStations: Station[];
   initialSelectedId: number | null;
 };
 
@@ -61,6 +72,7 @@ export default function MixtapeApp({
   initialMixes,
   initialMoments,
   initialSongs,
+  initialStations,
   initialSelectedId
 }: MixtapeAppProps) {
   const router = useRouter();
@@ -179,61 +191,9 @@ export default function MixtapeApp({
     [mixes]
   );
 
-  function youtubeEmbedUrl(url: string): string {
-    if (!url) return "";
-
-    try {
-      const parsed = new URL(url);
-      if (parsed.hostname.includes("youtu.be")) {
-        const id = parsed.pathname.replaceAll("/", "");
-        return id ? `https://www.youtube.com/embed/${id}` : "";
-      }
-      if (parsed.hostname.includes("youtube.com")) {
-        const id = parsed.searchParams.get("v");
-        if (id) return `https://www.youtube.com/embed/${id}`;
-        const segments = parsed.pathname.split("/").filter(Boolean);
-        const embedIndex = segments.findIndex((segment) => segment === "embed");
-        if (embedIndex >= 0 && segments[embedIndex + 1]) {
-          return `https://www.youtube.com/embed/${segments[embedIndex + 1]}`;
-        }
-      }
-    } catch {
-      return "";
-    }
-
-    return "";
-  }
-
-  function youtubeVideoId(url: string): string {
-    if (!url) return "";
-
-    try {
-      const parsed = new URL(url);
-      if (parsed.hostname.includes("youtu.be")) {
-        return parsed.pathname.replaceAll("/", "");
-      }
-      if (parsed.hostname.includes("youtube.com")) {
-        const id = parsed.searchParams.get("v");
-        if (id) return id;
-        const segments = parsed.pathname.split("/").filter(Boolean);
-        const embedIndex = segments.findIndex((segment) => segment === "embed");
-        if (embedIndex >= 0 && segments[embedIndex + 1]) {
-          return segments[embedIndex + 1];
-        }
-      }
-    } catch {
-      return "";
-    }
-
-    return "";
-  }
-
   const mixYoutubeEmbed = useMemo(() => {
     if (!selected) return "";
-    const ids = selected.tracks.map((track) => youtubeVideoId(track.youtubeUrl)).filter(Boolean);
-    if (ids.length === 0) return "";
-    if (ids.length === 1) return `https://www.youtube.com/embed/${ids[0]}`;
-    return `https://www.youtube.com/embed/${ids[0]}?playlist=${ids.slice(1).join(",")}`;
+    return youtubePlaylistEmbed(selected.tracks.map((track) => track.youtubeUrl));
   }, [selected]);
 
   return (
@@ -254,15 +214,29 @@ export default function MixtapeApp({
             <span>party arc</span>
             <span>MusicBrainz-ready</span>
           </div>
+          <div className="hero-actions">
+            <SignInButton />
+            <Link className="button" href="/dashboard">Host a station →</Link>
+          </div>
         </div>
 
         <div className="deck-card">
-          <p className="eyebrow">Read-only explorer</p>
-          <h2>Booth rules</h2>
-          <p>
-            Use Pinata chat to onboard a listener, pick a DJ persona, log memories, and save new
-            mixes. This page is the public-facing crate.
-          </p>
+          <p className="eyebrow">Influencer Radio</p>
+          <h2>Live stations</h2>
+          {initialStations.length === 0 ? (
+            <p className="muted">No public stations yet. Sign in to host the first.</p>
+          ) : (
+            <ul className="station-grid">
+              {initialStations.slice(0, 6).map((station) => (
+                <li className="station-card" key={station.id}>
+                  <h3>{station.name}</h3>
+                  <p>@{station.handle}</p>
+                  {station.tagline ? <p className="muted">{station.tagline}</p> : null}
+                  <Link className="button" href={`/s/${station.handle}`}>Listen</Link>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="deck-status">
             <span>{status}</span>
             <span>Outbound links only. No audio proxying.</span>

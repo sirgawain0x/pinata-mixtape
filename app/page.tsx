@@ -1,5 +1,6 @@
 import MixtapeApp from "./mixtape-app";
 import { listMixMoments, listMixes, listSongs, seedMixes, seedMixMoments } from "../lib/mixtapes";
+import { listStations } from "../lib/stations";
 
 type HomePageProps = {
   searchParams?: Promise<{ mix?: string }>;
@@ -16,6 +17,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       initialMixes={listMixes()}
       initialMoments={listMixMoments(12)}
       initialSongs={listSongs("", 8)}
+      initialStations={listStations({ publicOnly: true })}
       initialSelectedId={Number.isFinite(initialSelectedId) ? initialSelectedId : null}
     />
   );

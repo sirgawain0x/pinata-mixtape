@@ -16,10 +16,13 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",
+    "kokoro-js": "^1.2.1",
     "next": "^15.3.1",
     "pm2": "^6.0.8",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "rss-parser": "^3.13.0",
+    "viem": "^2.48.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

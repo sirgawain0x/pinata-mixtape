@@ -1,6 +1,4 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import { db } from "./db";
 import { searchMusicBrainzRecordings } from "./musicbrainz";
 
 export type TrackInput = {
@@ -143,13 +141,6 @@ type MixMomentRow = {
   created_at: string;
 };
 
-const dataDir = path.join(process.cwd(), "workspace", "data");
-const dbPath = path.join(dataDir, "mixtapes.db");
-
-fs.mkdirSync(dataDir, { recursive: true });
-
-const db = new Database(dbPath);
-db.pragma("journal_mode = WAL");
 db.exec(`
   CREATE TABLE IF NOT EXISTS mixes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
