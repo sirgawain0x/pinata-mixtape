@@ -1,0 +1,36 @@
+import { withCreator } from "../../../lib/auth";
+import { createStation, listStations } from "../../../lib/stations";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const mine = url.searchParams.get("mine") === "1";
+  if (mine) {
+    return withCreator(async (creator) => {
+      return Response.json({ stations: listStations({ creatorId: creator.id }) });
+    });
+  }
+  return Response.json({ stations: listStations({ publicOnly: true }) });
+}
+
+export async function POST(request: Request) {
+  return withCreator(async (creator) => {
+    const body = await request.json().catch(() => null);
+    if (!body) return Response.json({ error: "Body required." }, { status: 400 });
+    try {
+      const station = createStation({
+        creatorId: creator.id,
+        handle: String(body.handle ?? ""),
+        name: String(body.name ?? ""),
+        tagline: typeof body.tagline === "string" ? body.tagline : undefined,
+        coverUrl: typeof body.coverUrl === "string" ? body.coverUrl : undefined,
+        seedMixId: typeof body.seedMixId === "number" ? body.seedMixId : null
+      });
+      return Response.json({ station }, { status: 201 });
+    } catch (error) {
+      return Response.json({ error: (error as Error).message }, { status: 400 });
+    }
+  });
+}
