@@ -1,21 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createSiweMessage } from "viem/siwe";
+import {
+  useAuthModal,
+  useLogout,
+  useSignMessage,
+  useSignerStatus,
+  useSmartAccountClient
+} from "@account-kit/react";
 
 type Creator = {
   id: number;
   walletAddress: string;
   displayName: string;
 };
-
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-    };
-  }
-}
 
 const APP_BASE = "/app";
 
@@ -31,6 +30,13 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const signerStatus = useSignerStatus();
+  const { client } = useSmartAccountClient({});
+  const { signMessageAsync } = useSignMessage({ client });
+  const { openAuthModal } = useAuthModal();
+  const { logout } = useLogout();
+
+  // 1) On mount, see if there's an existing server session.
   useEffect(() => {
     void fetchMe().then((value) => {
       setCreator(value);
@@ -38,65 +44,70 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
     });
   }, [onChange]);
 
-  async function signIn() {
-    if (typeof window === "undefined" || !window.ethereum) {
-      setError("No Ethereum wallet detected. Install MetaMask or a compatible wallet.");
-      return;
-    }
+  // 2) Once Account Kit is connected and the smart-account client is ready,
+  //    run the SIWE handshake against our server (if we don't already have a session).
+  const inFlightRef = useRef(false);
+  useEffect(() => {
+    if (creator) return;
+    if (!signerStatus.isConnected) return;
+    const address = client?.account?.address as `0x${string}` | undefined;
+    const chainId = client?.chain?.id;
+    if (!address || !chainId) return;
+    if (inFlightRef.current) return;
+
+    inFlightRef.current = true;
     setBusy(true);
     setError("");
-    try {
-      const accounts = (await window.ethereum.request({ method: "eth_requestAccounts" })) as string[];
-      const address = accounts[0] as `0x${string}`;
-      if (!address) throw new Error("No account selected.");
 
-      const nonceResponse = await fetch(`${APP_BASE}/api/auth/nonce`, { cache: "no-store" });
-      const { nonce } = (await nonceResponse.json()) as { nonce: string };
+    (async () => {
+      try {
+        const nonceResponse = await fetch(`${APP_BASE}/api/auth/nonce`, { cache: "no-store" });
+        const { nonce } = (await nonceResponse.json()) as { nonce: string };
 
-      const domain = window.location.host;
-      const uri = window.location.origin;
-      const chainId = Number(await window.ethereum.request({ method: "eth_chainId" })) || 1;
+        const message = createSiweMessage({
+          domain: window.location.host,
+          address,
+          statement: "Sign in to Pinata Mixtape Radio.",
+          uri: window.location.origin,
+          version: "1",
+          chainId,
+          nonce,
+          issuedAt: new Date()
+        });
 
-      const message = createSiweMessage({
-        domain,
-        address,
-        statement: "Sign in to Pinata Mixtape Radio.",
-        uri,
-        version: "1",
-        chainId,
-        nonce,
-        issuedAt: new Date()
-      });
+        // Account Kit returns an ERC-1271 (deployed) or ERC-6492 (counterfactual)
+        // signature for smart accounts, and a regular ECDSA sig for EOA logins.
+        const signature = await signMessageAsync({ message });
 
-      const signature = (await window.ethereum.request({
-        method: "personal_sign",
-        params: [message, address]
-      })) as `0x${string}`;
+        const verifyResponse = await fetch(`${APP_BASE}/api/auth/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, signature })
+        });
 
-      const verifyResponse = await fetch(`${APP_BASE}/api/auth/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, signature })
-      });
+        const data = (await verifyResponse.json()) as { creator?: Creator; error?: string };
+        if (!verifyResponse.ok || !data.creator) {
+          throw new Error(data.error ?? "Sign-in failed.");
+        }
 
-      const data = (await verifyResponse.json()) as { creator?: Creator; error?: string };
-      if (!verifyResponse.ok || !data.creator) {
-        throw new Error(data.error ?? "Sign-in failed.");
+        setCreator(data.creator);
+        onChange?.(data.creator);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setBusy(false);
+        inFlightRef.current = false;
       }
-
-      setCreator(data.creator);
-      onChange?.(data.creator);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+    })();
+  }, [creator, client, signerStatus.isConnected, signMessageAsync, onChange]);
 
   async function signOut() {
     setBusy(true);
     try {
+      // Clear our server session first so /api/auth/me returns null on refresh.
       await fetch(`${APP_BASE}/api/auth/signout`, { method: "POST" });
+      // Then disconnect the Account Kit signer (clears its cookie too).
+      logout();
       setCreator(null);
       onChange?.(null);
     } finally {
@@ -116,10 +127,24 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
     );
   }
 
+  const buttonLabel = busy
+    ? "Signing in…"
+    : signerStatus.isConnected
+    ? "Finalizing…"
+    : signerStatus.isAuthenticating
+    ? "Authenticating…"
+    : signerStatus.isInitializing
+    ? "Loading…"
+    : "Sign in";
+
   return (
     <div className="signin">
-      <button onClick={signIn} disabled={busy} type="button">
-        {busy ? "Signing in…" : "Sign in with wallet"}
+      <button
+        onClick={openAuthModal}
+        disabled={busy || signerStatus.isInitializing}
+        type="button"
+      >
+        {buttonLabel}
       </button>
       {error ? <span className="signin-error">{error}</span> : null}
     </div>

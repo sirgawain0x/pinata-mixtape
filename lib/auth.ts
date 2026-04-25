@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
-import { type Address, recoverMessageAddress, isAddressEqual } from "viem";
+import { createPublicClient, http, type Chain } from "viem";
+import { base, baseSepolia } from "viem/chains";
 import { parseSiweMessage, validateSiweMessage } from "viem/siwe";
 import { db } from "./db";
 import { upsertCreatorByWallet, getCreator, type Creator } from "./stations";
@@ -8,6 +9,24 @@ import { upsertCreatorByWallet, getCreator, type Creator } from "./stations";
 const SESSION_COOKIE = "mixtape_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const NONCE_TTL_MS = 1000 * 60 * 10;
+
+// Chains we accept SIWE messages from. Add more here if/when the app expands.
+const ALLOWED_CHAINS: Record<number, Chain> = {
+  [base.id]: base,
+  [baseSepolia.id]: baseSepolia
+};
+
+function publicClientForChain(chainId: number) {
+  const chain = ALLOWED_CHAINS[chainId];
+  if (!chain) {
+    const err = new Error("Unsupported chain.") as Error & { status?: number };
+    err.status = 400;
+    throw err;
+  }
+  // ALCHEMY_RPC_URL is server-side; if absent, viem falls back to the chain's
+  // default public RPC, which may rate-limit ERC-1271/6492 deploy-checks.
+  return createPublicClient({ chain, transport: http(process.env.ALCHEMY_RPC_URL) });
+}
 
 export function issueNonce(): string {
   const nonce = randomBytes(16).toString("hex");
@@ -105,7 +124,7 @@ export async function verifySiweAndIssueSession(
   options: { expectedDomain: string }
 ): Promise<Creator> {
   const fields = parseSiweMessage(rawMessage);
-  if (!fields.address || !fields.nonce) {
+  if (!fields.address || !fields.nonce || !fields.chainId) {
     throw new Error("Invalid SIWE message.");
   }
 
@@ -116,15 +135,25 @@ export async function verifySiweAndIssueSession(
   });
   if (!valid) throw new Error("SIWE message failed validation.");
 
+  // Throws 400 "Unsupported chain." if chainId isn't in the allow-list.
+  const publicClient = publicClientForChain(fields.chainId);
+
   if (!consumeNonce(fields.nonce)) {
     throw new Error("Nonce expired or already used.");
   }
 
-  const recovered = await recoverMessageAddress({
+  // verifyMessage handles all three signature types in one call:
+  // - EOA: recovers the ECDSA signer.
+  // - Deployed smart account: calls ERC-1271 isValidSignature.
+  // - Counterfactual smart account: unwraps an ERC-6492 wrapper and simulates
+  //   the deploy before validating, so brand-new Account Kit users sign in
+  //   without first paying for an on-chain deploy.
+  const signatureValid = await publicClient.verifyMessage({
+    address: fields.address,
     message: rawMessage,
     signature
   });
-  if (!isAddressEqual(recovered as Address, fields.address as Address)) {
+  if (!signatureValid) {
     throw new Error("Signature does not match address.");
   }
 
