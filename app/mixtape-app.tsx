@@ -1,7 +1,54 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+
+export type HostedMixResult = {
+  mixId: number;
+  mixTitle: string;
+  voice: string;
+  output: string;
+  durationSeconds?: number;
+  script: string;
+  streamUrl: string;
+  downloadUrl: string;
+  clips: Record<string, string>;
+  segments: Record<string, string>;
+};
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (elementId: string, options: unknown) => YTPlayer;
+      PlayerState: {
+        UNSTARTED: number;
+        ENDED: number;
+        PLAYING: number;
+        PAUSED: number;
+        BUFFERING: number;
+        CUED: number;
+      };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+type YTPlayer = {
+  destroy: () => void;
+  getPlaylistIndex: () => number;
+  getPlayerState: () => number;
+  getVolume: () => number;
+  setVolume: (volume: number) => void;
+  getVideoData: () => { video_id?: string };
+};
+
+const NARRATION_VOICES = [
+  { id: "am_adam", label: "Adam" },
+  { id: "am_michael", label: "Michael" },
+  { id: "am_echo", label: "Echo" },
+  { id: "af_sky", label: "Sky" },
+  { id: "af_nova", label: "Nova" }
+] as const;
 
 export type Track = {
   title: string;
@@ -77,11 +124,27 @@ export default function MixtapeApp({
     `${initialMixes.length} tape${initialMixes.length === 1 ? "" : "s"} in rotation`
   );
   const [shareStatus, setShareStatus] = useState("");
+  const [hostedMixes, setHostedMixes] = useState<Record<number, HostedMixResult>>({});
+  const [narrationEnabled, setNarrationEnabled] = useState(true);
+  const [generatingNarrationFor, setGeneratingNarrationFor] = useState<number | null>(null);
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [pendingVoice, setPendingVoice] = useState("am_adam");
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [expandedTracks, setExpandedTracks] = useState<Record<string, boolean>>({});
+  const [latestBroadcastMoment, setLatestBroadcastMoment] = useState<MixMoment | null>(initialMoments[0] ?? null);
+  const [broadcastMomentPulse, setBroadcastMomentPulse] = useState(false);
+  const [playlistIsPlaying, setPlaylistIsPlaying] = useState(false);
+  const playerRef = useRef<YTPlayer | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playedRef = useRef<Record<string, boolean>>({});
+  const currentMixRef = useRef<number | null>(null);
 
   const selected = useMemo(
     () => mixes.find((mix) => mix.id === selectedId) ?? mixes[0] ?? null,
     [mixes, selectedId]
   );
+
+  const viewMode = searchParams.get("view") === "broadcast" ? "broadcast" : "explorer";
 
   async function loadMixes(query = search) {
     const response = await fetch(`/app/api/search?q=${encodeURIComponent(query)}`);
@@ -103,6 +166,12 @@ export default function MixtapeApp({
     const response = await fetch("/app/api/timeline?limit=12");
     const data = (await response.json()) as { moments: MixMoment[] };
     setMoments(data.moments);
+    setLatestBroadcastMoment(data.moments[0] ?? null);
+  }
+
+  function triggerBroadcastMomentPulse() {
+    setBroadcastMomentPulse(true);
+    window.setTimeout(() => setBroadcastMomentPulse(false), 900);
   }
 
   useEffect(() => {
@@ -120,6 +189,41 @@ export default function MixtapeApp({
     params.set("mix", String(selectedId));
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [pathname, router, searchParams, selectedId]);
+
+  useEffect(() => {
+    if (!selected || hostedMixes[selected.id]) return;
+
+    let cancelled = false;
+
+    async function loadHostedMix() {
+      const response = await fetch(`/app/api/mixes/${selected.id}/dj-hosted`);
+      if (!response.ok) return;
+      const data = (await response.json()) as { result?: HostedMixResult };
+      if (!cancelled && data.result) {
+        setHostedMixes((current) => ({ ...current, [selected.id]: data.result as HostedMixResult }));
+      }
+    }
+
+    void loadHostedMix();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hostedMixes, selected]);
+
+  useEffect(() => {
+    if (currentMixRef.current !== selected?.id) {
+      playedRef.current = {};
+      currentMixRef.current = selected?.id ?? null;
+      setCurrentTrackIndex(0);
+      setExpandedTracks({});
+      setPlaylistIsPlaying(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    }
+  }, [selected]);
 
   async function searchMixes(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,6 +251,10 @@ export default function MixtapeApp({
     setSelectedId(next.id);
   }
 
+  function toggleTrack(trackKey: string) {
+    setExpandedTracks((current) => ({ ...current, [trackKey]: !current[trackKey] }));
+  }
+
   async function copyShareLink() {
     if (!selectedId || typeof window === "undefined") return;
     const url = new URL(window.location.href);
@@ -162,6 +270,16 @@ export default function MixtapeApp({
     }
   }
 
+  function switchView(nextView: "explorer" | "broadcast") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextView === "broadcast") {
+      params.set("view", "broadcast");
+    } else {
+      params.delete("view");
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
   const facets = useMemo(() => {
     const counts = new Map<string, number>();
     for (const mix of mixes) {
@@ -173,6 +291,77 @@ export default function MixtapeApp({
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, 10);
   }, [mixes]);
+
+  const hosted = selected ? hostedMixes[selected.id] : null;
+
+  function openVoiceModal() {
+    setPendingVoice(hosted?.voice || "am_adam");
+    setVoiceModalOpen(true);
+  }
+
+  async function generateNarration(voice = pendingVoice) {
+    if (!selected) return;
+    setGeneratingNarrationFor(selected.id);
+    setShareStatus("Generating narration clips...");
+    try {
+      const response = await fetch(`/app/api/mixes/${selected.id}/dj-hosted`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voice })
+      });
+      const data = (await response.json()) as { result?: HostedMixResult; error?: string };
+      if (!response.ok || !data.result) {
+        throw new Error(data.error || "Could not generate narration.");
+      }
+      setHostedMixes((current) => ({ ...current, [selected.id]: data.result as HostedMixResult }));
+      playedRef.current = {};
+      setVoiceModalOpen(false);
+      setPendingVoice(data.result.voice);
+      setShareStatus(`Narration ready in ${data.result.voice}`);
+    } catch (error) {
+      setShareStatus(error instanceof Error ? error.message : "Narration generation failed");
+      console.error(error);
+    } finally {
+      setGeneratingNarrationFor(null);
+      window.setTimeout(() => setShareStatus(""), 3200);
+    }
+  }
+
+  async function playNarrationClip(kind: string) {
+    if (!hosted || !narrationEnabled || !playerRef.current) return;
+    if (playedRef.current[kind]) return;
+
+    const clipUrl = hosted.clips[kind];
+    if (!clipUrl) return;
+
+    playedRef.current[kind] = true;
+    const previousVolume = playerRef.current.getVolume();
+    playerRef.current.setVolume(10);
+
+    const audio = new Audio(clipUrl);
+    audio.volume = 1;
+    audioRef.current = audio;
+    audio.addEventListener(
+      "ended",
+      () => {
+        playerRef.current?.setVolume(previousVolume);
+        if (audioRef.current === audio) audioRef.current = null;
+      },
+      { once: true }
+    );
+    audio.addEventListener(
+      "error",
+      () => {
+        playerRef.current?.setVolume(previousVolume);
+        if (audioRef.current === audio) audioRef.current = null;
+      },
+      { once: true }
+    );
+    await audio.play().catch(() => {
+      playerRef.current?.setVolume(previousVolume);
+      if (audioRef.current === audio) audioRef.current = null;
+    });
+  }
 
   const totalTracks = useMemo(
     () => new Set(mixes.flatMap((mix) => mix.tracks.map((track) => `${track.artist}::${track.title}`))).size,
@@ -228,13 +417,269 @@ export default function MixtapeApp({
     return "";
   }
 
-  const mixYoutubeEmbed = useMemo(() => {
-    if (!selected) return "";
-    const ids = selected.tracks.map((track) => youtubeVideoId(track.youtubeUrl)).filter(Boolean);
-    if (ids.length === 0) return "";
-    if (ids.length === 1) return `https://www.youtube.com/embed/${ids[0]}`;
-    return `https://www.youtube.com/embed/${ids[0]}?playlist=${ids.slice(1).join(",")}`;
+  const mixYoutubeTracks = useMemo(() => {
+    if (!selected) return [] as Array<{ videoId: string; title: string; artist: string; index: number }>;
+    return selected.tracks
+      .map((track, index) => ({
+        videoId: youtubeVideoId(track.youtubeUrl),
+        title: track.title,
+        artist: track.artist,
+        index
+      }))
+      .filter((track) => track.videoId);
   }, [selected]);
+
+  const mixYoutubeIds = useMemo(() => mixYoutubeTracks.map((track) => track.videoId), [mixYoutubeTracks]);
+  const broadcastTrack = selected?.tracks[currentTrackIndex] ?? selected?.tracks[0] ?? null;
+  const broadcastQueue = selected?.tracks.slice(currentTrackIndex + 1, currentTrackIndex + 4) ?? [];
+  const shareUrl = useMemo(() => {
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("mix", String(selected?.id ?? ""));
+      url.searchParams.set("view", "broadcast");
+      return url.toString();
+    }
+
+    if (!selected) return "";
+    return `https://xjmsnx0f.agents.pinata.cloud/app?mix=${selected.id}&view=broadcast`;
+  }, [selected]);
+  const qrUrl = shareUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(shareUrl)}`
+    : "";
+
+  useEffect(() => {
+    if (viewMode !== "broadcast") return;
+
+    let cancelled = false;
+
+    async function pollLatestMoment() {
+      try {
+        const response = await fetch("/app/api/timeline?limit=1");
+        if (!response.ok) return;
+        const data = (await response.json()) as { moments: MixMoment[] };
+        if (!cancelled) {
+          const nextMoment = data.moments[0] ?? null;
+          setLatestBroadcastMoment((current) => {
+            const changed = (current?.id ?? null) !== (nextMoment?.id ?? null);
+            if (changed && nextMoment) {
+              triggerBroadcastMomentPulse();
+            }
+            return nextMoment;
+          });
+        }
+      } catch {
+        // ignore transient polling errors in broadcast mode
+      }
+    }
+
+    void pollLatestMoment();
+    const interval = window.setInterval(() => {
+      void pollLatestMoment();
+    }, 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (!selected || mixYoutubeIds.length === 0) return;
+
+    const elementId = viewMode === "broadcast" ? `yt-player-broadcast-${selected.id}` : `yt-player-${selected.id}`;
+    const setupPlayer = () => {
+      if (!window.YT?.Player) return;
+      playerRef.current?.destroy();
+      playerRef.current = new window.YT.Player(elementId, {
+        videoId: mixYoutubeIds[0],
+        playerVars: {
+          playlist: mixYoutubeIds.slice(1).join(","),
+          rel: 0,
+          modestbranding: 1
+        },
+        events: {
+          onStateChange: (event: { data: number }) => {
+            if (!window.YT || !playerRef.current) return;
+
+            const currentVideoId = playerRef.current.getVideoData?.().video_id ?? "";
+            const resolvedIndex = mixYoutubeTracks.findIndex((track) => track.videoId === currentVideoId);
+            const index = resolvedIndex >= 0 ? resolvedIndex : playerRef.current.getPlaylistIndex?.() ?? 0;
+            const lastIndex = mixYoutubeTracks.length - 1;
+            setCurrentTrackIndex(Math.max(0, index));
+
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              setPlaylistIsPlaying(true);
+            } else if (
+              event.data === window.YT.PlayerState.PAUSED ||
+              event.data === window.YT.PlayerState.ENDED ||
+              event.data === window.YT.PlayerState.BUFFERING ||
+              event.data === window.YT.PlayerState.CUED ||
+              event.data === window.YT.PlayerState.UNSTARTED
+            ) {
+              setPlaylistIsPlaying(false);
+            }
+
+            if (event.data === window.YT.PlayerState.ENDED) {
+              if (index === lastIndex) {
+                void playNarrationClip("outro");
+              }
+              return;
+            }
+
+            if (event.data !== window.YT.PlayerState.PLAYING) return;
+
+            if (index === 0) {
+              void playNarrationClip("intro");
+            } else if (index > 0) {
+              void playNarrationClip(`transition_${index}`);
+            }
+          }
+        }
+      });
+    };
+
+    if (window.YT?.Player) {
+      setupPlayer();
+    } else {
+      const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      if (!existingScript) {
+        const script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        document.body.appendChild(script);
+      }
+      window.onYouTubeIframeAPIReady = setupPlayer;
+    }
+
+    return () => {
+      playerRef.current?.destroy();
+      playerRef.current = null;
+    };
+  }, [mixYoutubeIds, narrationEnabled, selected?.id, hosted?.clips.intro, mixYoutubeTracks, viewMode]);
+
+  if (viewMode === "broadcast") {
+    return (
+      <main className="broadcast-shell">
+        {selected ? (
+          <section className="broadcast-deck">
+            <div className="broadcast-stage">
+              <div className="broadcast-stage-backdrop" aria-hidden="true" />
+              <div className="broadcast-stage-overlay" />
+              <div className="broadcast-player-frame">
+                {mixYoutubeIds.length > 0 ? (
+                  <div className="mix-player-embed broadcast-embed">
+                    <div className="yt-player-shell" id={`yt-player-broadcast-${selected.id}`} />
+                  </div>
+                ) : (
+                  <div className="broadcast-fallback-art">
+                    <span className="eyebrow">No direct video links</span>
+                    <h2>{selected.title}</h2>
+                    <p>{selected.description}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="broadcast-now-playing">
+                <span className="eyebrow">Now playing</span>
+                <h1>{broadcastTrack?.title ?? selected.title}</h1>
+                <p>{broadcastTrack ? broadcastTrack.artist : selected.djPersona}</p>
+                <div className="broadcast-meta-row">
+                  {broadcastTrack?.duration ? <span>{broadcastTrack.duration}</span> : null}
+                  {selected.duration ? <span>Mix {selected.duration}</span> : null}
+                  <span>{selected.tracks.length} tracks</span>
+                </div>
+              </div>
+            </div>
+
+            <aside className="broadcast-rail">
+              <div className="broadcast-rail-block">
+                <p className="eyebrow">Mix title</p>
+                <h2>{selected.title}</h2>
+                <p className="broadcast-description">{selected.description}</p>
+              </div>
+
+              <div className="broadcast-rail-block broadcast-qr-block">
+                <p className="eyebrow">Open this mix</p>
+                {qrUrl ? <img alt={`QR for ${selected.title}`} className="broadcast-qr" src={qrUrl} /> : null}
+                <small>{shareUrl.replace(/^https?:\/\//, "")}</small>
+              </div>
+
+              <div className="broadcast-rail-block">
+                <p className="eyebrow">Deck accent</p>
+                <div className={playlistIsPlaying ? "cassette cassette-mini cassette-playing" : "cassette cassette-mini"} aria-hidden="true">
+                  <span className="cassette-screw cassette-screw-tl" />
+                  <span className="cassette-screw cassette-screw-tr" />
+                  <span className="cassette-screw cassette-screw-bl" />
+                  <span className="cassette-screw cassette-screw-br" />
+                  <div className="cassette-top-strip" />
+                  <div className="cassette-label-block">
+                    <span className="cassette-label-band cassette-label-band-a" />
+                    <span className="cassette-label-band cassette-label-band-b" />
+                    <span className="cassette-label-band cassette-label-band-c" />
+                  </div>
+                  <div className="cassette-window">
+                    <span className="cassette-reel cassette-reel-left" />
+                    <span className="cassette-tape" />
+                    <span className="cassette-reel cassette-reel-right" />
+                    <span className="cassette-window-bar" />
+                  </div>
+                  <div className="cassette-bottom">
+                    <span className="cassette-hole cassette-hole-left" />
+                    <span className="cassette-bottom-center" />
+                    <span className="cassette-hole cassette-hole-right" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="broadcast-rail-block">
+                <p className="eyebrow">Up next</p>
+                <div className="broadcast-queue">
+                  {broadcastQueue.length > 0 ? (
+                    broadcastQueue.map((track, index) => (
+                      <article className="broadcast-queue-item" key={`${track.artist}-${track.title}`}>
+                        <span>{String(currentTrackIndex + index + 2).padStart(2, "0")}</span>
+                        <div>
+                          <strong>{track.title}</strong>
+                          <small>{track.artist}</small>
+                        </div>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="muted">No more queued tracks yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className={broadcastMomentPulse ? "broadcast-rail-block broadcast-module-slot broadcast-module-slot-pulse" : "broadcast-rail-block broadcast-module-slot"}>
+                <p className="eyebrow">Live note</p>
+                {latestBroadcastMoment ? (
+                  <div>
+                    <strong>{latestBroadcastMoment.title}</strong>
+                    <p>{latestBroadcastMoment.body}</p>
+                    <small>
+                      {latestBroadcastMoment.kind}
+                      {latestBroadcastMoment.createdAt
+                        ? ` · ${new Date(`${latestBroadcastMoment.createdAt}Z`).toLocaleTimeString([], {
+                            hour: "numeric",
+                            minute: "2-digit"
+                          })}`
+                        : ""}
+                    </small>
+                  </div>
+                ) : (
+                  <div>
+                    <strong>No live notes yet</strong>
+                    <p>Add a timeline note in chat and it will show up here on the broadcast deck.</p>
+                  </div>
+                )}
+              </div>
+            </aside>
+          </section>
+        ) : (
+          <div className="empty">Save a tape in chat to start building your listening memory.</div>
+        )}
+      </main>
+    );
+  }
 
   return (
     <main className="shell">
@@ -368,7 +813,38 @@ export default function MixtapeApp({
               </div>
               {shareStatus ? <p className="share-status">{shareStatus}</p> : null}
 
-              <div className="cassette" aria-hidden="true">
+              {voiceModalOpen ? (
+                <div className="modal-backdrop" role="presentation">
+                  <div aria-modal="true" className="confirm-modal" role="dialog">
+                    <p className="eyebrow">Narration voice</p>
+                    <h3>{hosted ? "Regenerate narration clips?" : "Generate narration clips?"}</h3>
+                    <p>
+                      Pick a Kokoro voice for this mix before we {hosted ? "replace" : "create"} the DJ overlay clips.
+                    </p>
+                    <label className="modal-field">
+                      <span>Voice</span>
+                      <select value={pendingVoice} onChange={(event) => setPendingVoice(event.target.value)}>
+                        {NARRATION_VOICES.map((voice) => (
+                          <option key={voice.id} value={voice.id}>
+                            {voice.label} ({voice.id})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="modal-actions">
+                      <button className="secondary-button" onClick={() => setVoiceModalOpen(false)} type="button">
+                        Cancel
+                      </button>
+                      <button onClick={() => void generateNarration(pendingVoice)} type="button">
+                        {hosted ? "Confirm regenerate" : "Generate clips"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+
+              <div className={playlistIsPlaying ? "cassette cassette-playing" : "cassette"} aria-hidden="true">
                 <span className="cassette-screw cassette-screw-tl" />
                 <span className="cassette-screw cassette-screw-tr" />
                 <span className="cassette-screw cassette-screw-bl" />
@@ -392,7 +868,7 @@ export default function MixtapeApp({
                 </div>
               </div>
 
-              {mixYoutubeEmbed ? (
+              {mixYoutubeIds.length > 0 ? (
                 <div className="mix-player">
                   <div className="mix-player-head">
                     <div>
@@ -400,19 +876,45 @@ export default function MixtapeApp({
                       <h3>YouTube Queue</h3>
                     </div>
                     <span>
-                      {selected.tracks.filter((track) => youtubeVideoId(track.youtubeUrl)).length} direct link
-                      {selected.tracks.filter((track) => youtubeVideoId(track.youtubeUrl)).length === 1 ? "" : "s"}
+                      {mixYoutubeIds.length} direct link{mixYoutubeIds.length === 1 ? "" : "s"}
                     </span>
                   </div>
+                  <div className="player-toolbar">
+                    <div className="player-toolbar-left">
+                      <label className="narration-toggle">
+                        <input
+                          checked={narrationEnabled}
+                          disabled={!hosted}
+                          onChange={(event) => {
+                            setNarrationEnabled(event.target.checked);
+                            if (event.target.checked) {
+                              playedRef.current = {};
+                            }
+                          }}
+                          type="checkbox"
+                        />
+                        <span>Narration overlay</span>
+                      </label>
+                      <button
+                        className="secondary-button"
+                        disabled={generatingNarrationFor === selected.id}
+                        onClick={openVoiceModal}
+                        type="button"
+                      >
+                        {generatingNarrationFor === selected.id
+                          ? "Generating..."
+                          : hosted
+                            ? "Regenerate clips"
+                            : "Generate clips"}
+                      </button>
+                      <button className="secondary-button" onClick={() => switchView("broadcast")} type="button">
+                        Open Broadcast Deck
+                      </button>
+                    </div>
+                    {hosted ? <small>Voice: {hosted.voice}</small> : <small>No generated narration yet for this mix.</small>}
+                  </div>
                   <div className="mix-player-embed">
-                    <iframe
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      loading="lazy"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      src={mixYoutubeEmbed}
-                      title={`${selected.title} YouTube mix`}
-                    />
+                    <div className="yt-player-shell" id={`yt-player-${selected.id}`} />
                   </div>
                 </div>
               ) : null}
@@ -421,70 +923,82 @@ export default function MixtapeApp({
                 <div>
                   <h3>Track List</h3>
                   <div className="track-grid">
-                    {selected.tracks.map((track, index) => (
-                      <article className="track" key={`${track.artist}-${track.title}`}>
-                        {(() => {
-                          const trackMeta = [track.releaseYear, track.duration, track.energy].filter(Boolean);
-                          const tags = track.moodTags.concat(track.sceneTags).filter(Boolean);
+                    {selected.tracks.map((track, index) => {
+                      const trackKey = `${track.artist}-${track.title}-${index}`;
+                      const isExpanded = !!expandedTracks[trackKey];
+                      const trackMeta = [track.releaseYear, track.duration, track.energy].filter(Boolean);
+                      const tags = track.moodTags.concat(track.sceneTags).filter(Boolean);
 
-                          return (
-                            <>
-                        <div className="track-head">
-                          <span>0{index + 1}</span>
-                          <div>
-                            <h4>{track.title}</h4>
-                            <p>{track.artist}</p>
-                          </div>
-                        </div>
-                        {trackMeta.length > 0 ? (
-                          <div className="track-meta">
-                            {trackMeta.map((item) => (
-                              <span key={`${track.title}-${item}`}>{item}</span>
-                            ))}
-                          </div>
-                        ) : null}
-                        {track.notes ? <p>{track.notes}</p> : null}
-                        {tags.length > 0 ? (
-                          <div className="pill-row">
-                            {tags.map((tag) => (
-                              <span key={`${track.title}-${tag}`}>{tag}</span>
-                            ))}
-                          </div>
-                        ) : null}
-                        <div className="link-row">
-                          {track.youtubeUrl ? (
-                            <a href={track.youtubeUrl} rel="noreferrer" target="_blank">
-                              Listen
-                            </a>
+                      return (
+                        <article className={isExpanded ? "track track-expanded" : "track"} key={trackKey}>
+                          <button
+                            aria-expanded={isExpanded}
+                            className="track-toggle"
+                            onClick={() => toggleTrack(trackKey)}
+                            type="button"
+                          >
+                            <div className="track-head">
+                              <span>{String(index + 1).padStart(2, "0")}</span>
+                              <div>
+                                <h4>{track.title}</h4>
+                                <p>{track.artist}</p>
+                              </div>
+                            </div>
+                            <span className="track-toggle-indicator">{isExpanded ? "Hide" : "Expand"}</span>
+                          </button>
+
+                          {trackMeta.length > 0 ? (
+                            <div className="track-meta">
+                              {trackMeta.map((item) => (
+                                <span key={`${track.title}-${item}`}>{item}</span>
+                              ))}
+                            </div>
                           ) : null}
-                          {!track.youtubeUrl && track.listenUrl ? (
-                            <a href={track.listenUrl} rel="noreferrer" target="_blank">
-                              Search
-                            </a>
+
+                          {isExpanded ? (
+                            <div className="track-body">
+                              {track.notes ? <p>{track.notes}</p> : null}
+                              {tags.length > 0 ? (
+                                <div className="pill-row">
+                                  {tags.map((tag) => (
+                                    <span key={`${track.title}-${tag}`}>{tag}</span>
+                                  ))}
+                                </div>
+                              ) : null}
+                              <div className="link-row">
+                                {track.youtubeUrl ? (
+                                  <a href={track.youtubeUrl} rel="noreferrer" target="_blank">
+                                    Listen
+                                  </a>
+                                ) : null}
+                                {!track.youtubeUrl && track.listenUrl ? (
+                                  <a href={track.listenUrl} rel="noreferrer" target="_blank">
+                                    Search
+                                  </a>
+                                ) : null}
+                                {track.musicbrainzUrl ? (
+                                  <a href={track.musicbrainzUrl} rel="noreferrer" target="_blank">
+                                    MusicBrainz
+                                  </a>
+                                ) : null}
+                              </div>
+                              {track.youtubeUrl ? (
+                                <div className="track-embed">
+                                  <iframe
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                    loading="lazy"
+                                    referrerPolicy="strict-origin-when-cross-origin"
+                                    src={youtubeEmbedUrl(track.youtubeUrl)}
+                                    title={`${track.title} video`}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
                           ) : null}
-                          {track.musicbrainzUrl ? (
-                            <a href={track.musicbrainzUrl} rel="noreferrer" target="_blank">
-                              MusicBrainz
-                            </a>
-                          ) : null}
-                        </div>
-                        {track.youtubeUrl ? (
-                          <div className="track-embed">
-                            <iframe
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                              loading="lazy"
-                              referrerPolicy="strict-origin-when-cross-origin"
-                              src={youtubeEmbedUrl(track.youtubeUrl)}
-                              title={`${track.title} video`}
-                            />
-                          </div>
-                        ) : null}
-                            </>
-                          );
-                        })()}
-                      </article>
-                    ))}
+                        </article>
+                      );
+                    })}
                   </div>
                 </div>
 

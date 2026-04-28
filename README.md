@@ -1,6 +1,6 @@
 # Pinata Mixtape
 
-Pinata Mixtape is a TypeScript + Next.js Pinata agent template for music taste capture, mixtape building, track timelines, and a hosted retro web explorer.
+Pinata Mixtape is a TypeScript + Next.js Pinata agent template for music taste capture, mixtape building, track timelines, and a hosted retro web explorer with an optional broadcast-style player.
 
 It includes:
 
@@ -36,6 +36,9 @@ npm run dev
 - `GET /app/api/mixes/:id`
 - `PATCH /app/api/mixes/:id`
 - `DELETE /app/api/mixes/:id`
+- `GET /app/api/mixes/:id/dj-hosted`
+- `GET /app/api/mixes/:id/dj-hosted/clip/:name`
+- `GET /app/api/mixes/:id/dj-hosted/file?mode=stream|download`
 - `GET /app/api/musicbrainz/recordings?title=...&artist=...`
 - `GET /app/api/songs?q=term&limit=12`
 - `GET /app/api/search?q=term`
@@ -46,9 +49,11 @@ npm run dev
 
 Pinata path routes strip the public prefix before traffic reaches the container, while this app also sets `basePath: "/app"` for local and hosted consistency. Keep the server bound to `0.0.0.0` and port `3000` unless you update `manifest.json`.
 
-This starter intentionally stays on the legal side of phase one. The hosted app shares mix structure, notes, and outbound links for listening or metadata lookup. It does not download or proxy audio.
+This starter intentionally stays on the legal side of phase one. The hosted app shares mix structure, notes, outbound links, and optional DJ-narration manifest metadata for listening overlays.
 
 The hosted web route is intentionally read-only. Bootstrap, taste capture, DJ persona selection, mix generation, and timeline logging should happen in the Pinata chat UI at the agent root. The agent can still call the app APIs to save mixes and append timeline moments.
+
+If `workspace/data/generated-mixtapes/<mixId>-dj-hosted/dj-script.json` exists, the app will expose it through `/app/api/mixes/:id/dj-hosted` and render a broadcast-style player with narrative lower-thirds. Clip audio and compiled broadcast files are optional. The app no longer assumes an ffmpeg-produced final MP3 is present.
 
 The left sidebar now behaves like a crate search. Queries can match:
 

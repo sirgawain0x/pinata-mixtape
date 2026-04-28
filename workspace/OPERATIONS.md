@@ -226,6 +226,47 @@ Supported moment kinds:
 - `discovery`: new artist, track, or scene notes.
 - `note`: general context that should stick.
 
+## DJ Hosted Broadcast Manifests
+
+If a mix has generated DJ-hosted artifacts, store them under:
+
+```text
+workspace/data/generated-mixtapes/<mixId>-dj-hosted/
+```
+
+Current expected artifact:
+
+- `dj-script.json`: the broadcast manifest used by the hosted `/app` player for narrative overlays.
+
+Optional artifacts:
+
+- `<clip-name>.mp3|wav|m4a|ogg|aac`: per-segment narration clips such as `intro`, `transition_1`, or `outro`
+- a compiled broadcast audio file such as `mix.mp3` if you still generate one
+
+Read manifest:
+
+```http
+GET /app/api/mixes/6/dj-hosted
+```
+
+Fetch a clip when present:
+
+```http
+GET /app/api/mixes/6/dj-hosted/clip/intro
+```
+
+Fetch a compiled broadcast file when present:
+
+```http
+GET /app/api/mixes/6/dj-hosted/file?mode=stream
+```
+
+Notes:
+
+- The hosted player can run in text-overlay mode even when no clip audio exists.
+- Do not assume an ffmpeg-built final MP3 exists; treat compiled audio as optional.
+- The manifest route should reflect real files on disk rather than hardcoded assumptions.
+
 ## Modeling Guidance
 
 Keep these distinctions clear:
@@ -244,6 +285,5 @@ Keep phase one conservative:
 - Store metadata.
 - Store user notes and sequencing logic.
 - Store legal outbound links.
-- Do not download, rehost, or proxy audio.
 
 That keeps the first version useful without taking on streaming rights or sketchy sourcing workflows.
