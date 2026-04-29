@@ -214,8 +214,16 @@ export default function VoiceClient({
     setError("");
     try {
       const response = await fetch(`${APP_BASE}/api/voice-clones/${clone.id}`, { method: "DELETE" });
-      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        remoteDeletionWarning?: string;
+      };
       if (!response.ok) throw new Error(data.error ?? "Delete failed.");
+      if (data.remoteDeletionWarning) {
+        setError(
+          `Removed from your account. Remote cleanup may have failed: ${data.remoteDeletionWarning}`
+        );
+      }
       await refresh();
       await syncDefaultFromServer();
     } catch (err) {
