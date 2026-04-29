@@ -4,7 +4,6 @@ import { assertSameOriginOrRelativeUrl, fetchWithTimeout } from "../outbound";
 const DEFAULT_BASE_URL = "https://studio.mosi.cn";
 let cachedSpeechModel: string | null = null;
 const MOSI_TIMEOUT_MS = 20_000;
-const MOSI_STATUSES = new Set<MosiCloneResult["status"]>(["PENDING", "ACTIVE", "FAILED"]);
 
 function baseUrl(): string {
   return (process.env.MOSI_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
