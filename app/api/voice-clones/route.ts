@@ -64,8 +64,8 @@ export async function POST(request: Request) {
         status: clone.status
       });
       return Response.json({ voiceClone: stored }, { status: 201 });
-    } catch (error) {
-      return Response.json({ error: (error as Error).message }, { status: 502 });
+    } catch {
+      return Response.json({ error: "Voice clone provider request failed." }, { status: 502 });
     }
   });
 }

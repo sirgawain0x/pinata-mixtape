@@ -27,7 +27,8 @@ export async function POST(request: Request) {
     try {
       synthesized = normalizeSynthesizedAudio(await provider.synthesize(text, { voiceId }));
     } catch (error) {
-      return Response.json({ error: (error as Error).message }, { status: 502 });
+      console.error("Voice preview failed", error);
+      return Response.json({ error: "Voice preview failed." }, { status: 502 });
     }
 
     return new Response(new Uint8Array(synthesized.audio), {

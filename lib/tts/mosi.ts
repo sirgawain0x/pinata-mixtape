@@ -1,7 +1,10 @@
 import type { SynthesizedAudio, TtsProvider, VoiceOption } from "./types";
+import { assertSameOriginOrRelativeUrl, fetchWithTimeout } from "../outbound";
 
 const DEFAULT_BASE_URL = "https://studio.mosi.cn";
 let cachedSpeechModel: string | null = null;
+const MOSI_TIMEOUT_MS = 20_000;
+const MOSI_STATUSES = new Set<MosiCloneResult["status"]>(["PENDING", "ACTIVE", "FAILED"]);
 
 function baseUrl(): string {
   return (process.env.MOSI_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
@@ -21,7 +24,7 @@ function configuredSpeechModel(): string {
 
 async function detectSpeechModel(headers: Headers): Promise<string | null> {
   try {
-    const response = await fetch(`${baseUrl()}/api/v1/models`, { headers });
+    const response = await fetchWithTimeout(`${baseUrl()}/api/v1/models`, { headers }, MOSI_TIMEOUT_MS);
     if (!response.ok) return null;
     const data = (await response.json()) as {
       data?: Array<{ id?: string; endpoints?: string[]; modes?: string[]; capabilities?: string[] }>;
@@ -60,16 +63,23 @@ export function isMosiConfigured(): boolean {
 
 export type MosiUploadResult = { fileId: string };
 export type MosiCloneResult = { voiceId: string; status: "PENDING" | "ACTIVE" | "FAILED" };
+const MOSI_STATUSES = new Set<MosiCloneResult["status"]>(["PENDING", "ACTIVE", "FAILED"]);
+
+function normalizeMosiStatus(status: unknown): MosiCloneResult["status"] {
+  return typeof status === "string" && MOSI_STATUSES.has(status as MosiCloneResult["status"])
+    ? (status as MosiCloneResult["status"])
+    : "PENDING";
+}
 
 export async function uploadMosiReference(file: Blob, name: string): Promise<MosiUploadResult> {
   const headers = authHeaders();
   const form = new FormData();
   form.append("file", file, name);
-  const response = await fetch(`${baseUrl()}/api/v1/files/upload`, {
+  const response = await fetchWithTimeout(`${baseUrl()}/api/v1/files/upload`, {
     method: "POST",
     headers,
     body: form
-  });
+  }, MOSI_TIMEOUT_MS);
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`Mosi upload failed (${response.status}): ${text}`);
@@ -82,11 +92,11 @@ export async function uploadMosiReference(file: Blob, name: string): Promise<Mos
 export async function createMosiVoiceClone(input: { fileId: string; text?: string }): Promise<MosiCloneResult> {
   const headers = authHeaders();
   headers.set("Content-Type", "application/json");
-  const response = await fetch(`${baseUrl()}/api/v1/voice/clone`, {
+  const response = await fetchWithTimeout(`${baseUrl()}/api/v1/voice/clone`, {
     method: "POST",
     headers,
     body: JSON.stringify({ file_id: input.fileId, text: input.text })
-  });
+  }, MOSI_TIMEOUT_MS);
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`Mosi clone failed (${response.status}): ${text}`);
@@ -95,20 +105,24 @@ export async function createMosiVoiceClone(input: { fileId: string; text?: strin
   if (!data.voice_id) throw new Error("Mosi clone missing voice_id.");
   return {
     voiceId: data.voice_id,
-    status: (data.status as MosiCloneResult["status"]) ?? "PENDING"
+    status: normalizeMosiStatus(data.status)
   };
 }
 
 export async function getMosiVoiceStatus(voiceId: string): Promise<MosiCloneResult> {
   const headers = authHeaders();
-  const response = await fetch(`${baseUrl()}/api/v1/voices/${encodeURIComponent(voiceId)}`, { headers });
+  const response = await fetchWithTimeout(
+    `${baseUrl()}/api/v1/voices/${encodeURIComponent(voiceId)}`,
+    { headers },
+    MOSI_TIMEOUT_MS
+  );
   if (!response.ok) {
     throw new Error(`Mosi status fetch failed (${response.status}).`);
   }
   const data = (await response.json()) as { voice_id?: string; status?: string };
   return {
     voiceId: data.voice_id ?? voiceId,
-    status: (data.status as MosiCloneResult["status"]) ?? "PENDING"
+    status: normalizeMosiStatus(data.status)
   };
 }
 
@@ -116,10 +130,10 @@ export async function getMosiVoiceStatus(voiceId: string): Promise<MosiCloneResu
 export async function deleteMosiVoice(externalVoiceId: string): Promise<void> {
   if (!isMosiConfigured()) return;
   const headers = authHeaders();
-  const response = await fetch(`${baseUrl()}/api/v1/voices/${encodeURIComponent(externalVoiceId)}`, {
+  const response = await fetchWithTimeout(`${baseUrl()}/api/v1/voices/${encodeURIComponent(externalVoiceId)}`, {
     method: "DELETE",
     headers
-  });
+  }, MOSI_TIMEOUT_MS);
   if (response.ok || response.status === 404 || response.status === 405) return;
   const text = await response.text().catch(() => "");
   throw new Error(`Mosi voice delete failed (${response.status}): ${text}`);
@@ -128,7 +142,7 @@ export async function deleteMosiVoice(externalVoiceId: string): Promise<void> {
 export async function listMosiVoices(): Promise<VoiceOption[]> {
   if (!isMosiConfigured()) return [];
   const headers = authHeaders();
-  const response = await fetch(`${baseUrl()}/api/v1/voices?status=ACTIVE&limit=50`, { headers });
+  const response = await fetchWithTimeout(`${baseUrl()}/api/v1/voices?status=ACTIVE&limit=50`, { headers }, MOSI_TIMEOUT_MS);
   if (!response.ok) return [];
   const data = (await response.json()) as {
     voices?: { voice_id: string; voice_name?: string; source_type?: string }[];
@@ -177,11 +191,14 @@ async function parseMosiSpeechResponse(response: Response): Promise<SynthesizedA
 
     const remoteUrl = pickUrl(json);
     if (remoteUrl) {
-      const absolute = remoteUrl.startsWith("http")
-        ? remoteUrl
-        : `${baseUrl()}${remoteUrl.startsWith("/") ? "" : "/"}${remoteUrl}`;
-      const innerHeaders = remoteUrl.startsWith("http") ? undefined : authHeaders();
-      const inner = await fetch(absolute, innerHeaders ? { headers: innerHeaders } : undefined);
+      const providerBase = baseUrl();
+      const absolute = assertSameOriginOrRelativeUrl(remoteUrl, providerBase, "Mosi audio URL");
+      const innerHeaders = absolute.origin === new URL(providerBase).origin ? authHeaders() : undefined;
+      const inner = await fetchWithTimeout(
+        absolute,
+        innerHeaders ? { headers: innerHeaders } : undefined,
+        MOSI_TIMEOUT_MS
+      );
       if (!inner.ok) {
         const t = await inner.text().catch(() => "");
         throw new Error(`Mosi audio download failed (${inner.status}): ${t.slice(0, 240)}`);
@@ -220,8 +237,10 @@ async function parseMosiSpeechResponse(response: Response): Promise<SynthesizedA
     const b64 = pickB64(json);
     if (b64) {
       try {
-        const raw = Buffer.from(b64.data, "base64");
-        return { audio: raw, mimeType: (b64.mime || declaredMime || "audio/mpeg").split(";")[0] };
+        const data = b64.data.includes(",") ? b64.data.split(",", 2)[1] : b64.data;
+        const raw = Buffer.from(data, "base64");
+        const dataUrlMime = /^data:([^;,]+);base64,/i.exec(b64.data)?.[1];
+        return { audio: raw, mimeType: (dataUrlMime || b64.mime || declaredMime || "audio/mpeg").split(";")[0] };
       } catch {
         throw new Error("Mosi returned invalid base64 audio.");
       }
@@ -250,7 +269,7 @@ export const MosiProvider: TtsProvider = {
     headers.set("Content-Type", "application/json");
     const model = await resolveSpeechModel(headers);
     // Moss TTS validates `text` (MossTTSRequest.Text). Other models often accept `input`; send both.
-    const response = await fetch(`${baseUrl()}/api/v1/audio/speech`, {
+    const response = await fetchWithTimeout(`${baseUrl()}/api/v1/audio/speech`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -259,7 +278,7 @@ export const MosiProvider: TtsProvider = {
         input: text,
         text
       })
-    });
+    }, MOSI_TIMEOUT_MS);
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       throw new Error(`Mosi synthesis failed (${response.status}) [model=${model}]: ${errorText}`);

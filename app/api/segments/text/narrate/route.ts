@@ -57,8 +57,8 @@ export async function POST(request: Request) {
       synthesized = normalizeSynthesizedAudio(
         await provider.synthesize(segment.body, { voiceId: resolvedVoiceId })
       );
-    } catch (error) {
-      return Response.json({ error: (error as Error).message }, { status: 502 });
+    } catch {
+      return Response.json({ error: "Narration provider failed." }, { status: 502 });
     }
 
     const normalizedMimeType = synthesized.mimeType.startsWith("audio/")
@@ -71,14 +71,20 @@ export async function POST(request: Request) {
         : normalizedMimeType.includes("ogg")
           ? "ogg"
           : "mp3";
-    const upload = await uploadFile(synthesized.audio, {
-      name: `narration-${segment.id}.${ext}`,
-      mimeType: normalizedMimeType
-    });
+    let upload;
+    try {
+      upload = await uploadFile(synthesized.audio, {
+        name: `narration-${segment.id}.${ext}`,
+        mimeType: normalizedMimeType
+      });
+    } catch {
+      return Response.json({ error: "Could not store narration audio." }, { status: 502 });
+    }
 
     const updated = updateSegment(segment.id, {
       audioCid: upload.cid,
       audioUrl: upload.url,
+      durationSeconds: synthesized.durationSeconds ?? null,
       ttsVoice: resolvedVoiceId,
       ttsProvider: provider.id
     });

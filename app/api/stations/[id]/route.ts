@@ -1,4 +1,4 @@
-import { withCreator } from "../../../../lib/auth";
+import { getCurrentCreator, withCreator } from "../../../../lib/auth";
 import { deleteStation, getStation, updateStation } from "../../../../lib/stations";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,12 @@ async function stationId(context: Context): Promise<number> {
 export async function GET(_request: Request, context: Context) {
   const station = getStation(await stationId(context));
   if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
+  if (!station.isPublic) {
+    const creator = await getCurrentCreator();
+    if (creator?.id !== station.creatorId) {
+      return Response.json({ error: "Station not found." }, { status: 404 });
+    }
+  }
   return Response.json({ station });
 }
 

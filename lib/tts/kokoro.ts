@@ -16,7 +16,10 @@ async function loadModel() {
         KokoroTTS: { from_pretrained: (id: string, opts: { dtype?: string; device?: string }) => Promise<unknown> };
       };
       return mod.KokoroTTS.from_pretrained(MODEL_ID, { dtype: "q8", device: "cpu" });
-    })();
+    })().catch((error) => {
+      modelPromise = null;
+      throw error;
+    });
   }
   return modelPromise;
 }

@@ -35,16 +35,19 @@ export function issueNonce(): string {
 }
 
 export function consumeNonce(nonce: string): boolean {
-  const row = db
-    .prepare(`SELECT issued_at, consumed FROM siwe_nonces WHERE nonce = ?`)
-    .get(nonce) as { issued_at: number; consumed: number } | undefined;
-  if (!row) return false;
-  if (row.consumed) return false;
-  if (Date.now() - row.issued_at > NONCE_TTL_MS) {
-    db.prepare(`DELETE FROM siwe_nonces WHERE nonce = ?`).run(nonce);
+  const result = db
+    .prepare(
+      `UPDATE siwe_nonces
+       SET consumed = 1
+       WHERE nonce = ?
+         AND consumed = 0
+         AND issued_at >= ?`
+    )
+    .run(nonce, Date.now() - NONCE_TTL_MS);
+  if (result.changes === 0) {
+    db.prepare(`DELETE FROM siwe_nonces WHERE nonce = ? AND issued_at < ?`).run(nonce, Date.now() - NONCE_TTL_MS);
     return false;
   }
-  db.prepare(`UPDATE siwe_nonces SET consumed = 1 WHERE nonce = ?`).run(nonce);
   return true;
 }
 
@@ -175,6 +178,6 @@ export async function withCreator(
     return await handler(creator);
   } catch (error) {
     const status = (error as Error & { status?: number }).status ?? 500;
-    return jsonError((error as Error).message || "Server error", status);
+    return jsonError(status >= 500 ? "Server error" : (error as Error).message || "Server error", status);
   }
 }

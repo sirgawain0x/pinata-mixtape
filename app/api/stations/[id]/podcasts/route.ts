@@ -1,6 +1,7 @@
 import { withCreator } from "../../../../../lib/auth";
 import { addPodcastFeed, getStation, listPodcastFeeds } from "../../../../../lib/stations";
 import { materializeEpisodesAsSegments, refreshFeed } from "../../../../../lib/podcasts";
+import { assertPublicHttpUrl } from "../../../../../lib/outbound";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,7 +32,8 @@ export async function POST(request: Request, context: Context) {
     if (!feedUrl) return Response.json({ error: "feedUrl required." }, { status: 400 });
 
     try {
-      const feed = addPodcastFeed(stationId, feedUrl);
+      const normalizedFeedUrl = assertPublicHttpUrl(feedUrl, "feedUrl").toString();
+      const feed = addPodcastFeed(stationId, normalizedFeedUrl);
       await refreshFeed(feed.id);
       const added = await materializeEpisodesAsSegments(feed, { limit: 3 });
       return Response.json({ feed, segmentsAdded: added }, { status: 201 });

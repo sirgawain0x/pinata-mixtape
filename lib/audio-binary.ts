@@ -36,7 +36,9 @@ export function normalizeSynthesizedAudio(input: SynthesizedAudio): SynthesizedA
                 ? (json.data as string)
                 : null;
       if (b64) {
-        buf = Buffer.from(b64, "base64");
+        const dataUrl = /^data:([^;,]+)?;base64,(.+)$/i.exec(b64.trim());
+        if (dataUrl?.[1]) mime = dataUrl[1];
+        buf = Buffer.from(dataUrl?.[2] ?? b64, "base64");
         mime =
           (typeof json.mime_type === "string" && json.mime_type) ||
           (typeof json.content_type === "string" && json.content_type) ||
