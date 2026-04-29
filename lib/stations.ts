@@ -178,12 +178,21 @@ try {
   // already added
 }
 
-const voiceCloneSchema = db
-  .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'voice_clones'`)
-  .get() as { sql?: string } | undefined;
+function voiceClonesNeedsProviderUniqueMigration(): boolean {
+  const row = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'voice_clones'`)
+    .get() as { sql?: string } | undefined;
+  const sql = row?.sql ?? "";
+  // Old schema: UNIQUE(provider, external_voice_id). New: UNIQUE(creator_id, provider, external_voice_id).
+  return sql.includes("UNIQUE(provider, external_voice_id)") && !sql.includes("UNIQUE(creator_id,");
+}
 
-if (voiceCloneSchema?.sql?.includes("UNIQUE(provider, external_voice_id)")) {
-  db.exec(`
+// `next build` loads this module in parallel workers; two DEFERRED migrations can interleave and break
+// (e.g. one renames voice_clones_new away while another still INSERTs). BEGIN IMMEDIATE serializes writers.
+const runVoiceCloneMigration = db
+  .transaction(() => {
+    if (!voiceClonesNeedsProviderUniqueMigration()) return;
+    db.exec(`
     CREATE TABLE IF NOT EXISTS voice_clones_new (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       creator_id INTEGER NOT NULL,
@@ -203,6 +212,14 @@ if (voiceCloneSchema?.sql?.includes("UNIQUE(provider, external_voice_id)")) {
     DROP TABLE voice_clones;
     ALTER TABLE voice_clones_new RENAME TO voice_clones;
   `);
+  })
+  .immediate;
+
+try {
+  runVoiceCloneMigration();
+} catch (error) {
+  // Another worker may have finished migrating first; only rethrow if we're still on the old schema.
+  if (voiceClonesNeedsProviderUniqueMigration()) throw error;
 }
 
 type CreatorRow = {
