@@ -24,6 +24,8 @@ type Voice = { id: string; label: string };
 
 const APP_BASE = "/app";
 const CONSENT_PHRASE = "I authorize my voice for use on my Pinata Mixtape Radio station.";
+const VOICE_PREVIEW_TEXT =
+  "Hello — this is a quick preview of this voice for your Pinata Mixtape radio station.";
 
 export default function VoiceClient({
   creator,
@@ -38,6 +40,9 @@ export default function VoiceClient({
   const [voices, setVoices] = useState<Voice[]>([]);
   const [defaultVoiceId, setDefaultVoiceId] = useState(creator.ttsVoiceId || "kokoro:af_heart");
   const [busy, setBusy] = useState(false);
+  const [previewBusyVoiceId, setPreviewBusyVoiceId] = useState<string | null>(null);
+  const [deletingCloneId, setDeletingCloneId] = useState<number | null>(null);
+  const [ttsPreviewUrl, setTtsPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [recording, setRecording] = useState(false);
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -45,11 +50,38 @@ export default function VoiceClient({
   const [displayName, setDisplayName] = useState(`${creator.displayName || creator.walletAddress.slice(0, 8)} voice`);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const ttsPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsPreviewUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (ttsPreviewUrlRef.current) {
+        URL.revokeObjectURL(ttsPreviewUrlRef.current);
+        ttsPreviewUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ttsPreviewUrl) return;
+    const el = ttsPreviewAudioRef.current;
+    if (!el) return;
+    el.load();
+    void el.play().catch(() => {
+      setError("Preview could not play in this browser. Try tapping play on the player.");
+    });
+  }, [ttsPreviewUrl]);
 
   const refresh = useCallback(async () => {
     const response = await fetch(`${APP_BASE}/api/voice-clones`, { cache: "no-store" });
     const data = (await response.json()) as { voiceClones: VoiceClone[] };
     setClones(data.voiceClones);
+  }, []);
+
+  const syncDefaultFromServer = useCallback(async () => {
+    const response = await fetch(`${APP_BASE}/api/auth/me`, { cache: "no-store" });
+    const data = (await response.json()) as { creator: Creator | null };
+    if (data.creator?.ttsVoiceId) setDefaultVoiceId(data.creator.ttsVoiceId);
   }, []);
 
   useEffect(() => {
@@ -142,6 +174,57 @@ export default function VoiceClient({
     }
   }
 
+  async function previewVoice(voiceId: string) {
+    setError("");
+    setPreviewBusyVoiceId(voiceId);
+    try {
+      const response = await fetch(`${APP_BASE}/api/voices/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voiceId, text: VOICE_PREVIEW_TEXT })
+      });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? "Preview failed.");
+      }
+      const blob = await response.blob();
+      if (ttsPreviewUrlRef.current) {
+        URL.revokeObjectURL(ttsPreviewUrlRef.current);
+        ttsPreviewUrlRef.current = null;
+      }
+      const url = URL.createObjectURL(blob);
+      ttsPreviewUrlRef.current = url;
+      setTtsPreviewUrl(url);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setPreviewBusyVoiceId(null);
+    }
+  }
+
+  async function removeClone(clone: VoiceClone) {
+    if (
+      !window.confirm(
+        `Delete “${clone.displayName}”? It will be removed from your account (and from Mosi when the API allows). This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingCloneId(clone.id);
+    setError("");
+    try {
+      const response = await fetch(`${APP_BASE}/api/voice-clones/${clone.id}`, { method: "DELETE" });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Delete failed.");
+      await refresh();
+      await syncDefaultFromServer();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeletingCloneId(null);
+    }
+  }
+
   async function setAsDefault(voiceId: string) {
     setBusy(true);
     setError("");
@@ -181,18 +264,43 @@ export default function VoiceClient({
       <section className="workspace dashboard-stations">
         <div className="composer">
           <h2>Stock voices</h2>
+          <p className="muted">Preview speaks a short sample line; nothing is saved to your station.</p>
+          {ttsPreviewUrl ? (
+            <div className="recorder-controls voice-tts-preview">
+              <audio
+                key={ttsPreviewUrl}
+                ref={ttsPreviewAudioRef}
+                controls
+                playsInline
+                preload="auto"
+                src={ttsPreviewUrl}
+                onError={() =>
+                  setError("Preview audio failed to load. Re-generate or check Mosi / network.")
+                }
+              />
+            </div>
+          ) : null}
           <ul className="voice-grid">
             {voices.map((voice) => (
               <li key={voice.id}>
                 <span>{voice.label}</span>
                 <small className="muted">{voice.id}</small>
-                <button
-                  onClick={() => void setAsDefault(voice.id)}
-                  disabled={busy || defaultVoiceId === voice.id}
-                  type="button"
-                >
-                  {defaultVoiceId === voice.id ? "Default" : "Use"}
-                </button>
+                <div className="voice-card-actions">
+                  <button
+                    onClick={() => void previewVoice(voice.id)}
+                    disabled={busy || Boolean(previewBusyVoiceId)}
+                    type="button"
+                  >
+                    {previewBusyVoiceId === voice.id ? "Loading…" : "Preview"}
+                  </button>
+                  <button
+                    onClick={() => void setAsDefault(voice.id)}
+                    disabled={busy || defaultVoiceId === voice.id}
+                    type="button"
+                  >
+                    {defaultVoiceId === voice.id ? "Default" : "Use"}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -239,13 +347,41 @@ export default function VoiceClient({
                       <li key={clone.id}>
                         <span>{clone.displayName}</span>
                         <small className="muted">{clone.status}</small>
-                        <button
-                          onClick={() => void setAsDefault(voiceId)}
-                          disabled={busy || clone.status !== "ACTIVE" || defaultVoiceId === voiceId}
-                          type="button"
-                        >
-                          {defaultVoiceId === voiceId ? "Default" : clone.status === "ACTIVE" ? "Use" : "Pending…"}
-                        </button>
+                        <div className="voice-card-actions">
+                          <button
+                            onClick={() => void previewVoice(voiceId)}
+                            disabled={
+                              busy ||
+                              Boolean(previewBusyVoiceId) ||
+                              deletingCloneId === clone.id ||
+                              clone.status !== "ACTIVE"
+                            }
+                            type="button"
+                          >
+                            {previewBusyVoiceId === voiceId ? "Loading…" : "Preview"}
+                          </button>
+                          <button
+                            onClick={() => void setAsDefault(voiceId)}
+                            disabled={
+                              busy ||
+                              Boolean(previewBusyVoiceId) ||
+                              deletingCloneId === clone.id ||
+                              clone.status !== "ACTIVE" ||
+                              defaultVoiceId === voiceId
+                            }
+                            type="button"
+                          >
+                            {defaultVoiceId === voiceId ? "Default" : clone.status === "ACTIVE" ? "Use" : "Pending…"}
+                          </button>
+                          <button
+                            className="voice-delete"
+                            onClick={() => void removeClone(clone)}
+                            disabled={busy || Boolean(previewBusyVoiceId) || deletingCloneId === clone.id}
+                            type="button"
+                          >
+                            {deletingCloneId === clone.id ? "Removing…" : "Delete"}
+                          </button>
+                        </div>
                       </li>
                     );
                   })}

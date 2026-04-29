@@ -6,6 +6,7 @@ import {
   getStation,
   updateSegment
 } from "../../../../../lib/stations";
+import { normalizeSynthesizedAudio } from "../../../../../lib/audio-binary";
 import { resolveProvider } from "../../../../../lib/tts";
 
 export const dynamic = "force-dynamic";
@@ -53,15 +54,26 @@ export async function POST(request: Request) {
 
     let synthesized;
     try {
-      synthesized = await provider.synthesize(segment.body, { voiceId: resolvedVoiceId });
+      synthesized = normalizeSynthesizedAudio(
+        await provider.synthesize(segment.body, { voiceId: resolvedVoiceId })
+      );
     } catch (error) {
       return Response.json({ error: (error as Error).message }, { status: 502 });
     }
 
-    const ext = synthesized.mimeType.includes("wav") ? "wav" : synthesized.mimeType.includes("mpeg") ? "mp3" : "audio";
+    const normalizedMimeType = synthesized.mimeType.startsWith("audio/")
+      ? synthesized.mimeType
+      : "audio/mpeg";
+    const ext = normalizedMimeType.includes("wav")
+      ? "wav"
+      : normalizedMimeType.includes("mpeg") || normalizedMimeType.includes("mp3")
+        ? "mp3"
+        : normalizedMimeType.includes("ogg")
+          ? "ogg"
+          : "mp3";
     const upload = await uploadFile(synthesized.audio, {
       name: `narration-${segment.id}.${ext}`,
-      mimeType: synthesized.mimeType
+      mimeType: normalizedMimeType
     });
 
     const updated = updateSegment(segment.id, {

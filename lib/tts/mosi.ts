@@ -1,6 +1,7 @@
 import type { SynthesizedAudio, TtsProvider, VoiceOption } from "./types";
 
 const DEFAULT_BASE_URL = "https://studio.mosi.cn";
+let cachedSpeechModel: string | null = null;
 
 function baseUrl(): string {
   return (process.env.MOSI_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
@@ -12,6 +13,45 @@ function authHeaders(): Headers {
   const headers = new Headers();
   headers.set("Authorization", `Bearer ${apiKey}`);
   return headers;
+}
+
+function configuredSpeechModel(): string {
+  return (process.env.MOSI_SPEECH_MODEL || process.env.MOSI_MODEL || "").trim();
+}
+
+async function detectSpeechModel(headers: Headers): Promise<string | null> {
+  try {
+    const response = await fetch(`${baseUrl()}/api/v1/models`, { headers });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      data?: Array<{ id?: string; endpoints?: string[]; modes?: string[]; capabilities?: string[] }>;
+      models?: Array<{ id?: string; endpoints?: string[]; modes?: string[]; capabilities?: string[] }>;
+    };
+    const models = data.data ?? data.models ?? [];
+    const supportsSpeech = (model: { endpoints?: string[]; modes?: string[]; capabilities?: string[] }) =>
+      (model.endpoints ?? []).includes("/audio/speech") ||
+      (model.modes ?? []).includes("audio/speech") ||
+      (model.capabilities ?? []).includes("audio/speech");
+    const match = models.find((model) => model.id && supportsSpeech(model)) ?? models.find((model) => model.id);
+    return match?.id?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveSpeechModel(headers: Headers): Promise<string> {
+  if (cachedSpeechModel) return cachedSpeechModel;
+  const configured = configuredSpeechModel();
+  if (configured) {
+    cachedSpeechModel = configured;
+    return configured;
+  }
+  const detected = await detectSpeechModel(headers);
+  if (detected) {
+    cachedSpeechModel = detected;
+    return detected;
+  }
+  throw new Error("MOSI speech model is not configured. Set MOSI_SPEECH_MODEL in .env.local.");
 }
 
 export function isMosiConfigured(): boolean {
@@ -72,6 +112,19 @@ export async function getMosiVoiceStatus(voiceId: string): Promise<MosiCloneResu
   };
 }
 
+/** Best-effort remote delete; 404 = already gone; 405 = API may not expose DELETE (caller still removes local row). */
+export async function deleteMosiVoice(externalVoiceId: string): Promise<void> {
+  if (!isMosiConfigured()) return;
+  const headers = authHeaders();
+  const response = await fetch(`${baseUrl()}/api/v1/voices/${encodeURIComponent(externalVoiceId)}`, {
+    method: "DELETE",
+    headers
+  });
+  if (response.ok || response.status === 404 || response.status === 405) return;
+  const text = await response.text().catch(() => "");
+  throw new Error(`Mosi voice delete failed (${response.status}): ${text}`);
+}
+
 export async function listMosiVoices(): Promise<VoiceOption[]> {
   if (!isMosiConfigured()) return [];
   const headers = authHeaders();
@@ -87,7 +140,107 @@ export async function listMosiVoices(): Promise<VoiceOption[]> {
 }
 
 function shortVoiceId(voiceId: string): string {
-  return voiceId.startsWith("mosi:") ? voiceId.slice("mosi:".length) : voiceId;
+  let id = voiceId.trim();
+  while (id.toLowerCase().startsWith("mosi:")) {
+    id = id.slice("mosi:".length).trim();
+  }
+  return id;
+}
+
+async function parseMosiSpeechResponse(response: Response): Promise<SynthesizedAudio> {
+  const declaredMime = (response.headers.get("content-type") || "").split(";")[0]?.trim() || "";
+  const buf = Buffer.from(await response.arrayBuffer());
+  const trimStart = buf.subarray(0, Math.min(256, buf.length)).toString("utf8").trimStart();
+  const looksJson =
+    declaredMime.includes("json") ||
+    trimStart.startsWith("{");
+
+  if (looksJson && trimStart.startsWith("{")) {
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(buf.toString("utf8")) as Record<string, unknown>;
+    } catch {
+      return { audio: buf, mimeType: declaredMime || "audio/mpeg" };
+    }
+
+    if (typeof json.error === "string" && json.error) {
+      throw new Error(`Mosi: ${json.error}`);
+    }
+
+    const pickUrl = (o: Record<string, unknown>): string | null => {
+      for (const key of ["url", "audio_url", "file_url", "download_url", "output_url"]) {
+        const v = o[key];
+        if (typeof v === "string" && (v.startsWith("http") || v.startsWith("/"))) return v;
+      }
+      return null;
+    };
+
+    const remoteUrl = pickUrl(json);
+    if (remoteUrl) {
+      const absolute = remoteUrl.startsWith("http")
+        ? remoteUrl
+        : `${baseUrl()}${remoteUrl.startsWith("/") ? "" : "/"}${remoteUrl}`;
+      const innerHeaders = remoteUrl.startsWith("http") ? undefined : authHeaders();
+      const inner = await fetch(absolute, innerHeaders ? { headers: innerHeaders } : undefined);
+      if (!inner.ok) {
+        const t = await inner.text().catch(() => "");
+        throw new Error(`Mosi audio download failed (${inner.status}): ${t.slice(0, 240)}`);
+      }
+      const innerMime = (inner.headers.get("content-type") || "").split(";")[0] || "audio/mpeg";
+      return { audio: Buffer.from(await inner.arrayBuffer()), mimeType: innerMime };
+    }
+
+    const pickB64 = (o: Record<string, unknown>): { data: string; mime?: string } | null => {
+      const mime =
+        (typeof o.mime_type === "string" && o.mime_type) ||
+        (typeof o.content_type === "string" && o.content_type) ||
+        undefined;
+      for (const key of [
+        "audio_data",
+        "audioData",
+        "audio",
+        "audio_base64",
+        "data",
+        "output",
+        "result",
+        "speech",
+        "file",
+        "content"
+      ]) {
+        const v = o[key];
+        if (typeof v === "string" && v.length > 24) return { data: v, mime };
+      }
+      const audioNested = o.audio;
+      if (audioNested && typeof audioNested === "object" && !Array.isArray(audioNested)) {
+        return pickB64(audioNested as Record<string, unknown>);
+      }
+      return null;
+    };
+
+    const b64 = pickB64(json);
+    if (b64) {
+      try {
+        const raw = Buffer.from(b64.data, "base64");
+        return { audio: raw, mimeType: (b64.mime || declaredMime || "audio/mpeg").split(";")[0] };
+      } catch {
+        throw new Error("Mosi returned invalid base64 audio.");
+      }
+    }
+
+    const maybeBytes = json.audio_data;
+    if (Array.isArray(maybeBytes) && maybeBytes.length > 0 && maybeBytes.every((x) => typeof x === "number")) {
+      return {
+        audio: Buffer.from(maybeBytes as number[]),
+        mimeType: declaredMime || "audio/mpeg"
+      };
+    }
+
+    throw new Error(
+      `Mosi returned JSON without playable audio (keys: ${Object.keys(json).slice(0, 12).join(", ")}).`
+    );
+  }
+
+  return { audio: buf, mimeType: declaredMime || "audio/mpeg" };
 }
 
 export const MosiProvider: TtsProvider = {
@@ -95,17 +248,22 @@ export const MosiProvider: TtsProvider = {
   async synthesize(text, opts): Promise<SynthesizedAudio> {
     const headers = authHeaders();
     headers.set("Content-Type", "application/json");
+    const model = await resolveSpeechModel(headers);
+    // Moss TTS validates `text` (MossTTSRequest.Text). Other models often accept `input`; send both.
     const response = await fetch(`${baseUrl()}/api/v1/audio/speech`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ voice_id: shortVoiceId(opts.voiceId), input: text })
+      body: JSON.stringify({
+        model,
+        voice_id: shortVoiceId(opts.voiceId),
+        input: text,
+        text
+      })
     });
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      throw new Error(`Mosi synthesis failed (${response.status}): ${errorText}`);
+      throw new Error(`Mosi synthesis failed (${response.status}) [model=${model}]: ${errorText}`);
     }
-    const arrayBuffer = await response.arrayBuffer();
-    const mimeType = response.headers.get("content-type") || "audio/mpeg";
-    return { audio: Buffer.from(arrayBuffer), mimeType };
+    return parseMosiSpeechResponse(response);
   }
 };

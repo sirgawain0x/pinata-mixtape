@@ -27,6 +27,8 @@ type Props = {
 };
 
 const TEXT_CARD_DURATION_MS = 12000;
+/** postMessage target for YouTube embed commands (avoid `"*"` — reduces internal API races). */
+const YOUTUBE_EMBED_ORIGIN = "https://www.youtube.com";
 
 export default function StationPlayer({ stationName, segments, embedOrigin = "" }: Props) {
   const [index, setIndex] = useState(0);
@@ -34,9 +36,13 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
   const audioRef = useRef<HTMLAudioElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const textTimerRef = useRef<number | null>(null);
+  const currentRef = useRef<(typeof segments)[number] | null>(null);
+  const audioSourceKeyRef = useRef("");
+  const lastAudioSegmentIdRef = useRef<number | null>(null);
 
   const queue = useMemo(() => segments.filter((segment) => segmentIsPlayable(segment)), [segments]);
   const current = queue[index] ?? null;
+  currentRef.current = current;
 
   const advance = useCallback(() => {
     setIndex((prev) => (queue.length === 0 ? 0 : (prev + 1) % queue.length));
@@ -45,20 +51,22 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
   function pauseYoutube() {
     iframeRef.current?.contentWindow?.postMessage(
       JSON.stringify({ event: "command", func: "pauseVideo", args: [] }),
-      "*"
+      YOUTUBE_EMBED_ORIGIN
     );
   }
 
   function playYoutube() {
     iframeRef.current?.contentWindow?.postMessage(
       JSON.stringify({ event: "command", func: "playVideo", args: [] }),
-      "*"
+      YOUTUBE_EMBED_ORIGIN
     );
   }
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (typeof event.data !== "string") return;
+      const origin = typeof event.origin === "string" ? event.origin : "";
+      if (!origin.includes("youtube.com")) return;
       try {
         const data = JSON.parse(event.data);
         if (data?.event === "onStateChange" && data.info === 0) advance();
@@ -79,8 +87,8 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
 
     if (current.kind === "music" && current.song?.youtubeUrl) {
       pauseAudio();
-      // iframe src updates via React; tell it to start playing
-      window.setTimeout(playYoutube, 800);
+      // URL may include autoplay=1 after Start; postMessage is a fallback once the iframe API is ready.
+      window.setTimeout(playYoutube, 1200);
       return;
     }
 
@@ -90,8 +98,24 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
       if (!audio) return;
       audio.muted = false;
       audio.volume = 1;
-      audio.src = audioPlayableUrl(current);
-      void audio.play().catch(() => undefined);
+      const url = audioPlayableUrl(current);
+      const sourceKey = `${current.id}:${url}`;
+      if (audioSourceKeyRef.current !== sourceKey) {
+        audioSourceKeyRef.current = sourceKey;
+        audio.src = url;
+        audio.load();
+      } else if (lastAudioSegmentIdRef.current !== current.id) {
+        audio.currentTime = 0;
+      }
+      lastAudioSegmentIdRef.current = current.id;
+      const tryPlay = () => {
+        void audio.play().catch(() => undefined);
+      };
+      if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) tryPlay();
+      else {
+        audio.addEventListener("canplay", tryPlay, { once: true });
+        tryPlay();
+      }
       return;
     }
 
@@ -131,7 +155,8 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
     isYoutube && current?.song
       ? youtubeEmbedUrl(current.song.youtubeUrl, {
           jsApi: true,
-          origin: embedOrigin || undefined
+          origin: embedOrigin || undefined,
+          autoplay: started
         })
       : "";
 
@@ -164,7 +189,18 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
             suppressHydrationWarning
           />
         ) : null}
-        <audio ref={audioRef} onEnded={advance} controls={!isYoutube} />
+        <audio
+          ref={audioRef}
+          controls={!isYoutube}
+          onEnded={advance}
+          onError={() => {
+            const c = currentRef.current;
+            if (c?.kind === "text" && c.body?.trim()) {
+              if (textTimerRef.current) window.clearTimeout(textTimerRef.current);
+              textTimerRef.current = window.setTimeout(advance, TEXT_CARD_DURATION_MS);
+            }
+          }}
+        />
       </div>
 
       <ol className="queue">
@@ -216,6 +252,8 @@ function segmentIsPlayable(segment: Segment): boolean {
     if (segment.audioUrl) return true;
     return false;
   }
-  if (segment.kind === "text") return Boolean(segment.audioUrl);
+  // Keep text cards in rotation even when narration audio is missing.
+  // This avoids "disappearing" updates when custom TTS generation fails.
+  if (segment.kind === "text") return Boolean(segment.body?.trim()) || Boolean(segment.audioUrl);
   return Boolean(segment.audioUrl);
 }
