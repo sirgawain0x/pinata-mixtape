@@ -71,6 +71,11 @@ export function assertSameOriginOrRelativeUrl(value: string, base: string, label
   return url;
 }
 
+export function parsePositiveInteger(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 export async function fetchWithTimeout(
   input: string | URL,
   init: RequestInit = {},
@@ -79,7 +84,8 @@ export async function fetchWithTimeout(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(input, { ...init, signal: init.signal ?? controller.signal });
+    const response = await fetch(input, { ...init, signal: init.signal ?? controller.signal });
+    return response;
   } finally {
     clearTimeout(timeout);
   }

@@ -16,7 +16,7 @@ export async function DELETE(_request: Request, context: Context) {
   return withCreator(async (creator) => {
     const params = await context.params;
     const id = Number(params.id);
-    if (!Number.isFinite(id)) return Response.json({ error: "Invalid id." }, { status: 400 });
+    if (!Number.isInteger(id) || id < 1) return Response.json({ error: "Invalid id." }, { status: 400 });
 
     const clone = getVoiceClone(id);
     if (!clone) return Response.json({ error: "Voice clone not found." }, { status: 404 });

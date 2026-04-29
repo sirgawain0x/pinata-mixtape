@@ -1,7 +1,7 @@
 import { withCreator } from "../../../../../lib/auth";
 import { addPodcastFeed, getStation, listPodcastFeeds } from "../../../../../lib/stations";
 import { materializeEpisodesAsSegments, refreshFeed } from "../../../../../lib/podcasts";
-import { assertPublicHttpUrl } from "../../../../../lib/outbound";
+import { assertPublicHttpUrl, parsePositiveInteger } from "../../../../../lib/outbound";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,7 +11,10 @@ type Context = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, context: Context) {
   return withCreator(async (creator) => {
     const params = await context.params;
-    const stationId = Number(params.id);
+    const stationId = parsePositiveInteger(params.id);
+    if (stationId === null) {
+      return Response.json({ error: "Invalid station id." }, { status: 400 });
+    }
     const station = getStation(stationId);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
@@ -22,7 +25,10 @@ export async function GET(_request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
   return withCreator(async (creator) => {
     const params = await context.params;
-    const stationId = Number(params.id);
+    const stationId = parsePositiveInteger(params.id);
+    if (stationId === null) {
+      return Response.json({ error: "Invalid station id." }, { status: 400 });
+    }
     const station = getStation(stationId);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });

@@ -8,6 +8,7 @@ import {
 } from "../../../../../lib/stations";
 import { normalizeSynthesizedAudio } from "../../../../../lib/audio-binary";
 import { resolveProvider } from "../../../../../lib/tts";
+import { parsePositiveInteger } from "../../../../../lib/outbound";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,7 +16,8 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   return withCreator(async (creator) => {
     const body = await request.json().catch(() => null);
-    const segmentId = Number(body?.segmentId);
+    const segmentId = parsePositiveInteger(body?.segmentId);
+    if (segmentId === null) return Response.json({ error: "Invalid segmentId." }, { status: 400 });
     const voiceId = typeof body?.voiceId === "string" ? body.voiceId : "";
 
     const segment = getSegment(segmentId);

@@ -8,11 +8,22 @@ type Context = { params: Promise<{ id: string; sid: string }> };
 
 async function ids(context: Context): Promise<{ stationId: number; segmentId: number }> {
   const params = await context.params;
-  return { stationId: Number(params.id), segmentId: Number(params.sid) };
+  const stationId = Number(params.id);
+  const segmentId = Number(params.sid);
+  if (!Number.isInteger(stationId) || stationId < 1 || !Number.isInteger(segmentId) || segmentId < 1) {
+    throw new Error("Invalid id.");
+  }
+  return { stationId, segmentId };
 }
 
 async function loadOwned(context: Context, creatorId: number) {
-  const { stationId, segmentId } = await ids(context);
+  let stationId: number;
+  let segmentId: number;
+  try {
+    ({ stationId, segmentId } = await ids(context));
+  } catch {
+    return { error: "Invalid id.", status: 400 } as const;
+  }
   const station = getStation(stationId);
   if (!station) return { error: "Station not found.", status: 404 } as const;
   if (station.creatorId !== creatorId) return { error: "Forbidden.", status: 403 } as const;

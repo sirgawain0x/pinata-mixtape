@@ -1,5 +1,6 @@
 import { getCurrentCreator, withCreator } from "../../../../lib/auth";
 import { deleteStation, getStation, updateStation } from "../../../../lib/stations";
+import { parsePositiveInteger } from "../../../../lib/outbound";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -8,7 +9,9 @@ type Context = { params: Promise<{ id: string }> };
 
 async function stationId(context: Context): Promise<number> {
   const params = await context.params;
-  return Number(params.id);
+  const id = parsePositiveInteger(params.id);
+  if (id === null) throw new Error("Invalid station id.");
+  return id;
 }
 
 export async function GET(_request: Request, context: Context) {

@@ -19,8 +19,8 @@ export async function GET(request: Request) {
     try {
       await refreshFeed(feed.id);
       results.push({ feedId: feed.id, ok: true });
-    } catch (error) {
-      results.push({ feedId: feed.id, ok: false, error: (error as Error).message });
+    } catch {
+      results.push({ feedId: feed.id, ok: false, error: "Feed refresh failed." });
     }
   }
   return Response.json({ refreshed: results.length, results });

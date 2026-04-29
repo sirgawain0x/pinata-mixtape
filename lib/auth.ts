@@ -5,6 +5,7 @@ import { base, baseSepolia } from "viem/chains";
 import { parseSiweMessage, validateSiweMessage } from "viem/siwe";
 import { db } from "./db";
 import { upsertCreatorByWallet, getCreator, type Creator } from "./stations";
+import { badRequest } from "./outbound";
 
 const SESSION_COOKIE = "mixtape_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;

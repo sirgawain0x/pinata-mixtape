@@ -6,6 +6,7 @@ import {
   type SegmentKind
 } from "../../../../../lib/stations";
 import { createSong, getSong } from "../../../../../lib/mixtapes";
+import { parsePositiveInteger } from "../../../../../lib/outbound";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,7 +17,9 @@ const VALID_KINDS = new Set<SegmentKind>(["music", "voice", "upload", "text", "p
 
 async function stationId(context: Context): Promise<number> {
   const params = await context.params;
-  return Number(params.id);
+  const id = parsePositiveInteger(params.id);
+  if (id === null) throw new Error("Invalid station id.");
+  return id;
 }
 
 export async function GET(_request: Request, context: Context) {
