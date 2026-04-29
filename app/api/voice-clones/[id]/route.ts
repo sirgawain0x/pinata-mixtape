@@ -22,15 +22,16 @@ export async function DELETE(_request: Request, context: Context) {
     if (!clone) return Response.json({ error: "Voice clone not found." }, { status: 404 });
     if (clone.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
 
+    let remoteDeletionWarning: string | undefined;
     if (clone.provider === "mosi" && isMosiConfigured()) {
       try {
         await deleteMosiVoice(clone.externalVoiceId);
       } catch (error) {
-        return Response.json({ error: (error as Error).message }, { status: 502 });
+        remoteDeletionWarning = (error as Error).message;
       }
     }
 
-    const fullVoiceId = `mosi:${clone.externalVoiceId}`;
+    const fullVoiceId = `${clone.provider}:${clone.externalVoiceId}`;
     const me = getCreator(creator.id);
     if (me?.ttsVoiceId === fullVoiceId) {
       updateCreator(creator.id, { ttsProvider: "kokoro", ttsVoiceId: "kokoro:af_heart" });
@@ -40,6 +41,9 @@ export async function DELETE(_request: Request, context: Context) {
       return Response.json({ error: "Could not delete voice clone." }, { status: 500 });
     }
 
-    return Response.json({ ok: true });
+    return Response.json({
+      ok: true,
+      ...(remoteDeletionWarning ? { remoteDeletionWarning } : {})
+    });
   });
 }

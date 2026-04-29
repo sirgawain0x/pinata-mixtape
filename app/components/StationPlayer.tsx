@@ -30,6 +30,24 @@ const TEXT_CARD_DURATION_MS = 12000;
 /** postMessage target for YouTube embed commands (avoid `"*"` — reduces internal API races). */
 const YOUTUBE_EMBED_ORIGIN = "https://www.youtube.com";
 
+/** Hostnames allowed for iframe playerApi postMessage origins (blocks e.g. attacker-youtube.com). */
+const TRUSTED_YOUTUBE_MESSAGE_HOSTS = new Set([
+  "www.youtube.com",
+  "youtube.com",
+  "www.youtube-nocookie.com",
+  "youtube-nocookie.com",
+  "m.youtube.com"
+]);
+
+function isTrustedYoutubeMessageOrigin(origin: string): boolean {
+  try {
+    const { hostname } = new URL(origin);
+    return TRUSTED_YOUTUBE_MESSAGE_HOSTS.has(hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export default function StationPlayer({ stationName, segments, embedOrigin = "" }: Props) {
   const [index, setIndex] = useState(0);
   const [started, setStarted] = useState(false);
@@ -66,7 +84,7 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
     function onMessage(event: MessageEvent) {
       if (typeof event.data !== "string") return;
       const origin = typeof event.origin === "string" ? event.origin : "";
-      if (!origin.includes("youtube.com")) return;
+      if (!isTrustedYoutubeMessageOrigin(origin)) return;
       try {
         const data = JSON.parse(event.data);
         if (data?.event === "onStateChange" && data.info === 0) advance();
