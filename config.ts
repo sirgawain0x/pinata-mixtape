@@ -2,10 +2,7 @@ import { type AlchemyAccountsUIConfig, cookieStorage, createConfig } from "@acco
 import { alchemy, base, baseSepolia } from "@account-kit/infra";
 import { QueryClient } from "@tanstack/react-query";
 
-const API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-if (!API_KEY) {
-  throw new Error("NEXT_PUBLIC_ALCHEMY_API_KEY is not set");
-}
+const API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "missing-alchemy-api-key";
 
 // Optional — populate to enable gas sponsorship for any UserOps the app sends.
 const POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_POLICY_ID;
