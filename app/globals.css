@@ -217,8 +217,14 @@ h2 {
   gap: 8px;
 }
 
+.search input {
+  padding: 12px 18px;
+  min-height: 46px;
+}
+
 .search > button {
-  padding: 0 14px;
+  padding: 0 20px;
+  min-height: 46px;
 }
 
 .mix-list,
@@ -248,6 +254,7 @@ h2 {
   justify-content: flex-start;
   text-align: left;
   min-height: 64px;
+  padding: 14px 18px;
   border-color: var(--line);
   background: rgba(20, 15, 32, 0.55);
 }
@@ -273,8 +280,6 @@ h2 {
   justify-items: start;
   align-content: center;
   gap: 4px;
-  padding-top: 10px;
-  padding-bottom: 10px;
 }
 
 .detail {
@@ -325,6 +330,11 @@ h2 {
   gap: 20px;
   align-items: flex-start;
   padding: 22px 0 8px;
+}
+
+.tape-meta > button {
+  padding: 10px 22px;
+  min-height: 44px;
 }
 
 .share-status {
