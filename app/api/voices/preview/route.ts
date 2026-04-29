@@ -22,9 +22,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const provider = resolveProvider(voiceId);
     let synthesized;
     try {
+      const provider = await resolveProvider(voiceId);
       synthesized = normalizeSynthesizedAudio(await provider.synthesize(text, { voiceId }));
     } catch (error) {
       console.error("Voice preview failed", error);

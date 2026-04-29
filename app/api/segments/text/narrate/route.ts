@@ -35,8 +35,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Forbidden." }, { status: 403 });
     }
 
-    const provider = resolveProvider(voiceId || creator.ttsVoiceId || "kokoro:af_heart");
     const resolvedVoiceId = voiceId || creator.ttsVoiceId || "kokoro:af_heart";
+    const provider = await resolveProvider(resolvedVoiceId);
 
     const cached = findGlobalCachedTts(segment.body, resolvedVoiceId, provider.id);
     if (cached) {

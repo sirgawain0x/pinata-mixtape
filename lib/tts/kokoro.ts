@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { SynthesizedAudio, TtsProvider, VoiceOption } from "./types";
+import type { SynthesizedAudio, TtsProvider } from "./types";
 import { pcmFloat32ToWav } from "./wav";
 
 const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
@@ -7,14 +7,20 @@ const CACHE_DIR = path.join(process.cwd(), "workspace", "models", "kokoro");
 
 let modelPromise: Promise<unknown> | null = null;
 
+async function importKokoro() {
+  // Keep the package specifier out of webpack's static graph; onnxruntime-node is too large for Vercel serverless bundles.
+  const packageName = "kokoro" + "-js";
+  return import(/* webpackIgnore: true */ packageName) as Promise<{
+    KokoroTTS: { from_pretrained: (id: string, opts: { dtype?: string; device?: string }) => Promise<unknown> };
+  }>;
+}
+
 async function loadModel() {
   if (!modelPromise) {
     modelPromise = (async () => {
       process.env.HF_HOME = process.env.HF_HOME || CACHE_DIR;
       process.env.TRANSFORMERS_CACHE = process.env.TRANSFORMERS_CACHE || CACHE_DIR;
-      const mod = (await import("kokoro-js")) as {
-        KokoroTTS: { from_pretrained: (id: string, opts: { dtype?: string; device?: string }) => Promise<unknown> };
-      };
+      const mod = await importKokoro();
       return mod.KokoroTTS.from_pretrained(MODEL_ID, { dtype: "q8", device: "cpu" });
     })().catch((error) => {
       modelPromise = null;
@@ -23,14 +29,6 @@ async function loadModel() {
   }
   return modelPromise;
 }
-
-export const KOKORO_VOICES: VoiceOption[] = [
-  { id: "kokoro:af_heart", label: "Heart (American, Female)" },
-  { id: "kokoro:af_bella", label: "Bella (American, Female)" },
-  { id: "kokoro:am_michael", label: "Michael (American, Male)" },
-  { id: "kokoro:bf_emma", label: "Emma (British, Female)" },
-  { id: "kokoro:bm_george", label: "George (British, Male)" }
-];
 
 function shortVoiceId(voiceId: string): string {
   return voiceId.startsWith("kokoro:") ? voiceId.slice("kokoro:".length) : voiceId;
