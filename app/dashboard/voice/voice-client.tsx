@@ -49,12 +49,16 @@ export default function VoiceClient({
   const [previewUrl, setPreviewUrl] = useState("");
   const [displayName, setDisplayName] = useState(`${creator.displayName || creator.walletAddress.slice(0, 8)} voice`);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const ttsPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const ttsPreviewUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
+      recorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       if (ttsPreviewUrlRef.current) {
         URL.revokeObjectURL(ttsPreviewUrlRef.current);
         ttsPreviewUrlRef.current = null;
@@ -115,6 +119,7 @@ export default function VoiceClient({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       const mimeCandidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
       const mime = mimeCandidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || "";
       const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
@@ -127,6 +132,7 @@ export default function VoiceClient({
         setBlob(finalBlob);
         setPreviewUrl(URL.createObjectURL(finalBlob));
         stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       };
       recorder.start();
       recorderRef.current = recorder;

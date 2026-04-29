@@ -1,14 +1,15 @@
-import { KokoroProvider, KOKORO_VOICES } from "./kokoro";
+import { KOKORO_VOICES } from "./kokoro-voices";
 import { MosiProvider, isMosiConfigured, listMosiVoices } from "./mosi";
 import type { TtsProvider, VoiceOption } from "./types";
 
 export type { TtsProvider, VoiceOption } from "./types";
 
-export function resolveProvider(voiceId: string): TtsProvider {
+export async function resolveProvider(voiceId: string): Promise<TtsProvider> {
   if (voiceId.startsWith("mosi:")) {
     if (!isMosiConfigured()) throw new Error("Mosi voice selected but MOSI_API_KEY is not configured.");
     return MosiProvider;
   }
+  const { KokoroProvider } = await import("./kokoro");
   return KokoroProvider;
 }
 

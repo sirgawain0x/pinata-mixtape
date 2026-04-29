@@ -6,6 +6,7 @@ import {
   type SegmentKind
 } from "../../../../../lib/stations";
 import { createSong, getSong } from "../../../../../lib/mixtapes";
+import { parsePositiveInteger } from "../../../../../lib/outbound";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,13 +17,16 @@ const VALID_KINDS = new Set<SegmentKind>(["music", "voice", "upload", "text", "p
 
 async function stationId(context: Context): Promise<number> {
   const params = await context.params;
-  return Number(params.id);
+  const id = parsePositiveInteger(params.id);
+  if (id === null) throw new Error("Invalid station id.");
+  return id;
 }
 
 export async function GET(_request: Request, context: Context) {
   const id = await stationId(context);
   const station = getStation(id);
   if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
+  if (!station.isPublic) return Response.json({ error: "Station not found." }, { status: 404 });
   return Response.json({ segments: listStationSegments(id) });
 }
 
@@ -44,8 +48,12 @@ export async function POST(request: Request, context: Context) {
     let songId: number | null = typeof body.songId === "number" ? body.songId : null;
     if (kind === "music") {
       if (!songId && body.song && typeof body.song === "object") {
-        const created = createSong(body.song);
-        songId = created.id;
+        try {
+          const created = createSong(body.song);
+          songId = created.id;
+        } catch {
+          return Response.json({ error: "Invalid song details." }, { status: 400 });
+        }
       }
       if (!songId || !getSong(songId)) {
         return Response.json({ error: "Music segment needs songId or song." }, { status: 400 });

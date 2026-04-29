@@ -83,6 +83,7 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (typeof event.data !== "string") return;
+      if (iframeRef.current?.contentWindow && event.source !== iframeRef.current.contentWindow) return;
       const origin = typeof event.origin === "string" ? event.origin : "";
       if (!isTrustedYoutubeMessageOrigin(origin)) return;
       try {
@@ -216,6 +217,8 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
             if (c?.kind === "text" && c.body?.trim()) {
               if (textTimerRef.current) window.clearTimeout(textTimerRef.current);
               textTimerRef.current = window.setTimeout(advance, TEXT_CARD_DURATION_MS);
+            } else {
+              advance();
             }
           }}
         />

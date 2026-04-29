@@ -26,11 +26,19 @@ export default function VoiceRecorder({ stationId, onUploaded, hint, uploadKind 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  function stopStream() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }
 
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+      stopStream();
     };
   }, [previewUrl]);
 
@@ -48,6 +56,7 @@ export default function VoiceRecorder({ stationId, onUploaded, hint, uploadKind 
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       const recorder = new MediaRecorder(stream, { mimeType: mime });
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
@@ -57,7 +66,7 @@ export default function VoiceRecorder({ stationId, onUploaded, hint, uploadKind 
         const finalBlob = new Blob(chunksRef.current, { type: mime });
         setBlob(finalBlob);
         setPreviewUrl(URL.createObjectURL(finalBlob));
-        stream.getTracks().forEach((track) => track.stop());
+        stopStream();
       };
       recorder.start();
       recorderRef.current = recorder;
@@ -70,6 +79,7 @@ export default function VoiceRecorder({ stationId, onUploaded, hint, uploadKind 
   function stop() {
     recorderRef.current?.stop();
     recorderRef.current = null;
+    stopStream();
     setRecording(false);
   }
 

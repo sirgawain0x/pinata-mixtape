@@ -25,11 +25,17 @@ export async function POST(request: Request) {
     if (!(file instanceof Blob)) {
       return Response.json({ error: "file is required." }, { status: 400 });
     }
+    if (!file.type.startsWith("audio/")) {
+      return Response.json({ error: "Only audio uploads are supported." }, { status: 415 });
+    }
     if (file.size > MAX_BYTES) {
       return Response.json({ error: "File exceeds 50 MB limit." }, { status: 413 });
     }
 
     const stationId = Number(stationIdRaw);
+    if (!Number.isInteger(stationId) || stationId <= 0) {
+      return Response.json({ error: "Invalid stationId." }, { status: 400 });
+    }
     const station = getStation(stationId);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });

@@ -8,6 +8,7 @@ import {
 } from "../../../../../lib/stations";
 import { normalizeSynthesizedAudio } from "../../../../../lib/audio-binary";
 import { resolveProvider } from "../../../../../lib/tts";
+import { parsePositiveInteger } from "../../../../../lib/outbound";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,7 +16,8 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   return withCreator(async (creator) => {
     const body = await request.json().catch(() => null);
-    const segmentId = Number(body?.segmentId);
+    const segmentId = parsePositiveInteger(body?.segmentId);
+    if (segmentId === null) return Response.json({ error: "Invalid segmentId." }, { status: 400 });
     const voiceId = typeof body?.voiceId === "string" ? body.voiceId : "";
 
     const segment = getSegment(segmentId);
@@ -33,8 +35,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Forbidden." }, { status: 403 });
     }
 
-    const provider = resolveProvider(voiceId || creator.ttsVoiceId || "kokoro:af_heart");
     const resolvedVoiceId = voiceId || creator.ttsVoiceId || "kokoro:af_heart";
+    const provider = await resolveProvider(resolvedVoiceId);
 
     const cached = findGlobalCachedTts(segment.body, resolvedVoiceId, provider.id);
     if (cached) {
@@ -57,8 +59,8 @@ export async function POST(request: Request) {
       synthesized = normalizeSynthesizedAudio(
         await provider.synthesize(segment.body, { voiceId: resolvedVoiceId })
       );
-    } catch (error) {
-      return Response.json({ error: (error as Error).message }, { status: 502 });
+    } catch {
+      return Response.json({ error: "Narration provider failed." }, { status: 502 });
     }
 
     const normalizedMimeType = synthesized.mimeType.startsWith("audio/")
@@ -71,10 +73,15 @@ export async function POST(request: Request) {
         : normalizedMimeType.includes("ogg")
           ? "ogg"
           : "mp3";
-    const upload = await uploadFile(synthesized.audio, {
-      name: `narration-${segment.id}.${ext}`,
-      mimeType: normalizedMimeType
-    });
+    let upload;
+    try {
+      upload = await uploadFile(synthesized.audio, {
+        name: `narration-${segment.id}.${ext}`,
+        mimeType: normalizedMimeType
+      });
+    } catch {
+      return Response.json({ error: "Could not store narration audio." }, { status: 502 });
+    }
 
     const updated = updateSegment(segment.id, {
       audioCid: upload.cid,

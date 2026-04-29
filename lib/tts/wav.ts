@@ -1,4 +1,8 @@
 export function pcmFloat32ToWav(samples: Float32Array, sampleRate: number): Buffer {
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0 || sampleRate > 384_000) {
+    throw new Error("Invalid WAV sample rate.");
+  }
+
   const numChannels = 1;
   const bitsPerSample = 16;
   const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;

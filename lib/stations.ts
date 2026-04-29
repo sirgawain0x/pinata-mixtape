@@ -153,7 +153,7 @@ db.exec(`
     source_cid TEXT,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(provider, external_voice_id),
+    UNIQUE(creator_id, provider, external_voice_id),
     FOREIGN KEY(creator_id) REFERENCES creators(id) ON DELETE CASCADE
   );
 
@@ -176,6 +176,50 @@ try {
   db.exec(`ALTER TABLE mix_moments ADD COLUMN segment_id INTEGER`);
 } catch {
   // already added
+}
+
+function voiceClonesNeedsProviderUniqueMigration(): boolean {
+  const row = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'voice_clones'`)
+    .get() as { sql?: string } | undefined;
+  const sql = row?.sql ?? "";
+  // Old schema: UNIQUE(provider, external_voice_id). New: UNIQUE(creator_id, provider, external_voice_id).
+  return sql.includes("UNIQUE(provider, external_voice_id)") && !sql.includes("UNIQUE(creator_id,");
+}
+
+// `next build` loads this module in parallel workers; two DEFERRED migrations can interleave and break
+// (e.g. one renames voice_clones_new away while another still INSERTs). BEGIN IMMEDIATE serializes writers.
+const runVoiceCloneMigration = db
+  .transaction(() => {
+    if (!voiceClonesNeedsProviderUniqueMigration()) return;
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS voice_clones_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creator_id INTEGER NOT NULL,
+      provider TEXT NOT NULL,
+      external_voice_id TEXT NOT NULL,
+      display_name TEXT,
+      source_cid TEXT,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(creator_id, provider, external_voice_id),
+      FOREIGN KEY(creator_id) REFERENCES creators(id) ON DELETE CASCADE
+    );
+    INSERT OR IGNORE INTO voice_clones_new
+      (id, creator_id, provider, external_voice_id, display_name, source_cid, status, created_at)
+    SELECT id, creator_id, provider, external_voice_id, display_name, source_cid, status, created_at
+    FROM voice_clones;
+    DROP TABLE voice_clones;
+    ALTER TABLE voice_clones_new RENAME TO voice_clones;
+  `);
+  })
+  .immediate;
+
+try {
+  runVoiceCloneMigration();
+} catch (error) {
+  // Another worker may have finished migrating first; only rethrow if we're still on the old schema.
+  if (voiceClonesNeedsProviderUniqueMigration()) throw error;
 }
 
 type CreatorRow = {
@@ -601,6 +645,17 @@ export function deleteSegment(id: number): boolean {
 }
 
 export function reorderSegments(stationId: number, orderedIds: number[]): Segment[] {
+  if (orderedIds.length === 0 || new Set(orderedIds).size !== orderedIds.length) {
+    throw new Error("Segment order must include each station segment exactly once.");
+  }
+  const existing = listStationSegments(stationId).map((segment) => segment.id);
+  if (existing.length !== orderedIds.length) {
+    throw new Error("Segment order must include each station segment exactly once.");
+  }
+  const expected = new Set(existing);
+  if (!orderedIds.every((id) => expected.has(id))) {
+    throw new Error("Segment order contains unknown segments.");
+  }
   const apply = db.transaction(() => {
     db.prepare(`UPDATE segments SET position = position + 100000 WHERE station_id = ?`).run(stationId);
     for (const [index, segId] of orderedIds.entries()) {
@@ -739,7 +794,7 @@ export function createVoiceClone(input: {
   db.prepare(
     `INSERT INTO voice_clones (creator_id, provider, external_voice_id, display_name, source_cid, status)
      VALUES (@creatorId, @provider, @externalVoiceId, @displayName, @sourceCid, @status)
-     ON CONFLICT(provider, external_voice_id) DO UPDATE SET
+     ON CONFLICT(creator_id, provider, external_voice_id) DO UPDATE SET
        display_name = excluded.display_name,
        source_cid = excluded.source_cid,
        status = excluded.status`
@@ -752,8 +807,8 @@ export function createVoiceClone(input: {
     status: input.status ?? "PENDING"
   });
   const row = db
-    .prepare(`SELECT * FROM voice_clones WHERE provider = ? AND external_voice_id = ?`)
-    .get(input.provider, input.externalVoiceId) as VoiceCloneRow;
+    .prepare(`SELECT * FROM voice_clones WHERE creator_id = ? AND provider = ? AND external_voice_id = ?`)
+    .get(input.creatorId, input.provider, input.externalVoiceId) as VoiceCloneRow;
   return mapVoiceClone(row);
 }
 

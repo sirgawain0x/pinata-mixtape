@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import { assertPublicHttpUrl, fetchWithTimeout } from "./outbound";
 import {
   addPodcastFeed,
   addSegment,
@@ -11,11 +12,32 @@ import {
   type PodcastFeed
 } from "./stations";
 
+const RSS_FETCH_TIMEOUT_MS = 15_000;
+
 const parser = new Parser({
   customFields: {
     item: ["enclosure", "guid", "itunes:duration"]
   }
 });
+
+async function fetchPublicText(url: string, redirectsRemaining = 3): Promise<string> {
+  const safeUrl = assertPublicHttpUrl(url, "Feed URL");
+  const response = await fetchWithTimeout(safeUrl, { redirect: "manual" }, RSS_FETCH_TIMEOUT_MS);
+
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    if (!location || redirectsRemaining <= 0) {
+      throw new Error("Feed URL redirected too many times.");
+    }
+    return fetchPublicText(new URL(location, safeUrl).toString(), redirectsRemaining - 1);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Feed fetch failed (${response.status}).`);
+  }
+
+  return response.text();
+}
 
 function parseDuration(value: unknown): number | null {
   if (typeof value !== "string") return null;
@@ -32,7 +54,7 @@ export async function refreshFeed(feedId: number): Promise<PodcastEpisode[]> {
   const feed = getPodcastFeed(feedId);
   if (!feed) throw new Error("Feed not found.");
 
-  const parsed = await parser.parseURL(feed.feedUrl);
+  const parsed = await parser.parseString(await fetchPublicText(feed.feedUrl));
   if (parsed.title) {
     addPodcastFeed(feed.stationId, feed.feedUrl, parsed.title);
   }
@@ -43,6 +65,11 @@ export async function refreshFeed(feedId: number): Promise<PodcastEpisode[]> {
     const enclosure = itemRecord.enclosure as { url?: string } | undefined;
     const audioUrl = enclosure?.url ?? "";
     if (!audioUrl) continue;
+    try {
+      assertPublicHttpUrl(audioUrl, "Episode audio URL");
+    } catch {
+      continue;
+    }
     const guid = (itemRecord.guid as string | undefined) || `${audioUrl}:${item.title ?? ""}`;
     const episode = upsertPodcastEpisode({
       feedId: feed.id,

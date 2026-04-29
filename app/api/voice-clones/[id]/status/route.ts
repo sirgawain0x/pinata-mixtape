@@ -11,6 +11,8 @@ export async function GET(_request: Request, context: Context) {
   return withCreator(async (creator) => {
     const params = await context.params;
     const id = Number(params.id);
+    if (!Number.isInteger(id) || id < 1) return Response.json({ error: "Invalid id." }, { status: 400 });
+
     const clone = getVoiceClone(id);
     if (!clone) return Response.json({ error: "Not found." }, { status: 404 });
     if (clone.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });

@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./outbound";
+
 const PINATA_UPLOAD_URL = "https://uploads.pinata.cloud/v3/files";
 
 export type PinataUpload = {
@@ -35,7 +37,7 @@ export async function uploadFile(
   form.append("file", blob, safeName);
   form.append("network", "public");
 
-  const response = await fetch(PINATA_UPLOAD_URL, {
+  const response = await fetchWithTimeout(PINATA_UPLOAD_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${jwt}`
