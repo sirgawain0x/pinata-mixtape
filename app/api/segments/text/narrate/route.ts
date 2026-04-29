@@ -86,7 +86,6 @@ export async function POST(request: Request) {
     const updated = updateSegment(segment.id, {
       audioCid: upload.cid,
       audioUrl: upload.url,
-      durationSeconds: synthesized.durationSeconds ?? null,
       ttsVoice: resolvedVoiceId,
       ttsProvider: provider.id
     });
