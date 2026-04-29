@@ -27,7 +27,7 @@ export async function DELETE(_request: Request, context: Context) {
       try {
         await deleteMosiVoice(clone.externalVoiceId);
       } catch (error) {
-        remoteDeletionWarning = (error as Error).message;
+        remoteDeletionWarning = error instanceof Error ? error.message : String(error);
       }
     }
 
