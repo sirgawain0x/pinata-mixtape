@@ -70,6 +70,9 @@ export default function StationEditor({
           </p>
           <h1>{station.name}</h1>
           <p className="lede">@{station.handle}{station.tagline ? ` · ${station.tagline}` : ""}</p>
+          <p className="muted">
+            Need a new narration voice? <Link href="/dashboard/voice">Configure it here</Link>.
+          </p>
           <p>
             <Link className="button" href={`/s/${station.handle}`}>Open public page →</Link>
           </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import SignInButton from "../components/SignInButton";
 
@@ -26,6 +27,7 @@ export default function DashboardClient({
   creator: Creator;
   initialStations: Station[];
 }) {
+  const router = useRouter();
   const [stations, setStations] = useState(initialStations);
   const [handle, setHandle] = useState("");
   const [name, setName] = useState("");
@@ -52,12 +54,13 @@ export default function DashboardClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ handle, name, tagline })
       });
-      const data = (await response.json()) as { error?: string };
+      const data = (await response.json()) as { station?: Station; error?: string };
       if (!response.ok) throw new Error(data.error ?? "Could not create station.");
+      if (!data.station) throw new Error("Could not open the new station.");
       setHandle("");
       setName("");
       setTagline("");
-      await refresh();
+      router.push(`/dashboard/stations/${data.station.id}`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -101,9 +104,6 @@ export default function DashboardClient({
             {busy ? "Creating…" : "Create station"}
           </button>
           {error ? <p className="signin-error">{error}</p> : null}
-          <p className="muted">
-            <Link href="/dashboard/voice">Configure your narration voice →</Link>
-          </p>
         </div>
       </section>
 

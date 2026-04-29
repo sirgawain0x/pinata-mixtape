@@ -22,7 +22,10 @@ export function youtubeVideoId(url: string): string {
   return "";
 }
 
-export function youtubeEmbedUrl(url: string, options: { jsApi?: boolean; origin?: string } = {}): string {
+export function youtubeEmbedUrl(
+  url: string,
+  options: { jsApi?: boolean; origin?: string; autoplay?: boolean } = {}
+): string {
   const id = youtubeVideoId(url);
   if (!id) return "";
   const params = new URLSearchParams();
@@ -30,6 +33,7 @@ export function youtubeEmbedUrl(url: string, options: { jsApi?: boolean; origin?
     params.set("enablejsapi", "1");
     if (options.origin) params.set("origin", options.origin);
   }
+  if (options.autoplay) params.set("autoplay", "1");
   const query = params.toString();
   return query ? `https://www.youtube.com/embed/${id}?${query}` : `https://www.youtube.com/embed/${id}`;
 }

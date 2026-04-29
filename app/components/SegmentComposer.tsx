@@ -77,7 +77,12 @@ export default function SegmentComposer({ stationId, segments, voices, defaultVo
       )}
       {tab === "podcast" && <PodcastTab stationId={stationId} onAdded={onChange} />}
 
-      <SegmentList stationId={stationId} segments={segments} onChange={onChange} />
+      <SegmentList
+        stationId={stationId}
+        segments={segments}
+        defaultVoiceId={defaultVoiceId}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -348,18 +353,25 @@ function PodcastTab({ stationId, onAdded }: { stationId: number; onAdded: () => 
 function SegmentList({
   stationId,
   segments,
+  defaultVoiceId,
   onChange
 }: {
   stationId: number;
   segments: Segment[];
+  defaultVoiceId: string;
   onChange: () => void;
 }) {
+  const [narratingId, setNarratingId] = useState<number | null>(null);
+  const [error, setError] = useState("");
+
   async function remove(id: number) {
+    setError("");
     await fetch(`${APP_BASE}/api/stations/${stationId}/segments/${id}`, { method: "DELETE" });
     onChange();
   }
 
   async function move(id: number, direction: -1 | 1) {
+    setError("");
     const current = segments.findIndex((segment) => segment.id === id);
     const target = current + direction;
     if (current < 0 || target < 0 || target >= segments.length) return;
@@ -370,28 +382,57 @@ function SegmentList({
     onChange();
   }
 
+  async function regenerateNarration(segment: Segment) {
+    if (segment.kind !== "text" || !segment.body.trim()) return;
+    setNarratingId(segment.id);
+    setError("");
+    try {
+      await postJson("/api/segments/text/narrate", {
+        segmentId: segment.id,
+        ...(segment.ttsVoice || defaultVoiceId ? { voiceId: segment.ttsVoice || defaultVoiceId } : {})
+      });
+      onChange();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setNarratingId(null);
+    }
+  }
+
   if (segments.length === 0) {
     return <p className="muted">No segments yet. Add music, voice, text, uploads, or podcast episodes above.</p>;
   }
 
   return (
-    <ol className="segment-list">
-      {segments.map((segment, index) => (
-        <li key={segment.id}>
-          <div>
-            <span className="queue-kind">{segment.kind}</span>
-            <strong>{segment.title || segment.kind}</strong>
-            {segment.body ? <p>{segment.body.slice(0, 120)}{segment.body.length > 120 ? "…" : ""}</p> : null}
-            {segment.song ? <small>{segment.song.artist} — {segment.song.title}</small> : null}
-            {segment.audioCid ? <small className="muted">cid: {segment.audioCid.slice(0, 12)}…</small> : null}
-          </div>
-          <div className="segment-actions">
-            <button onClick={() => void move(segment.id, -1)} disabled={index === 0} type="button">↑</button>
-            <button onClick={() => void move(segment.id, 1)} disabled={index === segments.length - 1} type="button">↓</button>
-            <button onClick={() => void remove(segment.id)} type="button">Remove</button>
-          </div>
-        </li>
-      ))}
-    </ol>
+    <>
+      <ol className="segment-list">
+        {segments.map((segment, index) => (
+          <li key={segment.id}>
+            <div>
+              <span className="queue-kind">{segment.kind}</span>
+              <strong>{segment.title || segment.kind}</strong>
+              {segment.body ? <p>{segment.body.slice(0, 120)}{segment.body.length > 120 ? "…" : ""}</p> : null}
+              {segment.song ? <small>{segment.song.artist} — {segment.song.title}</small> : null}
+              {segment.audioCid ? <small className="muted">cid: {segment.audioCid.slice(0, 12)}…</small> : null}
+            </div>
+            <div className="segment-actions">
+              <button onClick={() => void move(segment.id, -1)} disabled={index === 0} type="button">↑</button>
+              <button onClick={() => void move(segment.id, 1)} disabled={index === segments.length - 1} type="button">↓</button>
+              {segment.kind === "text" ? (
+                <button
+                  onClick={() => void regenerateNarration(segment)}
+                  disabled={narratingId === segment.id || !segment.body.trim()}
+                  type="button"
+                >
+                  {narratingId === segment.id ? "Narrating…" : "Re-generate narration"}
+                </button>
+              ) : null}
+              <button onClick={() => void remove(segment.id)} type="button">Remove</button>
+            </div>
+          </li>
+        ))}
+      </ol>
+      {error ? <p className="signin-error">{error}</p> : null}
+    </>
   );
 }

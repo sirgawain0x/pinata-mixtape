@@ -773,3 +773,8 @@ export function updateVoiceCloneStatus(id: number, status: VoiceClone["status"])
   db.prepare(`UPDATE voice_clones SET status = ? WHERE id = ?`).run(status, id);
   return getVoiceClone(id);
 }
+
+export function deleteVoiceClone(id: number, creatorId: number): boolean {
+  const result = db.prepare(`DELETE FROM voice_clones WHERE id = ? AND creator_id = ?`).run(id, creatorId);
+  return result.changes > 0;
+}
