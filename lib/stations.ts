@@ -1,3 +1,4 @@
+import "./mixtapes";
 import { db } from "./db";
 
 export type Creator = {
