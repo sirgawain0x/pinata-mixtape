@@ -29,11 +29,19 @@ export default async function StationEditorPage({ params }: PageProps) {
   }
 
   if (!station) {
+    const onVercel = process.env.VERCEL === "1";
     return (
       <main className="shell">
         <section className="hero">
           <div className="hero-copy">
             <h1>Station not found</h1>
+            {onVercel ? (
+              <p className="muted">
+                On Vercel this app uses a temporary SQLite file per instance. Creating a station on one
+                request and opening it on another often shows nothing here. Use a hosted database (e.g.
+                Postgres or Turso) wired into this project for real persistence.
+              </p>
+            ) : null}
             <p>
               <Link className="button" href="/dashboard">Back</Link>
             </p>
