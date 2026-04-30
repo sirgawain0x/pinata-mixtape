@@ -45,7 +45,12 @@ export async function getCurrentCreator(): Promise<Creator | null> {
   const session = await lookupSessionStorage(token);
   if (!session) return null;
   const fromDb = getCreator(session.creatorId);
-  return fromDb ?? session.creatorFallback ?? null;
+  if (fromDb) return fromDb;
+  // KV sessions can outlive SQLite (ephemeral tmp DB on Vercel, local reset). Re-materialize
+  // the creator row so FK constraints (e.g. stations.creator_id) see a real id.
+  const wallet = session.creatorFallback?.walletAddress?.trim();
+  if (wallet) return upsertCreatorByWallet(wallet);
+  return null;
 }
 
 export async function requireCreator(): Promise<Creator> {
