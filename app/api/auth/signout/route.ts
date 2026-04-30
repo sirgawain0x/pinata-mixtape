@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 export async function POST() {
   const token = await getSessionToken();
-  if (token) revokeSession(token);
+  if (token) await revokeSession(token);
   await clearSessionCookie();
   return Response.json({ ok: true });
 }

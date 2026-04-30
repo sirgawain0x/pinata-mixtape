@@ -29,6 +29,7 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
   const [creator, setCreator] = useState<Creator | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [siweBlocked, setSiweBlocked] = useState(false);
 
   const signerStatus = useSignerStatus();
   const { client } = useSmartAccountClient({});
@@ -36,22 +37,31 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
   const { openAuthModal } = useAuthModal();
   const { logout } = useLogout();
 
-  // 1) On mount, see if there's an existing server session.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const signMessageAsyncRef = useRef(signMessageAsync);
+  signMessageAsyncRef.current = signMessageAsync;
+
+  const address = client?.account?.address as `0x${string}` | undefined;
+  const chainId = client?.chain?.id;
+
   useEffect(() => {
     void fetchMe().then((value) => {
       setCreator(value);
-      onChange?.(value);
+      onChangeRef.current?.(value);
     });
-  }, [onChange]);
+  }, []);
 
-  // 2) Once Account Kit is connected and the smart-account client is ready,
-  //    run the SIWE handshake against our server (if we don't already have a session).
+  useEffect(() => {
+    if (!signerStatus.isConnected) setSiweBlocked(false);
+  }, [signerStatus.isConnected]);
+
   const inFlightRef = useRef(false);
   useEffect(() => {
     if (creator) return;
+    if (siweBlocked) return;
     if (!signerStatus.isConnected) return;
-    const address = client?.account?.address as `0x${string}` | undefined;
-    const chainId = client?.chain?.id;
     if (!address || !chainId) return;
     if (inFlightRef.current) return;
 
@@ -62,7 +72,18 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
     (async () => {
       try {
         const nonceResponse = await fetch(`${APP_BASE}/api/auth/nonce`, { cache: "no-store" });
-        const { nonce } = (await nonceResponse.json()) as { nonce: string };
+        if (!nonceResponse.ok) {
+          throw new Error(
+            nonceResponse.status >= 500
+              ? "Server error while starting sign-in. Use Retry when the app is ready, or try again later."
+              : `Could not start sign-in (${nonceResponse.status}).`
+          );
+        }
+        const nonceBody = (await nonceResponse.json()) as { nonce?: string };
+        if (!nonceBody.nonce) {
+          throw new Error("Invalid response from sign-in server.");
+        }
+        const { nonce } = nonceBody;
 
         const message = createSiweMessage({
           domain: window.location.host,
@@ -75,9 +96,7 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
           issuedAt: new Date()
         });
 
-        // Account Kit returns an ERC-1271 (deployed) or ERC-6492 (counterfactual)
-        // signature for smart accounts, and a regular ECDSA sig for EOA logins.
-        const signature = await signMessageAsync({ message });
+        const signature = await signMessageAsyncRef.current({ message });
 
         const verifyResponse = await fetch(`${APP_BASE}/api/auth/verify`, {
           method: "POST",
@@ -91,25 +110,30 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
         }
 
         setCreator(data.creator);
-        onChange?.(data.creator);
+        onChangeRef.current?.(data.creator);
       } catch (err) {
         setError((err as Error).message);
+        setSiweBlocked(true);
       } finally {
         setBusy(false);
         inFlightRef.current = false;
       }
     })();
-  }, [creator, client, signerStatus.isConnected, signMessageAsync, onChange]);
+  }, [creator, signerStatus.isConnected, siweBlocked, address, chainId]);
+
+  function handlePrimaryClick() {
+    setError("");
+    setSiweBlocked(false);
+    if (!signerStatus.isConnected) openAuthModal();
+  }
 
   async function signOut() {
     setBusy(true);
     try {
-      // Clear our server session first so /api/auth/me returns null on refresh.
       await fetch(`${APP_BASE}/api/auth/signout`, { method: "POST" });
-      // Then disconnect the Account Kit signer (clears its cookie too).
       logout();
       setCreator(null);
-      onChange?.(null);
+      onChangeRef.current?.(null);
     } finally {
       setBusy(false);
     }
@@ -129,6 +153,8 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
 
   const buttonLabel = busy
     ? "Signing in…"
+    : signerStatus.isConnected && siweBlocked
+    ? "Retry sign-in"
     : signerStatus.isConnected
     ? "Finalizing…"
     : signerStatus.isAuthenticating
@@ -140,7 +166,7 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
   return (
     <div className="signin">
       <button
-        onClick={openAuthModal}
+        onClick={handlePrimaryClick}
         disabled={busy || signerStatus.isInitializing}
         type="button"
       >

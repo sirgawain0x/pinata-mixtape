@@ -1,10 +1,10 @@
-import { issueNonce, purgeExpiredNonces } from "../../../../lib/auth";
+import { issueNonceStorage, purgeExpiredNoncesStorage } from "../../../../lib/auth-storage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  purgeExpiredNonces();
-  const nonce = issueNonce();
+  await purgeExpiredNoncesStorage();
+  const nonce = await issueNonceStorage();
   return Response.json({ nonce });
 }
