@@ -6,3 +6,4 @@ workspace/data/*.db
 workspace/data/*.db-*
 .env
 .env.local
+.vercel
