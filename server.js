@@ -9,7 +9,9 @@ const app = next({ dev, hostname: host, port });
 const handle = app.getRequestHandler();
 
 function normalizeBasePath(url) {
-  if (!url || url === "*" || url.startsWith(basePath)) return url;
+  if (!url || url === "*") return url;
+  const alreadyPrefixed = url === basePath || url.startsWith(`${basePath}/`) || url.startsWith(`${basePath}?`);
+  if (alreadyPrefixed) return url;
   return `${basePath}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
