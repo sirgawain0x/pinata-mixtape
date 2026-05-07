@@ -179,6 +179,12 @@ try {
   // already added
 }
 
+try {
+  db.exec(`ALTER TABLE stations ADD COLUMN is_public INTEGER NOT NULL DEFAULT 1`);
+} catch {
+  // already added
+}
+
 function voiceClonesNeedsProviderUniqueMigration(): boolean {
   const row = db
     .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'voice_clones'`)

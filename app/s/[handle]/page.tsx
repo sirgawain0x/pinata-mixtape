@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import StationPlayer from "../../components/StationPlayer";
+import { getCurrentCreator } from "../../../lib/auth";
 import { getStationByHandle, listStationSegments } from "../../../lib/stations";
 import { getSong } from "../../../lib/mixtapes";
 
@@ -25,7 +26,7 @@ async function requestOrigin(): Promise<string> {
 
 export default async function StationListenPage({ params }: PageProps) {
   const { handle } = await params;
-  const embedOrigin = await requestOrigin();
+  const [embedOrigin, creator] = await Promise.all([requestOrigin(), getCurrentCreator()]);
   const station = getStationByHandle(handle);
 
   if (!station || !station.isPublic) {
@@ -34,6 +35,11 @@ export default async function StationListenPage({ params }: PageProps) {
         <section className="hero">
           <div className="hero-copy">
             <h1>Station not found</h1>
+            <p className="muted">
+              The station <strong>@{handle}</strong> could not be found or is not public yet.
+              If you just created it, try visiting your{" "}
+              <Link href="/dashboard">dashboard</Link> to access the editor.
+            </p>
             <p>
               <Link className="button" href="/">Browse stations</Link>
             </p>
@@ -42,6 +48,8 @@ export default async function StationListenPage({ params }: PageProps) {
       </main>
     );
   }
+
+  const isOwner = creator?.id === station.creatorId;
 
   const rawSegments = listStationSegments(station.id);
   const segments = rawSegments.map((segment) => {
@@ -66,7 +74,12 @@ export default async function StationListenPage({ params }: PageProps) {
           <p className="hero-mark"><span>Influencer Radio</span></p>
           <h1>{station.name}</h1>
           <p className="lede">@{station.handle}{station.tagline ? ` · ${station.tagline}` : ""}</p>
-          <p className="muted">{segments.length} segments programmed</p>
+          <p className="muted">{segments.length} segment{segments.length !== 1 ? "s" : ""} programmed</p>
+          {isOwner && (
+            <p>
+              <Link className="button" href={`/dashboard/stations/${station.id}`}>Edit station →</Link>
+            </p>
+          )}
         </div>
       </section>
 
