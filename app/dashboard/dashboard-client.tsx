@@ -60,7 +60,7 @@ export default function DashboardClient({
       setHandle("");
       setName("");
       setTagline("");
-      router.push(`/dashboard/stations/${data.station.id}`);
+      router.push(`/s/${data.station.handle}`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
