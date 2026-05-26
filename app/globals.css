@@ -1338,16 +1338,16 @@ h2 {
     width: min(100%, 180px);
   }
 
-  .segment-list li {
+  .station-editor .segment-list li {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .segment-actions {
+  .station-editor .segment-actions {
     justify-content: flex-end;
   }
 
-  .hero-actions {
+  .station-editor .hero-actions {
     flex-direction: column;
     align-items: flex-start;
   }
