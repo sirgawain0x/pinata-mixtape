@@ -27,7 +27,7 @@ async function requestOrigin(): Promise<string> {
 export default async function StationListenPage({ params }: PageProps) {
   const { handle } = await params;
   const [embedOrigin, creator] = await Promise.all([requestOrigin(), getCurrentCreator()]);
-  const station = getStationByHandle(handle);
+  const station = await getStationByHandle(handle);
 
   if (!station || !station.isPublic) {
     return (
@@ -51,21 +51,23 @@ export default async function StationListenPage({ params }: PageProps) {
 
   const isOwner = creator?.id === station.creatorId;
 
-  const rawSegments = listStationSegments(station.id);
-  const segments = rawSegments.map((segment) => {
-    const song = segment.songId ? getSong(segment.songId) : null;
-    return {
-      id: segment.id,
-      position: segment.position,
-      kind: segment.kind,
-      title: segment.title,
-      body: segment.body,
-      audioCid: segment.audioCid,
-      audioUrl: segment.audioUrl,
-      durationSeconds: segment.durationSeconds,
-      song: song ? { title: song.title, artist: song.artist, youtubeUrl: song.youtubeUrl } : null
-    };
-  });
+  const rawSegments = await listStationSegments(station.id);
+  const segments = await Promise.all(
+    rawSegments.map(async (segment) => {
+      const song = segment.songId ? await getSong(segment.songId) : null;
+      return {
+        id: segment.id,
+        position: segment.position,
+        kind: segment.kind,
+        title: segment.title,
+        body: segment.body,
+        audioCid: segment.audioCid,
+        audioUrl: segment.audioUrl,
+        durationSeconds: segment.durationSeconds,
+        song: song ? { title: song.title, artist: song.artist, youtubeUrl: song.youtubeUrl } : null
+      };
+    })
+  );
 
   return (
     <main className="shell">

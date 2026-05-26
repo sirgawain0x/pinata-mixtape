@@ -7,7 +7,8 @@ It includes:
 - `manifest.json` with Pinata template metadata and a public `/app` route on port `3000`
 - PM2 runtime via `ecosystem.config.cjs`
 - TypeScript Next.js App Router UI mounted at `/app`
-- SQLite persistence in `workspace/data/mixtapes.db`
+- SQLite persistence in `workspace/data/mixtapes.db` for local dev and PM2 installs
+- **Vercel / serverless:** set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` (Turso libSQL). The ephemeral `/tmp` SQLite path was removed — without Turso, production cannot persist creators and stations across requests.
 - Normalized `mixes`, `songs`, and `mix_songs` storage for reusable track memory
 - API routes for mix CRUD, song-library search, combined sidebar search, and timestamped timeline moments
 - Workspace identity docs for onboarding, DJ personas, operations, and future task ideas

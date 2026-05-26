@@ -10,7 +10,7 @@ const MAX_BYTES = 25 * 1024 * 1024;
 
 export async function GET() {
   return withCreator(async (creator) => {
-    return Response.json({ voiceClones: listVoiceClones(creator.id) });
+    return Response.json({ voiceClones: await listVoiceClones(creator.id) });
   });
 }
 
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         fileId: upload.fileId,
         text: consentText || undefined
       });
-      const stored = createVoiceClone({
+      const stored = await createVoiceClone({
         creatorId: creator.id,
         provider: "mosi",
         externalVoiceId: clone.voiceId,

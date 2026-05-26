@@ -15,7 +15,7 @@ async function stationId(context: Context): Promise<number> {
 }
 
 export async function GET(_request: Request, context: Context) {
-  const station = getStation(await stationId(context));
+  const station = await getStation(await stationId(context));
   if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
   if (!station.isPublic) {
     const creator = await getCurrentCreator();
@@ -29,7 +29,7 @@ export async function GET(_request: Request, context: Context) {
 export async function PATCH(request: Request, context: Context) {
   return withCreator(async (creator) => {
     const id = await stationId(context);
-    const station = getStation(id);
+    const station = await getStation(id);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, context: Context) {
     if (body?.seedMixId === null || typeof body?.seedMixId === "number") {
       patch.seedMixId = body.seedMixId as number | null;
     }
-    const updated = updateStation(id, patch);
+    const updated = await updateStation(id, patch);
     return Response.json({ station: updated });
   });
 }
@@ -49,10 +49,10 @@ export async function PATCH(request: Request, context: Context) {
 export async function DELETE(_request: Request, context: Context) {
   return withCreator(async (creator) => {
     const id = await stationId(context);
-    const station = getStation(id);
+    const station = await getStation(id);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
-    deleteStation(id);
+    await deleteStation(id);
     return Response.json({ ok: true });
   });
 }

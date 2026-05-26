@@ -15,10 +15,10 @@ export async function GET(_request: Request, context: Context) {
     if (stationId === null) {
       return Response.json({ error: "Invalid station id." }, { status: 400 });
     }
-    const station = getStation(stationId);
+    const station = await getStation(stationId);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
-    return Response.json({ feeds: listPodcastFeeds(stationId) });
+    return Response.json({ feeds: await listPodcastFeeds(stationId) });
   });
 }
 
@@ -29,7 +29,7 @@ export async function POST(request: Request, context: Context) {
     if (stationId === null) {
       return Response.json({ error: "Invalid station id." }, { status: 400 });
     }
-    const station = getStation(stationId);
+    const station = await getStation(stationId);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
 
@@ -39,7 +39,7 @@ export async function POST(request: Request, context: Context) {
 
     try {
       const normalizedFeedUrl = assertPublicHttpUrl(feedUrl, "feedUrl").toString();
-      const feed = addPodcastFeed(stationId, normalizedFeedUrl);
+      const feed = await addPodcastFeed(stationId, normalizedFeedUrl);
       await refreshFeed(feed.id);
       const added = await materializeEpisodesAsSegments(feed, { limit: 3 });
       return Response.json({ feed, segmentsAdded: added }, { status: 201 });

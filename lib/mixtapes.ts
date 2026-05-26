@@ -1,5 +1,18 @@
-import { db } from "./db";
 import { searchMusicBrainzRecordings } from "./musicbrainz";
+import Database from "better-sqlite3";
+
+import { dbReady, getSqliteDatabase, useLibsql } from "./db";
+import { sqlAll, sqlGet, sqlRun, txGet, txRun, withWriteTransaction } from "./sql-bridge";
+import type { Transaction } from "@libsql/client";
+
+let legacyMigrationPromise: Promise<void> | null = null;
+
+function scheduleLegacyMixMigration(): Promise<void> {
+  if (!legacyMigrationPromise) {
+    legacyMigrationPromise = migrateLegacyTracks();
+  }
+  return legacyMigrationPromise;
+}
 
 export type TrackInput = {
   title: string;
@@ -141,76 +154,7 @@ type MixMomentRow = {
   created_at: string;
 };
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS mixes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT,
-    vibe TEXT,
-    use_case TEXT,
-    duration TEXT,
-    dj_persona TEXT,
-    cover_theme TEXT,
-    share_note TEXT,
-    tags TEXT NOT NULL DEFAULT '[]',
-    tracks TEXT NOT NULL DEFAULT '[]',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
 
-  CREATE TABLE IF NOT EXISTS songs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fingerprint TEXT NOT NULL UNIQUE,
-    title TEXT NOT NULL,
-    artist TEXT NOT NULL,
-    musicbrainz_id TEXT,
-    release_year TEXT,
-    duration TEXT,
-    bpm TEXT,
-    energy TEXT,
-    mood_tags TEXT NOT NULL DEFAULT '[]',
-    scene_tags TEXT NOT NULL DEFAULT '[]',
-    notes TEXT,
-    musicbrainz_url TEXT,
-    youtube_url TEXT,
-    listen_url TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS mix_songs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mix_id INTEGER NOT NULL,
-    song_id INTEGER NOT NULL,
-    position INTEGER NOT NULL,
-    UNIQUE(mix_id, position),
-    FOREIGN KEY(mix_id) REFERENCES mixes(id) ON DELETE CASCADE,
-    FOREIGN KEY(song_id) REFERENCES songs(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS mix_moments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    body TEXT,
-    kind TEXT NOT NULL DEFAULT 'note',
-    mix_id INTEGER,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(mix_id) REFERENCES mixes(id) ON DELETE SET NULL
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_mix_songs_mix_position ON mix_songs(mix_id, position);
-  CREATE INDEX IF NOT EXISTS idx_mix_songs_song ON mix_songs(song_id);
-`);
-try {
-  db.exec(`ALTER TABLE songs ADD COLUMN musicbrainz_id TEXT`);
-} catch {
-  // Column already exists in upgraded databases.
-}
-try {
-  db.exec(`ALTER TABLE songs ADD COLUMN youtube_url TEXT`);
-} catch {
-  // Column already exists in upgraded databases.
-}
 
 function parseList(value: string): string[] {
   try {
@@ -321,21 +265,20 @@ function mapLibrarySong(row: SongListRow): Song {
   };
 }
 
-function listTracksForMix(mixId: number): Track[] {
-  const rows = db
-    .prepare(
-      `SELECT songs.*, mix_songs.position
-       FROM mix_songs
-       JOIN songs ON songs.id = mix_songs.song_id
-       WHERE mix_songs.mix_id = ?
-       ORDER BY mix_songs.position ASC, mix_songs.id ASC`
-    )
-    .all(mixId) as MixSongRow[];
+async function listTracksForMix(mixId: number): Promise<Track[]> {
+  const rows = await sqlAll<MixSongRow>(
+    `SELECT songs.*, mix_songs.position
+     FROM mix_songs
+     JOIN songs ON songs.id = mix_songs.song_id
+     WHERE mix_songs.mix_id = ?
+     ORDER BY mix_songs.position ASC, mix_songs.id ASC`,
+    [mixId]
+  );
 
   return rows.map(mapSong);
 }
 
-function mapMix(row: MixRow): Mix {
+async function mapMix(row: MixRow): Promise<Mix> {
   return {
     id: row.id,
     title: row.title,
@@ -347,7 +290,7 @@ function mapMix(row: MixRow): Mix {
     coverTheme: row.cover_theme ?? "",
     shareNote: row.share_note ?? "",
     tags: parseList(row.tags),
-    tracks: listTracksForMix(row.id),
+    tracks: await listTracksForMix(row.id),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -369,8 +312,9 @@ function mapMixMoment(row: MixMomentRow): MixMoment {
   };
 }
 
-const upsertSongStatement = db.prepare(
-  `INSERT INTO songs (
+
+
+const UPSERT_SONG_SQL = `INSERT INTO songs (
     fingerprint, title, artist, musicbrainz_id, release_year, duration, bpm, energy, mood_tags, scene_tags, notes, musicbrainz_url, youtube_url, listen_url
   ) VALUES (
     @fingerprint, @title, @artist, @musicbrainzId, @releaseYear, @duration, @bpm, @energy, @moodTags, @sceneTags, @notes, @musicbrainzUrl, @youtubeUrl, @listenUrl
@@ -389,16 +333,14 @@ const upsertSongStatement = db.prepare(
     musicbrainz_url = excluded.musicbrainz_url,
     youtube_url = COALESCE(excluded.youtube_url, songs.youtube_url),
     listen_url = excluded.listen_url,
-    updated_at = CURRENT_TIMESTAMP`
-);
+    updated_at = CURRENT_TIMESTAMP`;
 
-const selectSongIdByFingerprint = db.prepare("SELECT id FROM songs WHERE fingerprint = ?");
+const INSERT_MIX_SONG_SQL = `INSERT INTO mix_songs (mix_id, song_id, position)
+     VALUES (@mixId, @songId, @position)`;
 
-function upsertSong(track: Track): number {
-  const fingerprint = fingerprintForTrack(track);
-
-  upsertSongStatement.run({
-    fingerprint,
+function upsertSongParams(track: Track): Record<string, unknown> {
+  return {
+    fingerprint: fingerprintForTrack(track),
     title: track.title,
     artist: track.artist,
     musicbrainzId: "",
@@ -412,68 +354,96 @@ function upsertSong(track: Track): number {
     musicbrainzUrl: track.musicbrainzUrl,
     youtubeUrl: track.youtubeUrl,
     listenUrl: track.listenUrl
-  });
+  };
+}
 
-  const row = selectSongIdByFingerprint.get(fingerprint) as { id: number } | undefined;
+function upsertSongSQLite(database: Database.Database, track: Track): number {
+  database.prepare(UPSERT_SONG_SQL).run(upsertSongParams(track));
+  const fingerprint = fingerprintForTrack(track);
+  const row = database.prepare("SELECT id FROM songs WHERE fingerprint = ?").get(fingerprint) as { id: number } | undefined;
   if (!row) throw new Error("Could not persist song.");
   return row.id;
 }
 
-function replaceMixSongs(mixId: number, tracks: Track[]): void {
-  db.prepare("DELETE FROM mix_songs WHERE mix_id = ?").run(mixId);
-
-  const insertMixSong = db.prepare(
-    `INSERT INTO mix_songs (mix_id, song_id, position)
-     VALUES (@mixId, @songId, @position)`
-  );
-
-  for (const [index, track] of tracks.entries()) {
-    const songId = upsertSong(track);
-    insertMixSong.run({
-      mixId,
-      songId,
-      position: index + 1
-    });
-  }
+async function upsertSongTx(tx: Transaction, track: Track): Promise<number> {
+  await txRun(tx, UPSERT_SONG_SQL, upsertSongParams(track));
+  const fingerprint = fingerprintForTrack(track);
+  const row = await txGet<{ id: number }>(tx, "SELECT id FROM songs WHERE fingerprint = ?", [fingerprint]);
+  if (!row) throw new Error("Could not persist song.");
+  return row.id;
 }
 
-function migrateLegacyTracks(): void {
-  const legacyRows = db
-    .prepare(
-      `SELECT mixes.*
-       FROM mixes
-       WHERE tracks <> '[]'
-         AND NOT EXISTS (
-           SELECT 1 FROM mix_songs WHERE mix_songs.mix_id = mixes.id
-         )`
-    )
-    .all() as MixRow[];
+async function upsertSong(track: Track): Promise<number> {
+  await dbReady();
+  if (useLibsql()) {
+    await sqlRun(UPSERT_SONG_SQL, upsertSongParams(track));
+    const fingerprint = fingerprintForTrack(track);
+    const row = await sqlGet<{ id: number }>("SELECT id FROM songs WHERE fingerprint = ?", [fingerprint]);
+    if (!row) throw new Error("Could not persist song.");
+    return row.id;
+  }
+  return upsertSongSQLite(getSqliteDatabase(), track);
+}
+
+async function replaceMixSongs(mixId: number, tracks: Track[]): Promise<void> {
+  await withWriteTransaction({
+    sqlite: () => {
+      const database = getSqliteDatabase();
+      database.transaction(() => {
+        database.prepare("DELETE FROM mix_songs WHERE mix_id = ?").run(mixId);
+        const insertMixSong = database.prepare(INSERT_MIX_SONG_SQL);
+        for (const [index, track] of tracks.entries()) {
+          const songId = upsertSongSQLite(database, track);
+          insertMixSong.run({
+            mixId,
+            songId,
+            position: index + 1
+          });
+        }
+      })();
+    },
+    libsql: async (tx) => {
+      await txRun(tx, "DELETE FROM mix_songs WHERE mix_id = ?", [mixId]);
+      for (const [index, track] of tracks.entries()) {
+        const songId = await upsertSongTx(tx, track);
+        await txRun(tx, INSERT_MIX_SONG_SQL, {
+          mixId,
+          songId,
+          position: index + 1
+        });
+      }
+    }
+  });
+}
+
+async function migrateLegacyTracks(): Promise<void> {
+  await dbReady();
+  const legacyRows = await sqlAll<MixRow>(
+    `SELECT mixes.*
+     FROM mixes
+     WHERE tracks <> '[]'
+       AND NOT EXISTS (
+         SELECT 1 FROM mix_songs WHERE mix_songs.mix_id = mixes.id
+       )`
+  );
 
   if (legacyRows.length === 0) return;
 
-  const migrate = db.transaction((rows: MixRow[]) => {
-    for (const row of rows) {
-      const tracks = parseLegacyTracks(row.tracks);
-      replaceMixSongs(row.id, tracks);
-    }
-  });
-
-  migrate(legacyRows);
+  for (const row of legacyRows) {
+    await replaceMixSongs(row.id, parseLegacyTracks(row.tracks));
+  }
 }
-
-migrateLegacyTracks();
-
-export function listMixes(query = ""): Mix[] {
+export async function listMixes(query = ""): Promise<Mix[]> {
+  await scheduleLegacyMixMigration();
   const search = query.trim();
   if (!search) {
-    const rows = db.prepare("SELECT * FROM mixes ORDER BY updated_at DESC, id DESC").all() as MixRow[];
-    return rows.map(mapMix);
+    const rows = await sqlAll<MixRow>("SELECT * FROM mixes ORDER BY updated_at DESC, id DESC");
+    return Promise.all(rows.map((row) => mapMix(row)));
   }
 
   const like = `%${search}%`;
-  const rows = db
-    .prepare(
-      `SELECT DISTINCT mixes.*
+  const rows = await sqlAll<MixRow>(
+    `SELECT DISTINCT mixes.*
        FROM mixes
        LEFT JOIN mix_songs ON mix_songs.mix_id = mixes.id
        LEFT JOIN songs ON songs.id = mix_songs.song_id
@@ -491,14 +461,15 @@ export function listMixes(query = ""): Mix[] {
           OR songs.notes LIKE @like
           OR songs.mood_tags LIKE @like
           OR songs.scene_tags LIKE @like
-       ORDER BY mixes.updated_at DESC, mixes.id DESC`
-    )
-    .all({ like }) as MixRow[];
+       ORDER BY mixes.updated_at DESC, mixes.id DESC`,
+    { like }
+  );
 
-  return rows.map(mapMix);
+  return Promise.all(rows.map((row) => mapMix(row)));
 }
 
-export function listSongs(query = "", limit = 12): Song[] {
+export async function listSongs(query = "", limit = 12): Promise<Song[]> {
+  await scheduleLegacyMixMigration();
   const search = query.trim();
   const baseQuery = `
     SELECT
@@ -510,21 +481,19 @@ export function listSongs(query = "", limit = 12): Song[] {
   `;
 
   if (!search) {
-    const rows = db
-      .prepare(
-        `${baseQuery}
+    const rows = await sqlAll<SongListRow>(
+      `${baseQuery}
          GROUP BY songs.id
          ORDER BY songs.updated_at DESC, songs.id DESC
-         LIMIT ?`
-      )
-      .all(Math.min(Math.max(limit, 1), 50)) as SongListRow[];
+         LIMIT ?`,
+      [Math.min(Math.max(limit, 1), 50)]
+    );
     return rows.map(mapLibrarySong);
   }
 
   const like = `%${search}%`;
-  const rows = db
-    .prepare(
-      `${baseQuery}
+  const rows = await sqlAll<SongListRow>(
+    `${baseQuery}
        WHERE songs.title LIKE @like
           OR songs.artist LIKE @like
           OR songs.energy LIKE @like
@@ -533,38 +502,40 @@ export function listSongs(query = "", limit = 12): Song[] {
           OR songs.scene_tags LIKE @like
        GROUP BY songs.id
        ORDER BY songs.updated_at DESC, songs.id DESC
-       LIMIT @limit`
-    )
-    .all({ like, limit: Math.min(Math.max(limit, 1), 50) }) as SongListRow[];
+       LIMIT @limit`,
+    { like, limit: Math.min(Math.max(limit, 1), 50) }
+  );
 
   return rows.map(mapLibrarySong);
 }
 
-export function getSong(id: number): Song | null {
-  const row = db
-    .prepare(
-      `SELECT
+export async function getSong(id: number): Promise<Song | null> {
+  await scheduleLegacyMixMigration();
+  const row = await sqlGet<SongListRow>(
+    `SELECT
         songs.*,
         COUNT(DISTINCT mix_songs.mix_id) AS mix_count,
         COALESCE(json_group_array(DISTINCT mix_songs.mix_id), '[]') AS mix_ids
        FROM songs
        LEFT JOIN mix_songs ON mix_songs.song_id = songs.id
        WHERE songs.id = ?
-       GROUP BY songs.id`
-    )
-    .get(id) as SongListRow | undefined;
+       GROUP BY songs.id`,
+    [id]
+  );
 
   return row ? mapLibrarySong(row) : null;
 }
 
-export function createSong(input: SongInput): Song {
+export async function createSong(input: SongInput): Promise<Song> {
+  await scheduleLegacyMixMigration();
   const track = normalizeTrack(input);
-  const songId = upsertSong(track);
-  return getSong(songId) as Song;
+  const songId = await upsertSong(track);
+  return (await getSong(songId)) as Song;
 }
 
-export function updateSong(id: number, input: Partial<SongInput>): Song | null {
-  const current = getSong(id);
+export async function updateSong(id: number, input: Partial<SongInput>): Promise<Song | null> {
+  await scheduleLegacyMixMigration();
+  const current = await getSong(id);
   if (!current) return null;
 
   const next = normalizeTrack({
@@ -582,7 +553,7 @@ export function updateSong(id: number, input: Partial<SongInput>): Song | null {
     listenUrl: input.listenUrl?.trim() ?? current.listenUrl
   });
 
-  db.prepare(
+  await sqlRun(
     `UPDATE songs
      SET title = @title,
          artist = @artist,
@@ -597,82 +568,107 @@ export function updateSong(id: number, input: Partial<SongInput>): Song | null {
          youtube_url = @youtubeUrl,
          listen_url = @listenUrl,
          updated_at = CURRENT_TIMESTAMP
-     WHERE id = @id`
-  ).run({
-    id,
-    title: next.title,
-    artist: next.artist,
-    releaseYear: next.releaseYear,
-    duration: next.duration,
-    bpm: next.bpm,
-    energy: next.energy,
-    moodTags: JSON.stringify(next.moodTags),
-    sceneTags: JSON.stringify(next.sceneTags),
-    notes: next.notes,
-    musicbrainzUrl: next.musicbrainzUrl,
-    youtubeUrl: next.youtubeUrl,
-    listenUrl: next.listenUrl
-  });
+     WHERE id = @id`,
+    {
+      id,
+      title: next.title,
+      artist: next.artist,
+      releaseYear: next.releaseYear,
+      duration: next.duration,
+      bpm: next.bpm,
+      energy: next.energy,
+      moodTags: JSON.stringify(next.moodTags),
+      sceneTags: JSON.stringify(next.sceneTags),
+      notes: next.notes,
+      musicbrainzUrl: next.musicbrainzUrl,
+      youtubeUrl: next.youtubeUrl,
+      listenUrl: next.listenUrl
+    }
+  );
 
-  return getSong(id);
+  return await getSong(id);
 }
 
-export function addSongToMix(
+export async function addSongToMix(
   mixId: number,
   input: { songId?: number; position?: number; song?: SongInput }
-): Mix | null {
-  const mix = getMix(mixId);
+): Promise<Mix | null> {
+  await scheduleLegacyMixMigration();
+  const mix = await getMix(mixId);
   if (!mix) return null;
 
   const resolvedSongId =
     typeof input.songId === "number" && Number.isFinite(input.songId)
       ? input.songId
       : input.song
-        ? createSong(input.song).id
+        ? (await createSong(input.song)).id
         : null;
 
   if (!resolvedSongId) {
     throw new Error("Provide either `songId` or `song` when adding to a mix.");
   }
 
-  const targetSong = getSong(resolvedSongId);
+  const targetSong = await getSong(resolvedSongId);
   if (!targetSong) {
     throw new Error("Song not found.");
   }
 
-  const currentCountRow = db
-    .prepare("SELECT COUNT(*) AS count, COALESCE(MAX(position), 0) AS max_position FROM mix_songs WHERE mix_id = ?")
-    .get(mixId) as { count: number; max_position: number };
+  const currentCountRow = await sqlGet<{ max_position: number }>(
+    "SELECT COALESCE(MAX(position), 0) AS max_position FROM mix_songs WHERE mix_id = ?",
+    [mixId]
+  );
 
   const requestedPosition =
     typeof input.position === "number" && Number.isFinite(input.position)
       ? Math.max(1, Math.floor(input.position))
-      : currentCountRow.max_position + 1;
+      : (currentCountRow?.max_position ?? 0) + 1;
 
-  const insert = db.transaction(() => {
-    db.prepare(
-      `UPDATE mix_songs
+  await withWriteTransaction({
+    sqlite: () => {
+      const database = getSqliteDatabase();
+      database.transaction(() => {
+        database
+          .prepare(
+            `UPDATE mix_songs
        SET position = position + 1
        WHERE mix_id = @mixId AND position >= @position`
-    ).run({
-      mixId,
-      position: requestedPosition
-    });
+          )
+          .run({
+            mixId,
+            position: requestedPosition
+          });
 
-    db.prepare(
-      `INSERT INTO mix_songs (mix_id, song_id, position)
+        database
+          .prepare(
+            `INSERT INTO mix_songs (mix_id, song_id, position)
        VALUES (@mixId, @songId, @position)`
-    ).run({
-      mixId,
-      songId: targetSong.id,
-      position: requestedPosition
-    });
+          )
+          .run({
+            mixId,
+            songId: targetSong.id,
+            position: requestedPosition
+          });
 
-    db.prepare("UPDATE mixes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(mixId);
+        database.prepare("UPDATE mixes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(mixId);
+      })();
+    },
+    libsql: async (tx) => {
+      await txRun(tx, `UPDATE mix_songs SET position = position + 1 WHERE mix_id = @mixId AND position >= @position`, {
+        mixId,
+        position: requestedPosition
+      });
+
+      await txRun(tx, `INSERT INTO mix_songs (mix_id, song_id, position) VALUES (@mixId, @songId, @position)`, {
+        mixId,
+        songId: targetSong.id,
+        position: requestedPosition
+      });
+
+      await txRun(tx, "UPDATE mixes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", [mixId]);
+    }
   });
 
-  insert();
-  return getMix(mixId);
+  return await getMix(mixId);
 }
 
 type EnrichSongInput = {
@@ -685,7 +681,7 @@ type EnrichSongInput = {
 };
 
 export async function enrichSongFromMusicBrainz(id: number, input: EnrichSongInput = {}): Promise<Song | null> {
-  const current = getSong(id);
+  const current = await getSong(id);
   if (!current) return null;
 
   const hasCanonicalMusicBrainzLink =
@@ -719,7 +715,7 @@ export async function enrichSongFromMusicBrainz(id: number, input: EnrichSongInp
     };
   }
 
-  db.prepare(
+  await sqlRun(
     `UPDATE songs
      SET musicbrainz_id = @musicbrainzId,
          musicbrainz_url = @musicbrainzUrl,
@@ -729,37 +725,38 @@ export async function enrichSongFromMusicBrainz(id: number, input: EnrichSongInp
            ELSE release_year
          END,
          updated_at = CURRENT_TIMESTAMP
-     WHERE id = @id`
-  ).run({
-    id,
-    musicbrainzId: next.musicbrainzId,
-    musicbrainzUrl: next.musicbrainzUrl,
-    youtubeUrl: next.youtubeUrl,
-    releaseYear: next.releaseYear
-  });
+     WHERE id = @id`,
+    {
+      id,
+      musicbrainzId: next.musicbrainzId,
+      musicbrainzUrl: next.musicbrainzUrl,
+      youtubeUrl: next.youtubeUrl,
+      releaseYear: next.releaseYear
+    }
+  );
 
-  return getSong(id);
+  return await getSong(id);
 }
 
-export function getMix(id: number): Mix | null {
-  const row = db.prepare("SELECT * FROM mixes WHERE id = ?").get(id) as MixRow | undefined;
-  return row ? mapMix(row) : null;
+export async function getMix(id: number): Promise<Mix | null> {
+  await scheduleLegacyMixMigration();
+  const row = await sqlGet<MixRow>("SELECT * FROM mixes WHERE id = ?", [id]);
+  return row ? await mapMix(row) : null;
 }
 
-export function createMix(input: MixInput): Mix {
+export async function createMix(input: MixInput): Promise<Mix> {
+  await scheduleLegacyMixMigration();
   const title = input.title.trim();
   if (!title) throw new Error("Title is required.");
 
   const tracks = (input.tracks ?? []).map(normalizeTrack);
-  const result = db
-    .prepare(
-      `INSERT INTO mixes (
+  const result = await sqlRun(
+    `INSERT INTO mixes (
         title, description, vibe, use_case, duration, dj_persona, cover_theme, share_note, tags, tracks
       ) VALUES (
         @title, @description, @vibe, @useCase, @duration, @djPersona, @coverTheme, @shareNote, @tags, '[]'
-      )`
-    )
-    .run({
+      )`,
+    {
       title,
       description: input.description?.trim() || "",
       vibe: input.vibe?.trim() || "",
@@ -769,15 +766,17 @@ export function createMix(input: MixInput): Mix {
       coverTheme: input.coverTheme?.trim() || "",
       shareNote: input.shareNote?.trim() || "",
       tags: JSON.stringify(normalizeList(input.tags))
-    });
+    }
+  );
 
   const mixId = Number(result.lastInsertRowid);
-  replaceMixSongs(mixId, tracks);
-  return getMix(mixId) as Mix;
+  await replaceMixSongs(mixId, tracks);
+  return (await getMix(mixId)) as Mix;
 }
 
-export function updateMix(id: number, input: Partial<MixInput>): Mix | null {
-  const current = getMix(id);
+export async function updateMix(id: number, input: Partial<MixInput>): Promise<Mix | null> {
+  await scheduleLegacyMixMigration();
+  const current = await getMix(id);
   if (!current) return null;
 
   const nextTracks = input.tracks ? input.tracks.map(normalizeTrack) : current.tracks;
@@ -794,7 +793,7 @@ export function updateMix(id: number, input: Partial<MixInput>): Mix | null {
     id
   };
 
-  db.prepare(
+  await sqlRun(
     `UPDATE mixes
      SET title = @title,
          description = @description,
@@ -806,59 +805,62 @@ export function updateMix(id: number, input: Partial<MixInput>): Mix | null {
          share_note = @shareNote,
          tags = @tags,
          updated_at = CURRENT_TIMESTAMP
-     WHERE id = @id`
-  ).run(next);
+     WHERE id = @id`,
+    next
+  );
 
-  replaceMixSongs(id, nextTracks);
-  return getMix(id);
+  await replaceMixSongs(id, nextTracks);
+  return await getMix(id);
 }
 
-export function deleteMix(id: number): boolean {
-  db.prepare("DELETE FROM mix_songs WHERE mix_id = ?").run(id);
-  const result = db.prepare("DELETE FROM mixes WHERE id = ?").run(id);
+export async function deleteMix(id: number): Promise<boolean> {
+  await scheduleLegacyMixMigration();
+  await sqlRun("DELETE FROM mix_songs WHERE mix_id = ?", [id]);
+  const result = await sqlRun("DELETE FROM mixes WHERE id = ?", [id]);
   return result.changes > 0;
 }
 
-export function listMixMoments(limit = 25): MixMoment[] {
-  const rows = db
-    .prepare(
-      `SELECT mix_moments.*, mixes.title AS mix_title
+export async function listMixMoments(limit = 25): Promise<MixMoment[]> {
+  await scheduleLegacyMixMigration();
+  const rows = await sqlAll<MixMomentRow>(
+    `SELECT mix_moments.*, mixes.title AS mix_title
        FROM mix_moments
        LEFT JOIN mixes ON mixes.id = mix_moments.mix_id
        ORDER BY mix_moments.created_at DESC, mix_moments.id DESC
-       LIMIT ?`
-    )
-    .all(Math.min(Math.max(limit, 1), 100)) as MixMomentRow[];
+       LIMIT ?`,
+    [Math.min(Math.max(limit, 1), 100)]
+  );
 
   return rows.map(mapMixMoment);
 }
 
-export function createMixMoment(input: MixMomentInput): MixMoment {
+export async function createMixMoment(input: MixMomentInput): Promise<MixMoment> {
+  await scheduleLegacyMixMigration();
   const title = input.title.trim();
   if (!title) throw new Error("Title is required.");
 
-  const result = db
-    .prepare(
-      `INSERT INTO mix_moments (title, body, kind, mix_id)
-       VALUES (@title, @body, @kind, @mixId)`
-    )
-    .run({
+  const result = await sqlRun(
+    `INSERT INTO mix_moments (title, body, kind, mix_id)
+       VALUES (@title, @body, @kind, @mixId)`,
+    {
       title,
       body: input.body?.trim() || "",
       kind: normalizeMomentKind(input.kind),
       mixId: input.mixId ?? null
-    });
+    }
+  );
 
-  return listMixMoments(100).find((moment) => moment.id === Number(result.lastInsertRowid)) as MixMoment;
+  const moments = await listMixMoments(100);
+  return moments.find((moment) => moment.id === Number(result.lastInsertRowid)) as MixMoment;
 }
 
-export function seedMixes(): Mix[] {
-  if (listMixes().length > 0) {
-    seedMixMoments();
-    return listMixes();
+export async function seedMixes(): Promise<Mix[]> {
+  if ((await listMixes()).length > 0) {
+    await seedMixMoments();
+    return await listMixes();
   }
 
-  const mix = createMix({
+  const mix = await createMix({
     title: "Neon Rooftop Warm-Up",
     description: "A retro house-and-leftfield opener that starts conversational, then lifts into a loose rooftop glide.",
     vibe: "warm-up to lift-off",
@@ -911,31 +913,31 @@ export function seedMixes(): Mix[] {
     ]
   });
 
-  seedMixMoments(mix.id);
-  return listMixes();
+  await seedMixMoments(mix.id);
+  return await listMixes();
 }
 
-export function seedMixMoments(mixId?: number): MixMoment[] {
-  if (listMixMoments(1).length > 0) return listMixMoments();
+export async function seedMixMoments(mixId?: number): Promise<MixMoment[]> {
+  if ((await listMixMoments(1)).length > 0) return await listMixMoments();
 
-  createMixMoment({
+  await createMixMoment({
     title: "Captured a rooftop warm-up arc",
     body: "The target arc starts social and patient, then widens into recognizable hooks once the room is full.",
     kind: "set",
-    mixId: mixId ?? listMixes()[0]?.id ?? null
+    mixId: mixId ?? (await listMixes())[0]?.id ?? null
   });
 
-  createMixMoment({
+  await createMixMoment({
     title: "User asked for a retro AI DJ persona",
     body: "Default to a lightly theatrical host voice, but keep recommendations grounded in actual event pacing.",
     kind: "memory"
   });
 
-  createMixMoment({
+  await createMixMoment({
     title: "Phase one sourcing rule",
     body: "Store metadata and legal outbound links only. Avoid direct download or audio hosting workflows in the first release.",
     kind: "note"
   });
 
-  return listMixMoments();
+  return await listMixMoments();
 }

@@ -18,10 +18,10 @@ export async function POST(_request: Request, context: Context) {
     if (!Number.isInteger(feedId) || feedId < 1) {
       return Response.json({ error: "Invalid feed id." }, { status: 400 });
     }
-    const station = getStation(stationId);
+    const station = await getStation(stationId);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
-    const feed = getPodcastFeed(feedId);
+    const feed = await getPodcastFeed(feedId);
     if (!feed || feed.stationId !== stationId) {
       return Response.json({ error: "Feed not found." }, { status: 404 });
     }

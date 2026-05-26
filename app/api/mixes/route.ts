@@ -4,9 +4,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  seedMixes();
+  await seedMixes();
   const url = new URL(request.url);
-  return Response.json({ mixes: listMixes(url.searchParams.get("q") ?? "") });
+  return Response.json({ mixes: await listMixes(url.searchParams.get("q") ?? "") });
 }
 
 export async function POST(request: Request) {
@@ -17,6 +17,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "Title is required." }, { status: 400 });
   }
 
-  const mix = createMix(body);
+  const mix = await createMix(body);
   return Response.json({ mix }, { status: 201 });
 }

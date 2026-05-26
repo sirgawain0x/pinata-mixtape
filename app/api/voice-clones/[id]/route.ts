@@ -18,7 +18,7 @@ export async function DELETE(_request: Request, context: Context) {
     const id = Number(params.id);
     if (!Number.isInteger(id) || id < 1) return Response.json({ error: "Invalid id." }, { status: 400 });
 
-    const clone = getVoiceClone(id);
+    const clone = await getVoiceClone(id);
     if (!clone) return Response.json({ error: "Voice clone not found." }, { status: 404 });
     if (clone.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
 
@@ -32,12 +32,12 @@ export async function DELETE(_request: Request, context: Context) {
     }
 
     const fullVoiceId = `${clone.provider}:${clone.externalVoiceId}`;
-    const me = getCreator(creator.id);
+    const me = await getCreator(creator.id);
     if (me?.ttsVoiceId === fullVoiceId) {
-      updateCreator(creator.id, { ttsProvider: "kokoro", ttsVoiceId: "kokoro:af_heart" });
+      await updateCreator(creator.id, { ttsProvider: "kokoro", ttsVoiceId: "kokoro:af_heart" });
     }
 
-    if (!deleteVoiceClone(id, creator.id)) {
+    if (!(await deleteVoiceClone(id, creator.id))) {
       return Response.json({ error: "Could not delete voice clone." }, { status: 500 });
     }
 

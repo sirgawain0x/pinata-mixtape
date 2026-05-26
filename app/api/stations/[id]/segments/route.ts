@@ -24,16 +24,16 @@ async function stationId(context: Context): Promise<number> {
 
 export async function GET(_request: Request, context: Context) {
   const id = await stationId(context);
-  const station = getStation(id);
+  const station = await getStation(id);
   if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
   if (!station.isPublic) return Response.json({ error: "Station not found." }, { status: 404 });
-  return Response.json({ segments: listStationSegments(id) });
+  return Response.json({ segments: await listStationSegments(id) });
 }
 
 export async function POST(request: Request, context: Context) {
   return withCreator(async (creator) => {
     const id = await stationId(context);
-    const station = getStation(id);
+    const station = await getStation(id);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
 
@@ -49,19 +49,19 @@ export async function POST(request: Request, context: Context) {
     if (kind === "music") {
       if (!songId && body.song && typeof body.song === "object") {
         try {
-          const created = createSong(body.song);
+          const created = await createSong(body.song);
           songId = created.id;
         } catch {
           return Response.json({ error: "Invalid song details." }, { status: 400 });
         }
       }
-      if (!songId || !getSong(songId)) {
+      if (!songId || !(await getSong(songId))) {
         return Response.json({ error: "Music segment needs songId or song." }, { status: 400 });
       }
     }
 
     try {
-      const segment = addSegment({
+      const segment = await addSegment({
         stationId: id,
         kind,
         title: typeof body.title === "string" ? body.title : "",

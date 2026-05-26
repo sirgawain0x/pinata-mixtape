@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import { createClient, type RedisClientType } from "redis";
-import { db } from "./db";
+import { dbReady } from "./db";
+import { sqlGet, sqlRun } from "./sql-bridge";
 import type { Creator } from "./stations";
 
 export const NONCE_TTL_MS = 1000 * 60 * 10;
@@ -65,13 +66,15 @@ export async function issueNonceStorage(): Promise<string> {
     await upstash().set(nonceKey(nonce), "1", { px: NONCE_TTL_MS });
     return nonce;
   }
-  db.prepare(`INSERT INTO siwe_nonces (nonce, issued_at) VALUES (?, ?)`).run(nonce, Date.now());
+  await dbReady();
+  await sqlRun(`INSERT INTO siwe_nonces (nonce, issued_at) VALUES (?, ?)`, [nonce, Date.now()]);
   return nonce;
 }
 
 export async function purgeExpiredNoncesStorage(): Promise<void> {
   if (kvMode() !== "off") return;
-  db.prepare(`DELETE FROM siwe_nonces WHERE issued_at < ?`).run(Date.now() - NONCE_TTL_MS);
+  await dbReady();
+  await sqlRun(`DELETE FROM siwe_nonces WHERE issued_at < ?`, [Date.now() - NONCE_TTL_MS]);
 }
 
 export async function consumeNonceStorage(nonce: string): Promise<boolean> {
@@ -85,17 +88,17 @@ export async function consumeNonceStorage(nonce: string): Promise<boolean> {
     const v = await upstash().getdel(nonceKey(nonce));
     return v != null;
   }
-  const result = db
-    .prepare(
-      `UPDATE siwe_nonces
+  await dbReady();
+  const result = await sqlRun(
+    `UPDATE siwe_nonces
        SET consumed = 1
        WHERE nonce = ?
          AND consumed = 0
-         AND issued_at >= ?`
-    )
-    .run(nonce, Date.now() - NONCE_TTL_MS);
+         AND issued_at >= ?`,
+    [nonce, Date.now() - NONCE_TTL_MS]
+  );
   if (result.changes === 0) {
-    db.prepare(`DELETE FROM siwe_nonces WHERE nonce = ? AND issued_at < ?`).run(nonce, Date.now() - NONCE_TTL_MS);
+    await sqlRun(`DELETE FROM siwe_nonces WHERE nonce = ? AND issued_at < ?`, [nonce, Date.now() - NONCE_TTL_MS]);
     return false;
   }
   return true;
@@ -137,12 +140,13 @@ export async function issueSessionStorage(creator: Creator): Promise<string> {
     });
     return token;
   }
-  db.prepare(`INSERT INTO sessions (token, creator_id, issued_at, expires_at) VALUES (?, ?, ?, ?)`).run(
+  await dbReady();
+  await sqlRun(`INSERT INTO sessions (token, creator_id, issued_at, expires_at) VALUES (?, ?, ?, ?)`, [
     token,
     creator.id,
     now,
     now + SESSION_TTL_MS
-  );
+  ]);
   return token;
 }
 
@@ -191,12 +195,14 @@ export async function lookupSessionStorage(token: string | undefined): Promise<S
     return { creatorId: payload.creatorId, creatorFallback: payload.creator };
   }
 
-  const row = db
-    .prepare(`SELECT creator_id, expires_at FROM sessions WHERE token = ?`)
-    .get(token) as { creator_id: number; expires_at: number } | undefined;
+  await dbReady();
+  const row = await sqlGet<{ creator_id: number; expires_at: number }>(
+    `SELECT creator_id, expires_at FROM sessions WHERE token = ?`,
+    [token]
+  );
   if (!row) return null;
   if (row.expires_at < Date.now()) {
-    db.prepare(`DELETE FROM sessions WHERE token = ?`).run(token);
+    await sqlRun(`DELETE FROM sessions WHERE token = ?`, [token]);
     return null;
   }
   return { creatorId: row.creator_id };
@@ -213,5 +219,6 @@ export async function revokeSessionStorage(token: string): Promise<void> {
     await upstash().del(sessionKey(token));
     return;
   }
-  db.prepare(`DELETE FROM sessions WHERE token = ?`).run(token);
+  await dbReady();
+  await sqlRun(`DELETE FROM sessions WHERE token = ?`, [token]);
 }

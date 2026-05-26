@@ -7,17 +7,17 @@ type HomePageProps = {
 };
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  seedMixes();
-  seedMixMoments();
+  await seedMixes();
+  await seedMixMoments();
   const params = searchParams ? await searchParams : undefined;
   const initialSelectedId = params?.mix ? Number(params.mix) : null;
 
   return (
     <MixtapeApp
-      initialMixes={listMixes()}
-      initialMoments={listMixMoments(12)}
-      initialSongs={listSongs("", 8)}
-      initialStations={listStations({ publicOnly: true })}
+      initialMixes={await listMixes()}
+      initialMoments={await listMixMoments(12)}
+      initialSongs={await listSongs("", 8)}
+      initialStations={await listStations({ publicOnly: true })}
       initialSelectedId={Number.isFinite(initialSelectedId) ? initialSelectedId : null}
     />
   );

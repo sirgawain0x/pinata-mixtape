@@ -27,6 +27,6 @@ export default async function DashboardPage() {
     );
   }
 
-  const stations = listStations({ creatorId: creator.id });
+  const stations = await listStations({ creatorId: creator.id });
   return <DashboardClient creator={creator} initialStations={stations} />;
 }

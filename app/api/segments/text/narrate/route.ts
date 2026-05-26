@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     if (segmentId === null) return Response.json({ error: "Invalid segmentId." }, { status: 400 });
     const voiceId = typeof body?.voiceId === "string" ? body.voiceId : "";
 
-    const segment = getSegment(segmentId);
+    const segment = await getSegment(segmentId);
     if (!segment) return Response.json({ error: "Segment not found." }, { status: 404 });
     if (segment.kind !== "text") {
       return Response.json({ error: "Only text segments can be narrated." }, { status: 400 });
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Text body is empty." }, { status: 400 });
     }
 
-    const station = getStation(segment.stationId);
+    const station = await getStation(segment.stationId);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) {
       return Response.json({ error: "Forbidden." }, { status: 403 });
@@ -38,9 +38,9 @@ export async function POST(request: Request) {
     const resolvedVoiceId = voiceId || creator.ttsVoiceId || "kokoro:af_heart";
     const provider = await resolveProvider(resolvedVoiceId);
 
-    const cached = findGlobalCachedTts(segment.body, resolvedVoiceId, provider.id);
+    const cached = await findGlobalCachedTts(segment.body, resolvedVoiceId, provider.id);
     if (cached) {
-      const updated = updateSegment(segment.id, {
+      const updated = await updateSegment(segment.id, {
         audioCid: cached.audioCid,
         audioUrl: cached.audioUrl,
         durationSeconds: cached.durationSeconds,
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Could not store narration audio." }, { status: 502 });
     }
 
-    const updated = updateSegment(segment.id, {
+    const updated = await updateSegment(segment.id, {
       audioCid: upload.cid,
       audioUrl: upload.url,
       ttsVoice: resolvedVoiceId,

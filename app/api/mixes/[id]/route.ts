@@ -13,20 +13,20 @@ async function mixId(context: Context): Promise<number> {
 }
 
 export async function GET(_request: Request, context: Context) {
-  const mix = getMix(await mixId(context));
+  const mix = await getMix(await mixId(context));
   if (!mix) return Response.json({ error: "Mix not found." }, { status: 404 });
   return Response.json({ mix });
 }
 
 export async function PATCH(request: Request, context: Context) {
   const body = await request.json().catch(() => null);
-  const mix = updateMix(await mixId(context), body ?? {});
+  const mix = await updateMix(await mixId(context), body ?? {});
   if (!mix) return Response.json({ error: "Mix not found." }, { status: 404 });
   return Response.json({ mix });
 }
 
 export async function DELETE(_request: Request, context: Context) {
-  const deleted = deleteMix(await mixId(context));
+  const deleted = await deleteMix(await mixId(context));
   if (!deleted) return Response.json({ error: "Mix not found." }, { status: 404 });
   return Response.json({ ok: true });
 }

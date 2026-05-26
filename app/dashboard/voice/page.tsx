@@ -23,6 +23,6 @@ export default async function VoicePage() {
     );
   }
 
-  const clones = listVoiceClones(creator.id);
+  const clones = await listVoiceClones(creator.id);
   return <VoiceClient creator={creator} initialClones={clones} mosiAvailable={isMosiConfigured()} />;
 }

@@ -36,9 +36,12 @@ export default function DashboardClient({
   const [error, setError] = useState("");
 
   async function refresh() {
-    const response = await fetch(`${APP_BASE}/api/stations?mine=1`, { cache: "no-store" });
+    const response = await fetch(`${APP_BASE}/api/stations?mine=1`, {
+      cache: "no-store",
+      credentials: "include"
+    });
     const data = (await response.json()) as { stations: Station[] };
-    setStations(data.stations);
+    setStations(data.stations ?? []);
   }
 
   async function create() {
@@ -52,14 +55,22 @@ export default function DashboardClient({
       const response = await fetch(`${APP_BASE}/api/stations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ handle, name, tagline })
       });
       const data = (await response.json()) as { station?: Station; error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Could not create station.");
+      if (!response.ok) {
+        const message = data.error ?? "Could not create station.";
+        if (message.toLowerCase().includes("already taken")) {
+          await refresh();
+        }
+        throw new Error(message);
+      }
       if (!data.station) throw new Error("Could not open the new station.");
       setHandle("");
       setName("");
       setTagline("");
+      await refresh();
       router.push(`/s/${data.station.handle}`);
     } catch (err) {
       setError((err as Error).message);

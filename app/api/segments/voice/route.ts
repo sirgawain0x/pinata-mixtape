@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     if (!Number.isInteger(stationId) || stationId <= 0) {
       return Response.json({ error: "Invalid stationId." }, { status: 400 });
     }
-    const station = getStation(stationId);
+    const station = await getStation(stationId);
     if (!station) return Response.json({ error: "Station not found." }, { status: 404 });
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
 
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       mimeType: file.type || "audio/webm"
     });
 
-    const segment = addSegment({
+    const segment = await addSegment({
       stationId,
       kind,
       title,

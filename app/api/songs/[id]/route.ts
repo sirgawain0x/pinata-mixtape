@@ -13,14 +13,14 @@ async function songId(context: Context): Promise<number> {
 }
 
 export async function GET(_request: Request, context: Context) {
-  const song = getSong(await songId(context));
+  const song = await getSong(await songId(context));
   if (!song) return Response.json({ error: "Song not found." }, { status: 404 });
   return Response.json({ song });
 }
 
 export async function PATCH(request: Request, context: Context) {
   const body = await request.json().catch(() => null);
-  const song = updateSong(await songId(context), body ?? {});
+  const song = await updateSong(await songId(context), body ?? {});
   if (!song) return Response.json({ error: "Song not found." }, { status: 404 });
   return Response.json({ song });
 }

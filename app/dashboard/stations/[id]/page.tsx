@@ -11,7 +11,7 @@ type PageProps = { params: Promise<{ id: string }> };
 export default async function StationEditorPage({ params }: PageProps) {
   const creator = await getCurrentCreator();
   const { id } = await params;
-  const station = getStation(Number(id));
+  const station = await getStation(Number(id));
 
   if (!creator) {
     return (
@@ -35,9 +35,8 @@ export default async function StationEditorPage({ params }: PageProps) {
           <div className="hero-copy">
             <h1>Station not found</h1>
             <p className="muted">
-              Station #{id} could not be found. If you just created it, it may not have persisted
-              yet — this can happen on deployments that use ephemeral storage. Return to your
-              dashboard to try again or create a new station.
+              Station #{id} could not be found. If you just created it, try visiting your{" "}
+              <Link href="/dashboard">dashboard</Link> to access the editor.
             </p>
             <p>
               <Link className="button" href="/dashboard">Back to dashboard</Link>
@@ -63,22 +62,24 @@ export default async function StationEditorPage({ params }: PageProps) {
     );
   }
 
-  const rawSegments = listStationSegments(station.id);
-  const segments = rawSegments.map((segment) => {
-    const song = segment.songId ? getSong(segment.songId) : null;
-    return {
-      id: segment.id,
-      position: segment.position,
-      kind: segment.kind,
-      title: segment.title,
-      body: segment.body,
-      audioCid: segment.audioCid,
-      audioUrl: segment.audioUrl,
-      ttsVoice: segment.ttsVoice,
-      ttsProvider: segment.ttsProvider,
-      song: song ? { title: song.title, artist: song.artist, youtubeUrl: song.youtubeUrl } : null
-    };
-  });
+  const rawSegments = await listStationSegments(station.id);
+  const segments = await Promise.all(
+    rawSegments.map(async (segment) => {
+      const song = segment.songId ? await getSong(segment.songId) : null;
+      return {
+        id: segment.id,
+        position: segment.position,
+        kind: segment.kind,
+        title: segment.title,
+        body: segment.body,
+        audioCid: segment.audioCid,
+        audioUrl: segment.audioUrl,
+        ttsVoice: segment.ttsVoice,
+        ttsProvider: segment.ttsProvider,
+        song: song ? { title: song.title, artist: song.artist, youtubeUrl: song.youtubeUrl } : null
+      };
+    })
+  );
 
   return <StationEditor station={station} initialSegments={segments} defaultVoiceId={creator.ttsVoiceId} />;
 }
