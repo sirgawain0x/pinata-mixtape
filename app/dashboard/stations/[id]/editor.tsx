@@ -86,8 +86,8 @@ export default function StationEditor({
   }
 
   return (
-    <main className="shell">
-      <section className="hero">
+    <main className="shell station-editor">
+      <section className="hero hero-single">
         <div className="hero-copy">
           <p className="hero-mark">
             <span>Station editor</span>
@@ -98,23 +98,23 @@ export default function StationEditor({
           <p className="muted">
             Need a new narration voice? <Link href="/dashboard/voice">Configure it here</Link>.
           </p>
-          <p>
+          <div className="hero-actions">
             <Link className="button" href={`/s/${station.handle}`}>
               {isPublic ? "Open public page →" : "Preview station →"}
             </Link>
-          </p>
-          <p className="muted">
-            <label>
+            <label className="publish-toggle muted">
               <input
                 checked={isPublic}
                 disabled={publishBusy}
                 onChange={() => void togglePublish()}
                 type="checkbox"
-              />{" "}
-              Public — listeners can open <code>/s/{station.handle}</code> without signing in
+              />
+              <span>
+                Public — listeners can open <code>/s/{station.handle}</code> without signing in
+              </span>
             </label>
-            {publishError ? <span className="signin-error"> {publishError}</span> : null}
-          </p>
+          </div>
+          {publishError ? <p className="signin-error">{publishError}</p> : null}
         </div>
       </section>
 
