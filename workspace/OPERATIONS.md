@@ -243,11 +243,13 @@ Optional artifacts:
 - `<clip-name>.mp3|wav|m4a|ogg|aac`: per-segment narration clips such as `intro`, `transition_1`, or `outro`
 - a compiled broadcast audio file such as `mix.mp3` if you still generate one
 
-Read manifest:
+Read manifest (returns `200` with `{ "result": null }` when no manifest exists):
 
 ```http
 GET /app/api/mixes/6/dj-hosted
 ```
+
+On Vercel, manifests are stored in the `mix_dj_hosted` table (Turso) after generation; local disk under `workspace/data/generated-mixtapes/` is a dev fallback.
 
 Fetch a clip when present:
 
@@ -287,3 +289,28 @@ Keep phase one conservative:
 - Store legal outbound links.
 
 That keeps the first version useful without taking on streaming rights or sketchy sourcing workflows.
+
+## Production deployment checklist (`air.creativeplatform.xyz`)
+
+Required Vercel environment variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` | Mixes, stations, `mix_dj_hosted` |
+| `PINATA_JWT` (+ gateway vars) | DJ clip / segment audio persistence |
+| Session KV / Redis (see `lib/auth-storage.ts`) | Stable creator sessions |
+
+Verify a station handle (e.g. `g2-radio`):
+
+```sql
+SELECT handle, is_public, creator_id FROM stations WHERE handle = 'g2-radio' COLLATE NOCASE;
+```
+
+If missing in Turso, recreate from `/app/dashboard` while signed in — local SQLite rows do not sync to production.
+
+Verify DJ-hosted API (no manifest is OK):
+
+```http
+GET /app/api/mixes/1/dj-hosted
+→ 200 { "result": null }
+```

@@ -37,7 +37,7 @@ npm run dev
 - `GET /app/api/mixes/:id`
 - `PATCH /app/api/mixes/:id`
 - `DELETE /app/api/mixes/:id`
-- `GET /app/api/mixes/:id/dj-hosted`
+- `GET /app/api/mixes/:id/dj-hosted` (returns `{ result: null }` when no DJ-hosted manifest exists)
 - `GET /app/api/mixes/:id/dj-hosted/clip/:name`
 - `GET /app/api/mixes/:id/dj-hosted/file?mode=stream|download`
 - `GET /app/api/musicbrainz/recordings?title=...&artist=...`
@@ -54,7 +54,9 @@ This starter intentionally stays on the legal side of phase one. The hosted app 
 
 The hosted web route is intentionally read-only. Bootstrap, taste capture, DJ persona selection, mix generation, and timeline logging should happen in the Pinata chat UI at the agent root. The agent can still call the app APIs to save mixes and append timeline moments.
 
-If `workspace/data/generated-mixtapes/<mixId>-dj-hosted/dj-script.json` exists, the app will expose it through `/app/api/mixes/:id/dj-hosted` and render a broadcast-style player with narrative lower-thirds. Clip audio and compiled broadcast files are optional. The app no longer assumes an ffmpeg-produced final MP3 is present.
+If `workspace/data/generated-mixtapes/<mixId>-dj-hosted/dj-script.json` exists (or a row in `mix_dj_hosted` after POST generation with Pinata), the app exposes it through `/app/api/mixes/:id/dj-hosted` and renders a broadcast-style player with narrative lower-thirds. Absence of a manifest is normal and returns `200` with `{ result: null }`. Clip audio and compiled broadcast files are optional.
+
+**Production (`air.creativeplatform.xyz`):** set `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `PINATA_JWT`, and session KV vars (see [`lib/auth-storage.ts`](lib/auth-storage.ts)). DJ-hosted manifests persist in Turso; clip audio should be uploaded to Pinata via POST from a machine with `workspace/scripts/venice_dj_poc.py`.
 
 The left sidebar now behaves like a crate search. Queries can match:
 

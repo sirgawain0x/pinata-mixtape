@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { findDjHostedCompiledAudio } from "../../../../../../lib/dj-hosted";
+import { getDjHostedCompiledAudioTarget } from "../../../../../../lib/dj-hosted";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,18 +27,24 @@ function contentType(filePath: string): string {
 }
 
 export async function GET(request: Request, context: Context) {
-  const filePath = findDjHostedCompiledAudio(await mixId(context));
-  if (!filePath) {
+  const id = await mixId(context);
+  const mode = new URL(request.url).searchParams.get("mode") === "download" ? "download" : "stream";
+  const target = await getDjHostedCompiledAudioTarget(id, mode);
+
+  if (!target) {
     return Response.json({ error: "Compiled broadcast audio is not available for this mix." }, { status: 404 });
   }
 
-  const mode = new URL(request.url).searchParams.get("mode");
-  const buffer = await fs.promises.readFile(filePath);
-  const fileName = path.basename(filePath);
+  if (target.startsWith("http://") || target.startsWith("https://")) {
+    return Response.redirect(target, 302);
+  }
+
+  const buffer = await fs.promises.readFile(target);
+  const fileName = path.basename(target);
 
   return new Response(buffer, {
     headers: {
-      "Content-Type": contentType(filePath),
+      "Content-Type": contentType(target),
       "Cache-Control": "no-store",
       ...(mode === "download" ? { "Content-Disposition": `attachment; filename="${fileName}"` } : {})
     }

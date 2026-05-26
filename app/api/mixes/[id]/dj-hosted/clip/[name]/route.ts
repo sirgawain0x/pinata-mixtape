@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { findDjHostedClip } from "../../../../../../../lib/dj-hosted";
+import { getDjHostedClipTarget } from "../../../../../../../lib/dj-hosted";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,15 +37,19 @@ function contentType(filePath: string): string {
 
 export async function GET(_request: Request, context: Context) {
   const { mixId, name } = await clipContext(context);
-  const filePath = findDjHostedClip(mixId, name);
-  if (!filePath) {
+  const target = await getDjHostedClipTarget(mixId, name);
+  if (!target) {
     return Response.json({ error: "Clip not found." }, { status: 404 });
   }
 
-  const buffer = await fs.promises.readFile(filePath);
+  if (target.startsWith("http://") || target.startsWith("https://")) {
+    return Response.redirect(target, 302);
+  }
+
+  const buffer = await fs.promises.readFile(target);
   return new Response(buffer, {
     headers: {
-      "Content-Type": contentType(filePath),
+      "Content-Type": contentType(target),
       "Cache-Control": "no-store"
     }
   });

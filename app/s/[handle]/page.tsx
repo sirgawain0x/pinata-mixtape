@@ -29,14 +29,14 @@ export default async function StationListenPage({ params }: PageProps) {
   const [embedOrigin, creator] = await Promise.all([requestOrigin(), getCurrentCreator()]);
   const station = await getStationByHandle(handle);
 
-  if (!station || !station.isPublic) {
+  if (!station) {
     return (
       <main className="shell">
         <section className="hero">
           <div className="hero-copy">
             <h1>Station not found</h1>
             <p className="muted">
-              The station <strong>@{handle}</strong> could not be found or is not public yet.
+              The station <strong>@{handle}</strong> could not be found.
               If you just created it, try visiting your{" "}
               <Link href="/dashboard">dashboard</Link> to access the editor.
             </p>
@@ -50,6 +50,25 @@ export default async function StationListenPage({ params }: PageProps) {
   }
 
   const isOwner = creator?.id === station.creatorId;
+
+  if (!station.isPublic && !isOwner) {
+    return (
+      <main className="shell">
+        <section className="hero">
+          <div className="hero-copy">
+            <h1>Station not public yet</h1>
+            <p className="muted">
+              The station <strong>@{handle}</strong> exists but is not public yet.
+              The owner can publish it from the station editor.
+            </p>
+            <p>
+              <Link className="button" href="/">Browse stations</Link>
+            </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   const rawSegments = await listStationSegments(station.id);
   const segments = await Promise.all(
@@ -77,6 +96,12 @@ export default async function StationListenPage({ params }: PageProps) {
           <h1>{station.name}</h1>
           <p className="lede">@{station.handle}{station.tagline ? ` · ${station.tagline}` : ""}</p>
           <p className="muted">{segments.length} segment{segments.length !== 1 ? "s" : ""} programmed</p>
+          {!station.isPublic && isOwner && (
+            <p className="muted">
+              This station is not public yet. Listeners cannot find it until you publish it from the{" "}
+              <Link href={`/dashboard/stations/${station.id}`}>editor</Link>.
+            </p>
+          )}
           {isOwner && (
             <p>
               <Link className="button" href={`/dashboard/stations/${station.id}`}>Edit station →</Link>

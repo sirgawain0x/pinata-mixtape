@@ -137,7 +137,7 @@ export default function MixtapeApp({
     `${initialMixes.length} tape${initialMixes.length === 1 ? "" : "s"} in rotation`
   );
   const [shareStatus, setShareStatus] = useState("");
-  const [hostedMixes, setHostedMixes] = useState<Record<number, HostedMixResult>>({});
+  const [hostedMixes, setHostedMixes] = useState<Record<number, HostedMixResult | null>>({});
   const [narrationEnabled, setNarrationEnabled] = useState(true);
   const [generatingNarrationFor, setGeneratingNarrationFor] = useState<number | null>(null);
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
@@ -204,16 +204,20 @@ export default function MixtapeApp({
   }, [pathname, router, searchParams, selectedId]);
 
   useEffect(() => {
-    if (!selected || hostedMixes[selected.id]) return;
+    if (!selected || hostedMixes[selected.id] !== undefined) return;
+    if (viewMode !== "broadcast" && !voiceModalOpen && generatingNarrationFor !== selected.id) return;
 
     let cancelled = false;
 
     async function loadHostedMix() {
       const response = await fetch(`/app/api/mixes/${selected.id}/dj-hosted`);
       if (!response.ok) return;
-      const data = (await response.json()) as { result?: HostedMixResult };
-      if (!cancelled && data.result) {
-        setHostedMixes((current) => ({ ...current, [selected.id]: data.result as HostedMixResult }));
+      const data = (await response.json()) as { result?: HostedMixResult | null };
+      if (!cancelled) {
+        setHostedMixes((current) => ({
+          ...current,
+          [selected.id]: (data.result ?? null) as HostedMixResult | null
+        }));
       }
     }
 
@@ -222,7 +226,7 @@ export default function MixtapeApp({
     return () => {
       cancelled = true;
     };
-  }, [hostedMixes, selected]);
+  }, [generatingNarrationFor, hostedMixes, selected, viewMode, voiceModalOpen]);
 
   useEffect(() => {
     if (currentMixRef.current !== selected?.id) {
