@@ -64,12 +64,30 @@ button:disabled {
   transform: none;
 }
 
-input {
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
   width: 100%;
   border: 1px solid var(--line);
   background: rgba(20, 15, 32, 0.88);
   color: var(--text);
   padding: 11px 12px;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--mint);
+  flex-shrink: 0;
+}
+
+input[type="file"] {
+  width: auto;
+  max-width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
 }
 
 h1,
@@ -1024,14 +1042,26 @@ h2 {
   gap: 10px;
 }
 
-.narration-toggle {
+.narration-toggle,
+.publish-toggle {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
+  cursor: pointer;
+  max-width: 100%;
 }
 
-.narration-toggle input {
-  width: auto;
+.narration-toggle {
+  align-items: center;
+}
+
+.publish-toggle span {
+  line-height: 1.5;
+}
+
+.publish-toggle:has(input:disabled) {
+  opacity: 0.7;
+  cursor: wait;
 }
 
 .mix-player-embed {
@@ -1307,6 +1337,20 @@ h2 {
   .broadcast-qr {
     width: min(100%, 180px);
   }
+
+  .station-editor .segment-list li {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .station-editor .segment-actions {
+    justify-content: flex-end;
+  }
+
+  .station-editor .hero-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* Influencer Radio additions */
@@ -1316,6 +1360,15 @@ h2 {
   align-items: center;
   gap: 12px;
   margin-top: 18px;
+}
+
+.hero-single {
+  grid-template-columns: 1fr;
+}
+
+.station-editor .hero-copy,
+.station-editor .composer {
+  max-width: min(100%, 960px);
 }
 
 .signin {
@@ -1418,6 +1471,11 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-width: min(100%, 520px);
+}
+
+.composer-form > button {
+  align-self: flex-start;
 }
 
 .composer-form input[type="text"],
