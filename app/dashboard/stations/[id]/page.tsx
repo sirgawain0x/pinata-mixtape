@@ -34,8 +34,12 @@ export default async function StationEditorPage({ params }: PageProps) {
         <section className="hero">
           <div className="hero-copy">
             <h1>Station not found</h1>
+            <p className="muted">
+              Station #{id} could not be found. If you just created it, try visiting your{" "}
+              <Link href="/dashboard">dashboard</Link> to access the editor.
+            </p>
             <p>
-              <Link className="button" href="/dashboard">Back</Link>
+              <Link className="button" href="/dashboard">Back to dashboard</Link>
             </p>
           </div>
         </section>

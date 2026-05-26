@@ -75,7 +75,6 @@ export type VoiceClone = {
   createdAt: string;
 };
 
-
 type CreatorRow = {
   id: number;
   wallet_address: string;
