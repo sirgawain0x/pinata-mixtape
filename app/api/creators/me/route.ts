@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function PATCH(request: Request) {
   return withCreator(async (creator) => {
     const body = await request.json().catch(() => null);
-    const next = updateCreator(creator.id, {
+    const next = await updateCreator(creator.id, {
       displayName: typeof body?.displayName === "string" ? body.displayName : undefined,
       avatarUrl: typeof body?.avatarUrl === "string" ? body.avatarUrl : undefined,
       bio: typeof body?.bio === "string" ? body.bio : undefined,

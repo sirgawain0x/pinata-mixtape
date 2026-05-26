@@ -4,10 +4,10 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  seedMixes();
+  await seedMixes();
   const url = new URL(request.url);
   const limit = Number(url.searchParams.get("limit") ?? 12);
-  return Response.json({ songs: listSongs(url.searchParams.get("q") ?? "", limit) });
+  return Response.json({ songs: await listSongs(url.searchParams.get("q") ?? "", limit) });
 }
 
 export async function POST(request: Request) {
@@ -19,6 +19,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "Song creation requires `title` and `artist`." }, { status: 400 });
   }
 
-  const song = createSong(body);
+  const song = await createSong(body);
   return Response.json({ song }, { status: 201 });
 }

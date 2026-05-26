@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   if (provided !== expected) {
     return Response.json({ error: "Forbidden." }, { status: 403 });
   }
-  const feeds = listAllFeeds();
+  const feeds = await listAllFeeds();
   const results: { feedId: number; ok: boolean; error?: string }[] = [];
   for (const feed of feeds) {
     try {

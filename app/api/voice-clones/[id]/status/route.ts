@@ -13,7 +13,7 @@ export async function GET(_request: Request, context: Context) {
     const id = Number(params.id);
     if (!Number.isInteger(id) || id < 1) return Response.json({ error: "Invalid id." }, { status: 400 });
 
-    const clone = getVoiceClone(id);
+    const clone = await getVoiceClone(id);
     if (!clone) return Response.json({ error: "Not found." }, { status: 404 });
     if (clone.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
 
@@ -21,7 +21,7 @@ export async function GET(_request: Request, context: Context) {
       try {
         const remote = await getMosiVoiceStatus(clone.externalVoiceId);
         if (remote.status !== clone.status) {
-          const next = updateVoiceCloneStatus(clone.id, remote.status);
+          const next = await updateVoiceCloneStatus(clone.id, remote.status);
           return Response.json({ voiceClone: next });
         }
       } catch {

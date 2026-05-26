@@ -24,10 +24,10 @@ async function loadOwned(context: Context, creatorId: number) {
   } catch {
     return { error: "Invalid id.", status: 400 } as const;
   }
-  const station = getStation(stationId);
+  const station = await getStation(stationId);
   if (!station) return { error: "Station not found.", status: 404 } as const;
   if (station.creatorId !== creatorId) return { error: "Forbidden.", status: 403 } as const;
-  const segment = getSegment(segmentId);
+  const segment = await getSegment(segmentId);
   if (!segment || segment.stationId !== stationId) return { error: "Segment not found.", status: 404 } as const;
   return { segment } as const;
 }
@@ -47,7 +47,7 @@ export async function PATCH(request: Request, context: Context) {
     }
     if (typeof body?.ttsVoice === "string") patch.ttsVoice = body.ttsVoice;
     if (typeof body?.ttsProvider === "string") patch.ttsProvider = body.ttsProvider;
-    const updated = updateSegment(result.segment.id, patch);
+    const updated = await updateSegment(result.segment.id, patch);
     return Response.json({ segment: updated });
   });
 }
@@ -56,7 +56,7 @@ export async function DELETE(_request: Request, context: Context) {
   return withCreator(async (creator) => {
     const result = await loadOwned(context, creator.id);
     if ("error" in result) return Response.json({ error: result.error }, { status: result.status });
-    deleteSegment(result.segment.id);
+    await deleteSegment(result.segment.id);
     return Response.json({ ok: true });
   });
 }

@@ -51,12 +51,12 @@ function parseDuration(value: unknown): number | null {
 }
 
 export async function refreshFeed(feedId: number): Promise<PodcastEpisode[]> {
-  const feed = getPodcastFeed(feedId);
+  const feed = await getPodcastFeed(feedId);
   if (!feed) throw new Error("Feed not found.");
 
   const parsed = await parser.parseString(await fetchPublicText(feed.feedUrl));
   if (parsed.title) {
-    addPodcastFeed(feed.stationId, feed.feedUrl, parsed.title);
+    await addPodcastFeed(feed.stationId, feed.feedUrl, parsed.title);
   }
 
   const episodes: PodcastEpisode[] = [];
@@ -71,7 +71,7 @@ export async function refreshFeed(feedId: number): Promise<PodcastEpisode[]> {
       continue;
     }
     const guid = (itemRecord.guid as string | undefined) || `${audioUrl}:${item.title ?? ""}`;
-    const episode = upsertPodcastEpisode({
+    const episode = await upsertPodcastEpisode({
       feedId: feed.id,
       guid: String(guid),
       title: item.title ?? "Untitled episode",
@@ -81,7 +81,7 @@ export async function refreshFeed(feedId: number): Promise<PodcastEpisode[]> {
     });
     episodes.push(episode);
   }
-  touchPodcastFeed(feed.id);
+  await touchPodcastFeed(feed.id);
   return episodes;
 }
 
@@ -89,16 +89,17 @@ export async function materializeEpisodesAsSegments(
   feed: PodcastFeed,
   options: { limit?: number } = {}
 ): Promise<number> {
-  const episodes = listPodcastEpisodes(feed.id, options.limit ?? 5);
+  const episodes = await listPodcastEpisodes(feed.id, options.limit ?? 5);
+  const segments = await listStationSegments(feed.stationId);
   const alreadyMaterialized = new Set(
-    listStationSegments(feed.stationId)
+    segments
       .filter((segment) => segment.kind === "podcast" && segment.podcastEpisodeId !== null)
       .map((segment) => segment.podcastEpisodeId as number)
   );
   let added = 0;
   for (const episode of episodes) {
     if (alreadyMaterialized.has(episode.id)) continue;
-    addSegment({
+    await addSegment({
       stationId: feed.stationId,
       kind: "podcast",
       title: episode.title || "Podcast episode",

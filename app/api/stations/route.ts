@@ -1,5 +1,5 @@
 import { withCreator } from "../../../lib/auth";
-import { createStation, listStations } from "../../../lib/stations";
+import { createStation, getStationByHandle, listStations } from "../../../lib/stations";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,10 +9,10 @@ export async function GET(request: Request) {
   const mine = url.searchParams.get("mine") === "1";
   if (mine) {
     return withCreator(async (creator) => {
-      return Response.json({ stations: listStations({ creatorId: creator.id }) });
+      return Response.json({ stations: await listStations({ creatorId: creator.id }) });
     });
   }
-  return Response.json({ stations: listStations({ publicOnly: true }) });
+  return Response.json({ stations: await listStations({ publicOnly: true }) });
 }
 
 export async function POST(request: Request) {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      const station = createStation({
+      const station = await createStation({
         creatorId: creator.id,
         handle,
         name,
@@ -37,8 +37,17 @@ export async function POST(request: Request) {
       return Response.json({ station }, { status: 201 });
     } catch (error) {
       const code = (error as { code?: string }).code;
-      const message = code === "SQLITE_CONSTRAINT_UNIQUE" ? "Station handle is already taken." : (error as Error).message;
-      return Response.json({ error: message }, { status: 400 });
+      const isUnique =
+        code === "SQLITE_CONSTRAINT_UNIQUE" ||
+        (error instanceof Error && /unique|UNIQUE/i.test(error.message));
+      if (isUnique) {
+        const existing = await getStationByHandle(handle.toLowerCase());
+        if (existing && existing.creatorId === creator.id) {
+          return Response.json({ station: existing }, { status: 200 });
+        }
+        return Response.json({ error: "Station handle is already taken." }, { status: 400 });
+      }
+      return Response.json({ error: (error as Error).message }, { status: 400 });
     }
   });
 }

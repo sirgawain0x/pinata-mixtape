@@ -16,7 +16,7 @@ export async function POST(request: Request, context: Context) {
   const body = await request.json().catch(() => null);
 
   try {
-    const mix = addSongToMix(await mixId(context), {
+    const mix = await addSongToMix(await mixId(context), {
       songId: typeof body?.songId === "number" ? body.songId : undefined,
       position: typeof body?.position === "number" ? body.position : undefined,
       song: body?.song && typeof body.song === "object" ? body.song : undefined

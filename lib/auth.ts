@@ -10,7 +10,7 @@ import {
   SESSION_TTL_MS,
   isKvAuthEnabled
 } from "./auth-storage";
-import { upsertCreatorByWallet, getCreator, type Creator } from "./stations";
+import { upsertCreatorByWallet, getCreator, getCreatorByWallet, type Creator } from "./stations";
 
 export { isKvAuthEnabled };
 
@@ -44,12 +44,19 @@ export async function getCurrentCreator(): Promise<Creator | null> {
   const token = await getSessionToken();
   const session = await lookupSessionStorage(token);
   if (!session) return null;
-  const fromDb = getCreator(session.creatorId);
-  if (fromDb) return fromDb;
-  // KV sessions can outlive SQLite (ephemeral tmp DB on Vercel, local reset). Re-materialize
-  // the creator row so FK constraints (e.g. stations.creator_id) see a real id.
+
+  // Always resolve by wallet when the session carries it (Redis/KV). Stale creatorId values
+  // from the pre-Turso ephemeral DB caused stations to be written under one id and listed
+  // under another (or not at all).
   const wallet = session.creatorFallback?.walletAddress?.trim();
-  if (wallet) return upsertCreatorByWallet(wallet);
+  if (wallet) {
+    const byWallet = await getCreatorByWallet(wallet);
+    if (byWallet) return byWallet;
+    return await upsertCreatorByWallet(wallet);
+  }
+
+  const fromDb = await getCreator(session.creatorId);
+  if (fromDb) return fromDb;
   return null;
 }
 
@@ -113,7 +120,7 @@ export async function verifySiweAndIssueSession(
     throw new Error("Signature does not match address.");
   }
 
-  const creator = upsertCreatorByWallet(fields.address);
+  const creator = await upsertCreatorByWallet(fields.address);
   const token = await issueSessionStorage(creator);
   await setSessionCookie(token);
   return creator;
