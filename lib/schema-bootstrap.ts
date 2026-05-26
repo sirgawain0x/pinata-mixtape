@@ -63,6 +63,13 @@ export const MIX_SCHEMA_DDL = `
 
   CREATE INDEX IF NOT EXISTS idx_mix_songs_mix_position ON mix_songs(mix_id, position);
   CREATE INDEX IF NOT EXISTS idx_mix_songs_song ON mix_songs(song_id);
+
+  CREATE TABLE IF NOT EXISTS mix_dj_hosted (
+    mix_id INTEGER PRIMARY KEY,
+    manifest_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(mix_id) REFERENCES mixes(id) ON DELETE CASCADE
+  );
 `;
 
 export const STATION_SCHEMA_DDL = `

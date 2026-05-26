@@ -9,6 +9,7 @@ type Station = {
   handle: string;
   name: string;
   tagline: string;
+  isPublic: boolean;
 };
 
 type Segment = {
@@ -38,6 +39,9 @@ export default function StationEditor({
   const [segments, setSegments] = useState(initialSegments);
   const [voices, setVoices] = useState<{ id: string; label: string }[]>([]);
   const [chosenVoice, setChosenVoice] = useState(defaultVoiceId);
+  const [isPublic, setIsPublic] = useState(station.isPublic);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishError, setPublishError] = useState("");
 
   const refresh = useCallback(async () => {
     const response = await fetch(`${APP_BASE}/api/stations/${station.id}/segments`, { cache: "no-store" });
@@ -60,6 +64,27 @@ export default function StationEditor({
     };
   }, [chosenVoice]);
 
+  async function togglePublish() {
+    setPublishBusy(true);
+    setPublishError("");
+    try {
+      const response = await fetch(`${APP_BASE}/api/stations/${station.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic: !isPublic })
+      });
+      const data = (await response.json()) as { station?: Station; error?: string };
+      if (!response.ok || !data.station) {
+        throw new Error(data.error ?? "Could not update station.");
+      }
+      setIsPublic(data.station.isPublic);
+    } catch (err) {
+      setPublishError((err as Error).message);
+    } finally {
+      setPublishBusy(false);
+    }
+  }
+
   return (
     <main className="shell">
       <section className="hero">
@@ -74,7 +99,21 @@ export default function StationEditor({
             Need a new narration voice? <Link href="/dashboard/voice">Configure it here</Link>.
           </p>
           <p>
-            <Link className="button" href={`/s/${station.handle}`}>Open public page →</Link>
+            <Link className="button" href={`/s/${station.handle}`}>
+              {isPublic ? "Open public page →" : "Preview station →"}
+            </Link>
+          </p>
+          <p className="muted">
+            <label>
+              <input
+                checked={isPublic}
+                disabled={publishBusy}
+                onChange={() => void togglePublish()}
+                type="checkbox"
+              />{" "}
+              Public — listeners can open <code>/s/{station.handle}</code> without signing in
+            </label>
+            {publishError ? <span className="signin-error"> {publishError}</span> : null}
           </p>
         </div>
       </section>

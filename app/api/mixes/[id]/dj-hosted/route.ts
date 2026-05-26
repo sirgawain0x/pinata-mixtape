@@ -2,7 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readDjHostedManifest } from "../../../../../lib/dj-hosted";
+import {
+  manifestToClientResult,
+  persistDjHostedArtifacts,
+  readDjHostedManifest
+} from "../../../../../lib/dj-hosted";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,26 +25,16 @@ async function mixId(context: Context): Promise<number> {
 
 export async function GET(_request: Request, context: Context) {
   const id = await mixId(context);
-  const manifest = readDjHostedManifest(id);
-  if (!manifest) {
-    return Response.json({ error: "Hosted DJ narrative not found." }, { status: 404 });
+  if (!Number.isFinite(id) || id <= 0) {
+    return Response.json({ error: "Invalid mix id." }, { status: 400 });
   }
 
-  return Response.json({
-    result: {
-      mixId: manifest.mixId,
-      mixTitle: manifest.mixTitle,
-      voice: manifest.voice,
-      model: manifest.model,
-      output: path.join(process.cwd(), "workspace", "data", "generated-mixtapes", `${id}-dj-hosted`, `${id}-dj-hosted-mixtape.mp3`),
-      script: path.join(process.cwd(), "workspace", "data", "generated-mixtapes", `${id}-dj-hosted`, "dj-script.json"),
-      streamUrl: manifest.streamUrl ?? `/app/api/mixes/${id}/dj-hosted/file?mode=stream`,
-      downloadUrl: manifest.downloadUrl ?? `/app/api/mixes/${id}/dj-hosted/file?mode=download`,
-      clips: manifest.clips,
-      sourceTracks: manifest.sourceTracks,
-      segments: manifest.segments
-    }
-  });
+  const manifest = await readDjHostedManifest(id);
+  if (!manifest) {
+    return Response.json({ result: null });
+  }
+
+  return Response.json({ result: manifestToClientResult(manifest, id) });
 }
 
 export async function POST(request: Request, context: Context) {
@@ -69,8 +63,14 @@ export async function POST(request: Request, context: Context) {
       maxBuffer: 1024 * 1024 * 4
     });
 
-    const result = JSON.parse(stdout.trim()) as unknown;
-    return Response.json({ result }, { status: 201 });
+    JSON.parse(stdout.trim());
+
+    const manifest = await persistDjHostedArtifacts(id);
+    if (!manifest) {
+      return Response.json({ error: "Generation finished but manifest was not found." }, { status: 500 });
+    }
+
+    return Response.json({ result: manifestToClientResult(manifest, id) }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not generate DJ-hosted mix.";
     return Response.json({ error: message }, { status: 500 });
