@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import ImportMixPanel from "../../../components/ImportMixPanel";
 import SegmentComposer from "../../../components/SegmentComposer";
 
 type Station = {
@@ -119,6 +120,7 @@ export default function StationEditor({
       </section>
 
       <section className="workspace dashboard-stations">
+        <ImportMixPanel stationId={station.id} onImported={() => void refresh()} />
         <SegmentComposer
           stationId={station.id}
           segments={segments}

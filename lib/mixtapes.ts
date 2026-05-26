@@ -1,3 +1,4 @@
+import { parseAllowedEmbedUrl, resolveEmbedSourceKind, type EmbedSourceKind } from "./embed-sources";
 import { searchMusicBrainzRecordings } from "./musicbrainz";
 import Database from "better-sqlite3";
 
@@ -24,15 +25,30 @@ export type TrackInput = {
   moodTags?: string[];
   sceneTags?: string[];
   notes?: string;
+  musicbrainzId?: string;
   musicbrainzUrl?: string;
   youtubeUrl?: string;
   listenUrl?: string;
+  embedSourceKind?: EmbedSourceKind;
+  embedIframeUrl?: string;
 };
 
 export type Track = Required<
   Omit<
     TrackInput,
-    "releaseYear" | "duration" | "bpm" | "energy" | "notes" | "musicbrainzUrl" | "youtubeUrl" | "listenUrl" | "moodTags" | "sceneTags"
+    | "releaseYear"
+    | "duration"
+    | "bpm"
+    | "energy"
+    | "notes"
+    | "musicbrainzUrl"
+    | "youtubeUrl"
+    | "listenUrl"
+    | "moodTags"
+    | "sceneTags"
+    | "musicbrainzId"
+    | "embedSourceKind"
+    | "embedIframeUrl"
   >
 > & {
   releaseYear: string;
@@ -42,9 +58,12 @@ export type Track = Required<
   moodTags: string[];
   sceneTags: string[];
   notes: string;
+  musicbrainzId: string;
   musicbrainzUrl: string;
   youtubeUrl: string;
   listenUrl: string;
+  embedSourceKind: EmbedSourceKind;
+  embedIframeUrl: string;
 };
 
 export type MixInput = {
@@ -58,6 +77,10 @@ export type MixInput = {
   shareNote?: string;
   tags?: string[];
   tracks?: TrackInput[];
+  creatorId?: number | null;
+  isPublic?: boolean;
+  slug?: string;
+  publish?: boolean;
 };
 
 export type SongInput = TrackInput;
@@ -74,15 +97,23 @@ export type Mix = {
   shareNote: string;
   tags: string[];
   tracks: Track[];
+  creatorId: number | null;
+  isPublic: boolean;
+  slug: string;
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type Song = Track & {
   id: number;
-  musicbrainzId: string;
   mixCount: number;
   mixIds: number[];
+};
+
+export type MixListFilter = {
+  publicOnly?: boolean;
+  viewerCreatorId?: number | null;
 };
 
 export type MixMomentInput = {
@@ -114,6 +145,10 @@ type MixRow = {
   share_note: string | null;
   tags: string;
   tracks: string;
+  is_public?: number | null;
+  slug?: string | null;
+  published_at?: string | null;
+  creator_id?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -133,6 +168,8 @@ type SongRow = {
   musicbrainz_url: string | null;
   youtube_url: string | null;
   listen_url: string | null;
+  embed_source_kind?: string | null;
+  embed_iframe_url?: string | null;
 };
 
 type MixSongRow = SongRow & {
@@ -182,11 +219,63 @@ function buildYoutubeSearchUrl(title: string, artist: string): string {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 }
 
+const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+
+export function slugifyMixTitle(title: string): string {
+  const base = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  if (base.length >= 3 && SLUG_REGEX.test(base)) return base;
+  const padded = (base || "tape").padEnd(3, "0").slice(0, 48);
+  return padded.replace(/^-+|-+$/g, "") || "tape";
+}
+
+export async function ensureUniqueMixSlug(base: string, excludeMixId?: number): Promise<string> {
+  await scheduleLegacyMixMigration();
+  let candidate = slugifyMixTitle(base);
+  if (!SLUG_REGEX.test(candidate)) candidate = `tape-${Date.now().toString(36).slice(-6)}`;
+  let suffix = 0;
+  for (;;) {
+    const slug = suffix === 0 ? candidate : `${candidate}-${suffix}`;
+    const row = await sqlGet<{ id: number }>(
+      `SELECT id FROM mixes WHERE slug = ? COLLATE NOCASE AND (? IS NULL OR id <> ?)`,
+      [slug, excludeMixId ?? null, excludeMixId ?? null]
+    );
+    if (!row) return slug;
+    suffix += 1;
+  }
+}
+
 function normalizeTrack(input: TrackInput): Track {
   const title = input.title?.trim() ?? "";
   const artist = input.artist?.trim() ?? "";
   if (!title || !artist) {
     throw new Error("Each track requires a title and artist.");
+  }
+
+  const youtubeUrl = input.youtubeUrl?.trim() || "";
+  const listenUrl = input.listenUrl?.trim() || buildYoutubeSearchUrl(title, artist);
+  const embedIframeRaw = input.embedIframeUrl?.trim() || "";
+  const embedSourceKind = resolveEmbedSourceKind(input.embedSourceKind, youtubeUrl, embedIframeRaw);
+  let embedIframeUrl = "";
+  if (embedSourceKind === "iframe_allowed") {
+    const parsed = parseAllowedEmbedUrl(embedIframeRaw || youtubeUrl || listenUrl);
+    if (!parsed) {
+      throw new Error("Iframe embed URL must use an allowed music host (Spotify, SoundCloud, Bandcamp, Apple Music, YouTube).");
+    }
+    embedIframeUrl = parsed.toString();
+  }
+
+  const musicbrainzId = input.musicbrainzId?.trim() || "";
+  let musicbrainzUrl = input.musicbrainzUrl?.trim() || "";
+  if (!musicbrainzUrl && musicbrainzId) {
+    musicbrainzUrl = `https://musicbrainz.org/recording/${musicbrainzId}`;
+  }
+  if (!musicbrainzUrl) {
+    musicbrainzUrl = buildMusicBrainzSearchUrl(title, artist);
   }
 
   return {
@@ -199,9 +288,12 @@ function normalizeTrack(input: TrackInput): Track {
     moodTags: normalizeList(input.moodTags),
     sceneTags: normalizeList(input.sceneTags),
     notes: input.notes?.trim() || "",
-    musicbrainzUrl: input.musicbrainzUrl?.trim() || buildMusicBrainzSearchUrl(title, artist),
-    youtubeUrl: input.youtubeUrl?.trim() || "",
-    listenUrl: input.listenUrl?.trim() || buildYoutubeSearchUrl(title, artist)
+    musicbrainzId,
+    musicbrainzUrl,
+    youtubeUrl,
+    listenUrl,
+    embedSourceKind,
+    embedIframeUrl
   };
 }
 
@@ -228,6 +320,9 @@ function fingerprintForTrack(track: Track): string {
 function mapSong(row: SongRow): Track {
   const title = row.title;
   const artist = row.artist;
+  const embedKindRaw = row.embed_source_kind?.trim() || "youtube";
+  const embedSourceKind: EmbedSourceKind =
+    embedKindRaw === "iframe_allowed" || embedKindRaw === "link_only" ? embedKindRaw : "youtube";
 
   return {
     title,
@@ -239,9 +334,12 @@ function mapSong(row: SongRow): Track {
     moodTags: parseList(row.mood_tags),
     sceneTags: parseList(row.scene_tags),
     notes: row.notes ?? "",
+    musicbrainzId: row.musicbrainz_id ?? "",
     musicbrainzUrl: row.musicbrainz_url?.trim() || buildMusicBrainzSearchUrl(title, artist),
     youtubeUrl: row.youtube_url ?? "",
-    listenUrl: row.listen_url?.trim() || buildYoutubeSearchUrl(title, artist)
+    listenUrl: row.listen_url?.trim() || buildYoutubeSearchUrl(title, artist),
+    embedSourceKind,
+    embedIframeUrl: row.embed_iframe_url?.trim() ?? ""
   };
 }
 
@@ -258,7 +356,6 @@ function mapLibrarySong(row: SongListRow): Song {
 
   return {
     id: row.id,
-    musicbrainzId: row.musicbrainz_id ?? "",
     mixCount: row.mix_count,
     mixIds,
     ...mapSong(row)
@@ -291,6 +388,10 @@ async function mapMix(row: MixRow): Promise<Mix> {
     shareNote: row.share_note ?? "",
     tags: parseList(row.tags),
     tracks: await listTracksForMix(row.id),
+    creatorId: row.creator_id ?? null,
+    isPublic: row.is_public === undefined || row.is_public === null ? true : row.is_public !== 0,
+    slug: row.slug?.trim() ?? "",
+    publishedAt: row.published_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -315,9 +416,9 @@ function mapMixMoment(row: MixMomentRow): MixMoment {
 
 
 const UPSERT_SONG_SQL = `INSERT INTO songs (
-    fingerprint, title, artist, musicbrainz_id, release_year, duration, bpm, energy, mood_tags, scene_tags, notes, musicbrainz_url, youtube_url, listen_url
+    fingerprint, title, artist, musicbrainz_id, release_year, duration, bpm, energy, mood_tags, scene_tags, notes, musicbrainz_url, youtube_url, listen_url, embed_source_kind, embed_iframe_url
   ) VALUES (
-    @fingerprint, @title, @artist, @musicbrainzId, @releaseYear, @duration, @bpm, @energy, @moodTags, @sceneTags, @notes, @musicbrainzUrl, @youtubeUrl, @listenUrl
+    @fingerprint, @title, @artist, @musicbrainzId, @releaseYear, @duration, @bpm, @energy, @moodTags, @sceneTags, @notes, @musicbrainzUrl, @youtubeUrl, @listenUrl, @embedSourceKind, @embedIframeUrl
   )
   ON CONFLICT(fingerprint) DO UPDATE SET
     title = excluded.title,
@@ -333,6 +434,8 @@ const UPSERT_SONG_SQL = `INSERT INTO songs (
     musicbrainz_url = excluded.musicbrainz_url,
     youtube_url = COALESCE(excluded.youtube_url, songs.youtube_url),
     listen_url = excluded.listen_url,
+    embed_source_kind = excluded.embed_source_kind,
+    embed_iframe_url = COALESCE(excluded.embed_iframe_url, songs.embed_iframe_url),
     updated_at = CURRENT_TIMESTAMP`;
 
 const INSERT_MIX_SONG_SQL = `INSERT INTO mix_songs (mix_id, song_id, position)
@@ -343,7 +446,7 @@ function upsertSongParams(track: Track): Record<string, unknown> {
     fingerprint: fingerprintForTrack(track),
     title: track.title,
     artist: track.artist,
-    musicbrainzId: "",
+    musicbrainzId: track.musicbrainzId,
     releaseYear: track.releaseYear,
     duration: track.duration,
     bpm: track.bpm,
@@ -353,7 +456,9 @@ function upsertSongParams(track: Track): Record<string, unknown> {
     notes: track.notes,
     musicbrainzUrl: track.musicbrainzUrl,
     youtubeUrl: track.youtubeUrl,
-    listenUrl: track.listenUrl
+    listenUrl: track.listenUrl,
+    embedSourceKind: track.embedSourceKind,
+    embedIframeUrl: track.embedIframeUrl
   };
 }
 
@@ -433,11 +538,29 @@ async function migrateLegacyTracks(): Promise<void> {
     await replaceMixSongs(row.id, parseLegacyTracks(row.tracks));
   }
 }
-export async function listMixes(query = ""): Promise<Mix[]> {
+function mixVisibilityClause(filter: MixListFilter = {}): { sql: string; params: Record<string, unknown> } {
+  const parts: string[] = [];
+  const params: Record<string, unknown> = {};
+  if (filter.publicOnly) {
+    parts.push("mixes.is_public = 1");
+  } else if (filter.viewerCreatorId) {
+    parts.push("(mixes.is_public = 1 OR mixes.creator_id = @viewerCreatorId)");
+    params.viewerCreatorId = filter.viewerCreatorId;
+  }
+  const sql = parts.length > 0 ? parts.join(" AND ") : "1=1";
+  return { sql, params };
+}
+
+export async function listMixes(query = "", filter: MixListFilter = {}): Promise<Mix[]> {
   await scheduleLegacyMixMigration();
   const search = query.trim();
+  const vis = mixVisibilityClause(filter);
+
   if (!search) {
-    const rows = await sqlAll<MixRow>("SELECT * FROM mixes ORDER BY updated_at DESC, id DESC");
+    const rows = await sqlAll<MixRow>(
+      `SELECT * FROM mixes WHERE ${vis.sql} ORDER BY updated_at DESC, id DESC`,
+      vis.params
+    );
     return Promise.all(rows.map((row) => mapMix(row)));
   }
 
@@ -447,7 +570,9 @@ export async function listMixes(query = ""): Promise<Mix[]> {
        FROM mixes
        LEFT JOIN mix_songs ON mix_songs.mix_id = mixes.id
        LEFT JOIN songs ON songs.id = mix_songs.song_id
-       WHERE mixes.title LIKE @like
+       WHERE (${vis.sql})
+         AND (
+           mixes.title LIKE @like
           OR mixes.description LIKE @like
           OR mixes.vibe LIKE @like
           OR mixes.use_case LIKE @like
@@ -461,11 +586,20 @@ export async function listMixes(query = ""): Promise<Mix[]> {
           OR songs.notes LIKE @like
           OR songs.mood_tags LIKE @like
           OR songs.scene_tags LIKE @like
+         )
        ORDER BY mixes.updated_at DESC, mixes.id DESC`,
-    { like }
+    { like, ...vis.params }
   );
 
   return Promise.all(rows.map((row) => mapMix(row)));
+}
+
+export async function getMixBySlug(slug: string): Promise<Mix | null> {
+  await scheduleLegacyMixMigration();
+  const normalized = slug.trim().toLowerCase();
+  if (!normalized) return null;
+  const row = await sqlGet<MixRow>(`SELECT * FROM mixes WHERE slug = ? COLLATE NOCASE`, [normalized]);
+  return row ? await mapMix(row) : null;
 }
 
 export async function listSongs(query = "", limit = 12): Promise<Song[]> {
@@ -548,15 +682,19 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
     moodTags: input.moodTags ?? current.moodTags,
     sceneTags: input.sceneTags ?? current.sceneTags,
     notes: input.notes?.trim() ?? current.notes,
+    musicbrainzId: input.musicbrainzId?.trim() ?? current.musicbrainzId,
     musicbrainzUrl: input.musicbrainzUrl?.trim() ?? current.musicbrainzUrl,
     youtubeUrl: input.youtubeUrl?.trim() ?? current.youtubeUrl,
-    listenUrl: input.listenUrl?.trim() ?? current.listenUrl
+    listenUrl: input.listenUrl?.trim() ?? current.listenUrl,
+    embedSourceKind: input.embedSourceKind ?? current.embedSourceKind,
+    embedIframeUrl: input.embedIframeUrl?.trim() ?? current.embedIframeUrl
   });
 
   await sqlRun(
     `UPDATE songs
      SET title = @title,
          artist = @artist,
+         musicbrainz_id = @musicbrainzId,
          release_year = @releaseYear,
          duration = @duration,
          bpm = @bpm,
@@ -567,12 +705,15 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
          musicbrainz_url = @musicbrainzUrl,
          youtube_url = @youtubeUrl,
          listen_url = @listenUrl,
+         embed_source_kind = @embedSourceKind,
+         embed_iframe_url = @embedIframeUrl,
          updated_at = CURRENT_TIMESTAMP
      WHERE id = @id`,
     {
       id,
       title: next.title,
       artist: next.artist,
+      musicbrainzId: next.musicbrainzId,
       releaseYear: next.releaseYear,
       duration: next.duration,
       bpm: next.bpm,
@@ -582,7 +723,9 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
       notes: next.notes,
       musicbrainzUrl: next.musicbrainzUrl,
       youtubeUrl: next.youtubeUrl,
-      listenUrl: next.listenUrl
+      listenUrl: next.listenUrl,
+      embedSourceKind: next.embedSourceKind,
+      embedIframeUrl: next.embedIframeUrl
     }
   );
 
@@ -750,11 +893,19 @@ export async function createMix(input: MixInput): Promise<Mix> {
   if (!title) throw new Error("Title is required.");
 
   const tracks = (input.tracks ?? []).map(normalizeTrack);
+  const slug = input.slug?.trim()
+    ? slugifyMixTitle(input.slug)
+    : await ensureUniqueMixSlug(title);
+  const isPublic = input.isPublic === undefined ? true : Boolean(input.isPublic);
+  const publishedAt = input.publish === false ? null : new Date().toISOString();
+
   const result = await sqlRun(
     `INSERT INTO mixes (
-        title, description, vibe, use_case, duration, dj_persona, cover_theme, share_note, tags, tracks
+        title, description, vibe, use_case, duration, dj_persona, cover_theme, share_note, tags, tracks,
+        is_public, slug, published_at, creator_id
       ) VALUES (
-        @title, @description, @vibe, @useCase, @duration, @djPersona, @coverTheme, @shareNote, @tags, '[]'
+        @title, @description, @vibe, @useCase, @duration, @djPersona, @coverTheme, @shareNote, @tags, '[]',
+        @isPublic, @slug, @publishedAt, @creatorId
       )`,
     {
       title,
@@ -765,7 +916,11 @@ export async function createMix(input: MixInput): Promise<Mix> {
       djPersona: input.djPersona?.trim() || "",
       coverTheme: input.coverTheme?.trim() || "",
       shareNote: input.shareNote?.trim() || "",
-      tags: JSON.stringify(normalizeList(input.tags))
+      tags: JSON.stringify(normalizeList(input.tags)),
+      isPublic: isPublic ? 1 : 0,
+      slug,
+      publishedAt,
+      creatorId: input.creatorId ?? null
     }
   );
 
@@ -780,6 +935,28 @@ export async function updateMix(id: number, input: Partial<MixInput>): Promise<M
   if (!current) return null;
 
   const nextTracks = input.tracks ? input.tracks.map(normalizeTrack) : current.tracks;
+  let slug = current.slug;
+  if (input.slug !== undefined) {
+    slug = input.slug.trim() ? slugifyMixTitle(input.slug) : "";
+  }
+  if (!slug && input.title?.trim()) {
+    slug = await ensureUniqueMixSlug(input.title.trim(), id);
+  } else if (slug) {
+    const taken = await sqlGet<{ id: number }>(
+      `SELECT id FROM mixes WHERE slug = ? COLLATE NOCASE AND id <> ?`,
+      [slug, id]
+    );
+    if (taken) slug = await ensureUniqueMixSlug(slug, id);
+  }
+
+  const isPublic = input.isPublic === undefined ? current.isPublic : Boolean(input.isPublic);
+  let publishedAt = current.publishedAt;
+  if (input.publish === true) {
+    publishedAt = new Date().toISOString();
+  } else if (input.publish === false) {
+    publishedAt = null;
+  }
+
   const next = {
     title: input.title?.trim() || current.title,
     description: input.description?.trim() ?? current.description,
@@ -790,6 +967,10 @@ export async function updateMix(id: number, input: Partial<MixInput>): Promise<M
     coverTheme: input.coverTheme?.trim() ?? current.coverTheme,
     shareNote: input.shareNote?.trim() ?? current.shareNote,
     tags: JSON.stringify(input.tags ? normalizeList(input.tags) : current.tags),
+    isPublic: isPublic ? 1 : 0,
+    slug: slug || null,
+    publishedAt,
+    creatorId: input.creatorId === undefined ? current.creatorId : input.creatorId,
     id
   };
 
@@ -804,6 +985,10 @@ export async function updateMix(id: number, input: Partial<MixInput>): Promise<M
          cover_theme = @coverTheme,
          share_note = @shareNote,
          tags = @tags,
+         is_public = @isPublic,
+         slug = @slug,
+         published_at = @publishedAt,
+         creator_id = @creatorId,
          updated_at = CURRENT_TIMESTAMP
      WHERE id = @id`,
     next
@@ -811,6 +996,55 @@ export async function updateMix(id: number, input: Partial<MixInput>): Promise<M
 
   await replaceMixSongs(id, nextTracks);
   return await getMix(id);
+}
+
+export async function removeSongFromMix(mixId: number, position: number): Promise<Mix | null> {
+  await scheduleLegacyMixMigration();
+  const mix = await getMix(mixId);
+  if (!mix) return null;
+  const pos = Math.max(1, Math.floor(position));
+
+  await withWriteTransaction({
+    sqlite: () => {
+      const database = getSqliteDatabase();
+      database.transaction(() => {
+        database.prepare("DELETE FROM mix_songs WHERE mix_id = ? AND position = ?").run(mixId, pos);
+        database
+          .prepare(
+            `UPDATE mix_songs SET position = position - 1 WHERE mix_id = ? AND position > ?`
+          )
+          .run(mixId, pos);
+        database.prepare("UPDATE mixes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(mixId);
+      })();
+    },
+    libsql: async (tx) => {
+      await txRun(tx, "DELETE FROM mix_songs WHERE mix_id = ? AND position = ?", [mixId, pos]);
+      await txRun(tx, `UPDATE mix_songs SET position = position - 1 WHERE mix_id = ? AND position > ?`, [
+        mixId,
+        pos
+      ]);
+      await txRun(tx, "UPDATE mixes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", [mixId]);
+    }
+  });
+
+  return await getMix(mixId);
+}
+
+export async function reorderMixTracks(mixId: number, positions: number[]): Promise<Mix | null> {
+  await scheduleLegacyMixMigration();
+  const mix = await getMix(mixId);
+  if (!mix) return null;
+  if (positions.length !== mix.tracks.length) {
+    throw new Error("Track order must include every position exactly once.");
+  }
+  const expected = new Set(mix.tracks.map((_, index) => index + 1));
+  if (!positions.every((p) => expected.has(p)) || new Set(positions).size !== positions.length) {
+    throw new Error("Track order must include every position exactly once.");
+  }
+
+  const reordered = positions.map((position) => mix.tracks[position - 1]);
+  await replaceMixSongs(mixId, reordered);
+  return await getMix(mixId);
 }
 
 export async function deleteMix(id: number): Promise<boolean> {

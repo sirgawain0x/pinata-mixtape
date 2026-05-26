@@ -32,11 +32,14 @@ npm run dev
 
 ## API Routes
 
-- `GET /app/api/mixes?q=term`
+- `GET /app/api/mixes?q=term` (add `?all=1` when signed in to list all tapes for import)
 - `POST /app/api/mixes`
 - `GET /app/api/mixes/:id`
 - `PATCH /app/api/mixes/:id`
 - `DELETE /app/api/mixes/:id`
+- `POST /app/api/mixes/:id/reorder` — `{ "positions": [2,1,3] }`
+- `DELETE /app/api/mixes/:id/songs/:position`
+- `GET /app/m/:slug` — public share page with Open Graph metadata
 - `GET /app/api/mixes/:id/dj-hosted` (returns `{ result: null }` when no DJ-hosted manifest exists)
 - `GET /app/api/mixes/:id/dj-hosted/clip/:name`
 - `GET /app/api/mixes/:id/dj-hosted/file?mode=stream|download`
@@ -45,6 +48,8 @@ npm run dev
 - `GET /app/api/search?q=term`
 - `GET /app/api/timeline?limit=25`
 - `POST /app/api/timeline`
+- `POST /app/api/agent/suggestions` — curate / news / broadcast hints for the Pinata agent
+- `POST /app/api/stations/:id/segments/import-mix` — bulk import a mix into station programming (auth required)
 
 ## Template Notes
 
@@ -52,7 +57,9 @@ Pinata path routes strip the public prefix before traffic reaches the container,
 
 This starter intentionally stays on the legal side of phase one. The hosted app shares mix structure, notes, outbound links, and optional DJ-narration manifest metadata for listening overlays.
 
-The hosted web route is intentionally read-only. Bootstrap, taste capture, DJ persona selection, mix generation, and timeline logging should happen in the Pinata chat UI at the agent root. The agent can still call the app APIs to save mixes and append timeline moments.
+The hosted `/app` crate supports in-browser mixtape editing (New tape / Edit), MusicBrainz lookup, YouTube and allowlisted iframe links, and public share pages at `/app/m/{slug}`. Pinata chat remains the best place for taste onboarding, news research (posted as timeline moments), and broadcast coaching — see `workspace/OPERATIONS.md` and `POST /app/api/agent/suggestions`.
+
+Set `MIXTAPE_WRITE_TOKEN` in production and pass `Authorization: Bearer <token>` for agent writes, or sign in with SIWE so mixes can be owned via `creator_id`.
 
 If `workspace/data/generated-mixtapes/<mixId>-dj-hosted/dj-script.json` exists (or a row in `mix_dj_hosted` after POST generation with Pinata), the app exposes it through `/app/api/mixes/:id/dj-hosted` and renders a broadcast-style player with narrative lower-thirds. Absence of a manifest is normal and returns `200` with `{ result: null }`. Clip audio and compiled broadcast files are optional.
 
@@ -70,5 +77,5 @@ The template also includes a MusicBrainz recording-search proxy route for offici
 ## First Agent Prompt
 
 ```text
-You are Pinata Mixtape. First, inspect workspace/BOOTSTRAP.md, workspace/IDENTITY.md, workspace/SOUL.md, workspace/DJ_PERSONALITIES.md, workspace/OPERATIONS.md, workspace/MIXTAPES.md, and workspace/TASK_IDEAS.md. Then run a short onboarding to learn my taste profile, favorite artists, event use cases, desired energy arc, and default DJ persona. Use chat for onboarding and curation. Use the hosted /app route as a read-only retro mixtape explorer.
+You are Pinata Mixtape. First, inspect workspace/BOOTSTRAP.md, workspace/IDENTITY.md, workspace/SOUL.md, workspace/DJ_PERSONALITIES.md, workspace/OPERATIONS.md, workspace/MIXTAPES.md, and workspace/TASK_IDEAS.md. Then run a short onboarding to learn my taste profile, favorite artists, event use cases, desired energy arc, and default DJ persona. Use chat for onboarding, curation, artist news (timeline moments), and broadcast planning. Use the hosted /app route to browse, edit, and share mixtapes; call the app APIs (or POST /app/api/agent/suggestions) to persist mixes and import them into stations.
 ```

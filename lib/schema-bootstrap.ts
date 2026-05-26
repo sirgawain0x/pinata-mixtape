@@ -220,6 +220,42 @@ export function bootstrapSqlite(database: SqliteDb): void {
     // exists
   }
 
+  try {
+    database.exec(`ALTER TABLE mixes ADD COLUMN is_public INTEGER NOT NULL DEFAULT 1`);
+  } catch {
+    // exists
+  }
+  try {
+    database.exec(`ALTER TABLE mixes ADD COLUMN slug TEXT`);
+  } catch {
+    // exists
+  }
+  try {
+    database.exec(`ALTER TABLE mixes ADD COLUMN published_at TEXT`);
+  } catch {
+    // exists
+  }
+  try {
+    database.exec(`ALTER TABLE mixes ADD COLUMN creator_id INTEGER`);
+  } catch {
+    // exists
+  }
+
+  try {
+    database.exec(`ALTER TABLE songs ADD COLUMN embed_source_kind TEXT NOT NULL DEFAULT 'youtube'`);
+  } catch {
+    // exists
+  }
+  try {
+    database.exec(`ALTER TABLE songs ADD COLUMN embed_iframe_url TEXT`);
+  } catch {
+    // exists
+  }
+
+  database.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_mixes_slug_unique ON mixes(slug COLLATE NOCASE) WHERE slug IS NOT NULL AND TRIM(slug) <> ''`
+  );
+
   const runVoiceCloneMigration = database
     .transaction(() => {
       if (!voiceClonesNeedsProviderUniqueMigrationSql(database)) return;
@@ -247,6 +283,19 @@ export async function bootstrapLibsql(client: Client): Promise<void> {
   await tryAlter(`ALTER TABLE songs ADD COLUMN musicbrainz_id TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN youtube_url TEXT`);
   await tryAlter(`ALTER TABLE mix_moments ADD COLUMN segment_id INTEGER`);
+
+  await tryAlter(`ALTER TABLE mixes ADD COLUMN is_public INTEGER NOT NULL DEFAULT 1`);
+  await tryAlter(`ALTER TABLE mixes ADD COLUMN slug TEXT`);
+  await tryAlter(`ALTER TABLE mixes ADD COLUMN published_at TEXT`);
+  await tryAlter(`ALTER TABLE mixes ADD COLUMN creator_id INTEGER`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN embed_source_kind TEXT NOT NULL DEFAULT 'youtube'`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN embed_iframe_url TEXT`);
+
+  try {
+    await client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mixes_slug_unique ON mixes(slug COLLATE NOCASE) WHERE slug IS NOT NULL AND TRIM(slug) <> ''`);
+  } catch {
+    /* exists */
+  }
 
   async function voiceClonesNeedsProviderUniqueMigrationRemote(): Promise<boolean> {
     const rs = await client.execute(

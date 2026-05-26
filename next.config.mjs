@@ -1,6 +1,31 @@
 /** @type {import('next').NextConfig} */
+const embedFrameHosts = [
+  "https://www.youtube.com",
+  "https://youtube.com",
+  "https://www.youtube-nocookie.com",
+  "https://open.spotify.com",
+  "https://soundcloud.com",
+  "https://w.soundcloud.com",
+  "https://bandcamp.com",
+  "https://music.apple.com",
+  "https://embed.music.apple.com"
+];
+
 const nextConfig = {
   basePath: "/app",
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: `frame-src 'self' ${embedFrameHosts.join(" ")};`
+          }
+        ]
+      }
+    ];
+  },
   // kokoro-js loads voice .bin files via path relative to its dist/ folder; bundling breaks that (ENOENT under .next/server/voices).
   serverExternalPackages: ["kokoro-js", "onnxruntime-node"],
   // Kokoro is disabled on Vercel (see lib/tts/index.ts); keep ONNX stack out of serverless zips (250MB limit).

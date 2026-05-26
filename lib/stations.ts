@@ -1,3 +1,4 @@
+import { getMix, getSong } from "./mixtapes";
 import { dbReady, getSqliteDatabase, useLibsql } from "./db";
 import { sqlAll, sqlGet, sqlRun, txRun, withWriteTransaction } from "./sql-bridge";
 import type { Transaction } from "@libsql/client";
@@ -571,6 +572,62 @@ export async function reorderSegments(stationId: number, orderedIds: number[]): 
     }
   });
   return await listStationSegments(stationId);
+}
+
+export async function importStationMix(input: {
+  stationId: number;
+  mixId: number;
+  position?: number;
+  clearExisting?: boolean;
+}): Promise<Segment[]> {
+  await dbReady();
+  const station = await getStation(input.stationId);
+  if (!station) throw new Error("Station not found.");
+  const mix = await getMix(input.mixId);
+  if (!mix) throw new Error("Mix not found.");
+
+  const songRows = await sqlAll<{ position: number; song_id: number }>(
+    `SELECT position, song_id FROM mix_songs WHERE mix_id = ? ORDER BY position ASC, id ASC`,
+    [input.mixId]
+  );
+  if (songRows.length === 0) throw new Error("Mix has no tracks to import.");
+
+  if (input.clearExisting) {
+    await sqlRun(`DELETE FROM segments WHERE station_id = ?`, [input.stationId]);
+  }
+
+  let startPos =
+    typeof input.position === "number" && Number.isFinite(input.position)
+      ? Math.max(1, Math.floor(input.position))
+      : await nextSegmentPosition(input.stationId);
+  if (input.clearExisting) startPos = 1;
+
+  const created: Segment[] = [];
+  for (const row of songRows) {
+    const song = await getSong(row.song_id);
+    if (!song) continue;
+    const segment = await addSegment({
+      stationId: input.stationId,
+      kind: "music",
+      title: `${song.artist} — ${song.title}`,
+      songId: row.song_id,
+      position: startPos
+    });
+    created.push(segment);
+    startPos += 1;
+  }
+
+  await updateStation(input.stationId, { seedMixId: input.mixId });
+  return created;
+}
+
+/** When a station has seed_mix_id but no segments yet, materialize programming once. */
+export async function materializeSeedMixIfEmpty(stationId: number): Promise<Segment[]> {
+  const station = await getStation(stationId);
+  if (!station?.seedMixId) return [];
+  const existing = await listStationSegments(stationId);
+  if (existing.length > 0) return existing;
+  return importStationMix({ stationId, mixId: station.seedMixId, clearExisting: false });
 }
 
 export async function findCachedTtsSegment(

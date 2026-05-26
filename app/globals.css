@@ -1018,6 +1018,66 @@ h2 {
   z-index: 40;
 }
 
+.mixtape-editor-modal {
+  width: min(100%, 640px);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+}
+
+.editor-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.editor-tracks {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.editor-track-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.editor-track-list li {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.editor-track-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.editor-add-track {
+  display: grid;
+  gap: 8px;
+}
+
+.mb-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mb-results button {
+  text-align: left;
+  width: 100%;
+}
+
+.import-mix-panel {
+  border: 1px solid var(--line);
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
 .confirm-modal {
   width: min(100%, 460px);
   border: 1px solid var(--line);

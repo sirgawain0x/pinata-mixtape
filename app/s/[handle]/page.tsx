@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import StationPlayer from "../../components/StationPlayer";
 import { getCurrentCreator } from "../../../lib/auth";
-import { getStationByHandle, listStationSegments } from "../../../lib/stations";
+import { getStationByHandle, listStationSegments, materializeSeedMixIfEmpty } from "../../../lib/stations";
 import { getSong } from "../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +70,7 @@ export default async function StationListenPage({ params }: PageProps) {
     );
   }
 
+  await materializeSeedMixIfEmpty(station.id);
   const rawSegments = await listStationSegments(station.id);
   const segments = await Promise.all(
     rawSegments.map(async (segment) => {
@@ -83,7 +84,15 @@ export default async function StationListenPage({ params }: PageProps) {
         audioCid: segment.audioCid,
         audioUrl: segment.audioUrl,
         durationSeconds: segment.durationSeconds,
-        song: song ? { title: song.title, artist: song.artist, youtubeUrl: song.youtubeUrl } : null
+        song: song
+          ? {
+              title: song.title,
+              artist: song.artist,
+              youtubeUrl: song.youtubeUrl,
+              embedSourceKind: song.embedSourceKind,
+              embedIframeUrl: song.embedIframeUrl
+            }
+          : null
       };
     })
   );
