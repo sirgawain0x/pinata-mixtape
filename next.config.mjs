@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const embedFrameHosts = [
+const defaultEmbedFrameHosts = [
   "https://www.youtube.com",
   "https://youtube.com",
   "https://www.youtube-nocookie.com",
@@ -11,6 +11,25 @@ const embedFrameHosts = [
   "https://embed.music.apple.com"
 ];
 
+function cspFrameHosts() {
+  const hosts = new Set(defaultEmbedFrameHosts);
+  const raw = process.env.MIXTAPE_EMBED_IFRAME_HOSTS?.trim();
+  if (!raw) return [...hosts];
+
+  for (const entry of raw.split(/[\s,]+/)) {
+    const trimmed = entry.trim().toLowerCase();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+      hosts.add(trimmed);
+    } else {
+      hosts.add(`https://${trimmed}`);
+    }
+  }
+  return [...hosts];
+}
+
+const allFrameHosts = cspFrameHosts();
+
 const nextConfig = {
   basePath: "/app",
   async headers() {
@@ -20,7 +39,7 @@ const nextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: `frame-src 'self' ${embedFrameHosts.join(" ")};`
+            value: `frame-src 'self' ${allFrameHosts.join(" ")};`
           }
         ]
       }

@@ -29,6 +29,7 @@ type Props = {
 };
 
 const TEXT_CARD_DURATION_MS = 12000;
+const IFRAME_EMBED_FALLBACK_MS = 180_000;
 /** postMessage target for YouTube embed commands (avoid `"*"` — reduces internal API races). */
 const YOUTUBE_EMBED_ORIGIN = "https://www.youtube.com";
 
@@ -116,6 +117,10 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
     if (current.kind === "music" && current.song?.embedIframeUrl && current.song.embedSourceKind === "iframe_allowed") {
       pauseYoutube();
       pauseAudio();
+      const durationMs = current.durationSeconds
+        ? current.durationSeconds * 1000
+        : IFRAME_EMBED_FALLBACK_MS;
+      textTimerRef.current = window.setTimeout(advance, durationMs);
       return;
     }
 

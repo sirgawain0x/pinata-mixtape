@@ -82,7 +82,7 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const searchMb = useCallback(async () => {
+  const searchMb = useCallback(async (signal?: AbortSignal) => {
     if (!mbTitle.trim() && !mbArtist.trim()) return;
     setMbBusy(true);
     setError("");
@@ -91,24 +91,32 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
       if (mbTitle.trim()) params.set("title", mbTitle.trim());
       if (mbArtist.trim()) params.set("artist", mbArtist.trim());
       params.set("limit", "6");
-      const response = await fetch(`${APP_BASE}/api/musicbrainz/recordings?${params}`);
+      const response = await fetch(`${APP_BASE}/api/musicbrainz/recordings?${params}`, { signal });
       const data = await readJson<{ recordings: MbRecording[] }>(response);
       if (!response.ok) throw new Error(data.error ?? "MusicBrainz search failed.");
       setMbResults(data.recordings ?? []);
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError((err as Error).message);
       setMbResults([]);
     } finally {
-      setMbBusy(false);
+      if (!signal?.aborted) setMbBusy(false);
     }
   }, [mbArtist, mbTitle]);
 
   useEffect(() => {
-    if (!mbTitle.trim() && !mbArtist.trim()) return;
+    if (!mbTitle.trim() && !mbArtist.trim()) {
+      setMbResults([]);
+      return;
+    }
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void searchMb();
+      void searchMb(controller.signal);
     }, 500);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [mbArtist, mbTitle, searchMb]);
 
   function applyMb(recording: MbRecording) {

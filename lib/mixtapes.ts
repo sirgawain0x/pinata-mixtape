@@ -114,6 +114,7 @@ export type Song = Track & {
 export type MixListFilter = {
   publicOnly?: boolean;
   viewerCreatorId?: number | null;
+  limit?: number;
 };
 
 export type MixMomentInput = {
@@ -551,14 +552,22 @@ function mixVisibilityClause(filter: MixListFilter = {}): { sql: string; params:
   return { sql, params };
 }
 
+function mixLimitClause(filter: MixListFilter): string {
+  if (typeof filter.limit !== "number" || !Number.isFinite(filter.limit)) return "";
+  const n = Math.min(Math.max(Math.floor(filter.limit), 1), 100);
+  return ` LIMIT ${n}`;
+}
+
 export async function listMixes(query = "", filter: MixListFilter = {}): Promise<Mix[]> {
   await scheduleLegacyMixMigration();
   const search = query.trim();
   const vis = mixVisibilityClause(filter);
 
+  const limitSql = mixLimitClause(filter);
+
   if (!search) {
     const rows = await sqlAll<MixRow>(
-      `SELECT * FROM mixes WHERE ${vis.sql} ORDER BY updated_at DESC, id DESC`,
+      `SELECT * FROM mixes WHERE ${vis.sql} ORDER BY updated_at DESC, id DESC${limitSql}`,
       vis.params
     );
     return Promise.all(rows.map((row) => mapMix(row)));
@@ -587,7 +596,7 @@ export async function listMixes(query = "", filter: MixListFilter = {}): Promise
           OR songs.mood_tags LIKE @like
           OR songs.scene_tags LIKE @like
          )
-       ORDER BY mixes.updated_at DESC, mixes.id DESC`,
+       ORDER BY mixes.updated_at DESC, mixes.id DESC${limitSql}`,
     { like, ...vis.params }
   );
 

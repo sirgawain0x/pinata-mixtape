@@ -592,33 +592,95 @@ export async function importStationMix(input: {
   );
   if (songRows.length === 0) throw new Error("Mix has no tracks to import.");
 
-  if (input.clearExisting) {
-    await sqlRun(`DELETE FROM segments WHERE station_id = ?`, [input.stationId]);
-  }
-
   let startPos =
     typeof input.position === "number" && Number.isFinite(input.position)
       ? Math.max(1, Math.floor(input.position))
       : await nextSegmentPosition(input.stationId);
   if (input.clearExisting) startPos = 1;
 
-  const created: Segment[] = [];
+  const pending: Array<{ songId: number; title: string; position: number }> = [];
+  let pos = startPos;
   for (const row of songRows) {
     const song = await getSong(row.song_id);
     if (!song) continue;
-    const segment = await addSegment({
-      stationId: input.stationId,
-      kind: "music",
-      title: `${song.artist} — ${song.title}`,
+    pending.push({
       songId: row.song_id,
-      position: startPos
+      title: `${song.artist} — ${song.title}`,
+      position: pos++
     });
-    created.push(segment);
-    startPos += 1;
   }
+  if (pending.length === 0) throw new Error("Mix has no importable tracks.");
+
+  const insertAtMiddle =
+    !input.clearExisting &&
+    typeof input.position === "number" &&
+    Number.isFinite(input.position);
+
+  await withWriteTransaction({
+    sqlite: () => {
+      const database = getSqliteDatabase();
+      database.transaction(() => {
+        if (input.clearExisting) {
+          database.prepare(`DELETE FROM segments WHERE station_id = ?`).run(input.stationId);
+        } else if (insertAtMiddle) {
+          database
+            .prepare(
+              `UPDATE segments SET position = position + ? WHERE station_id = ? AND position >= ?`
+            )
+            .run(pending.length, input.stationId, startPos);
+        }
+        const insert = database.prepare(INSERT_SEGMENT_SQL);
+        for (const row of pending) {
+          insert.run({
+            stationId: input.stationId,
+            position: row.position,
+            kind: "music",
+            title: row.title,
+            body: "",
+            songId: row.songId,
+            audioCid: "",
+            audioUrl: "",
+            durationSeconds: null,
+            podcastEpisodeId: null,
+            ttsVoice: "",
+            ttsProvider: ""
+          });
+        }
+        database.prepare(`UPDATE stations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(input.stationId);
+      })();
+    },
+    libsql: async (tx) => {
+      if (input.clearExisting) {
+        await txRun(tx, `DELETE FROM segments WHERE station_id = ?`, [input.stationId]);
+      } else if (insertAtMiddle) {
+        await txRun(tx, `UPDATE segments SET position = position + ? WHERE station_id = ? AND position >= ?`, [
+          pending.length,
+          input.stationId,
+          startPos
+        ]);
+      }
+      for (const row of pending) {
+        await txRun(tx, INSERT_SEGMENT_SQL, {
+          stationId: input.stationId,
+          position: row.position,
+          kind: "music",
+          title: row.title,
+          body: "",
+          songId: row.songId,
+          audioCid: "",
+          audioUrl: "",
+          durationSeconds: null,
+          podcastEpisodeId: null,
+          ttsVoice: "",
+          ttsProvider: ""
+        });
+      }
+      await txRun(tx, `UPDATE stations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [input.stationId]);
+    }
+  });
 
   await updateStation(input.stationId, { seedMixId: input.mixId });
-  return created;
+  return await listStationSegments(input.stationId);
 }
 
 /** When a station has seed_mix_id but no segments yet, materialize programming once. */
