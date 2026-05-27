@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { youtubeEmbedUrl, youtubeVideoId } from "../lib/youtube";
+import MixtapeEditor from "./components/MixtapeEditor";
 import SignInButton from "./components/SignInButton";
 
 export type HostedMixResult = {
@@ -64,9 +65,12 @@ export type Track = {
   moodTags: string[];
   sceneTags: string[];
   notes: string;
+  musicbrainzId: string;
   musicbrainzUrl: string;
   youtubeUrl: string;
   listenUrl: string;
+  embedSourceKind: "youtube" | "iframe_allowed" | "link_only";
+  embedIframeUrl: string;
 };
 
 export type Mix = {
@@ -81,6 +85,10 @@ export type Mix = {
   shareNote: string;
   tags: string[];
   tracks: Track[];
+  creatorId: number | null;
+  isPublic: boolean;
+  slug: string;
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -137,6 +145,8 @@ export default function MixtapeApp({
     `${initialMixes.length} tape${initialMixes.length === 1 ? "" : "s"} in rotation`
   );
   const [shareStatus, setShareStatus] = useState("");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorMix, setEditorMix] = useState<Mix | null>(null);
   const [hostedMixes, setHostedMixes] = useState<Record<number, HostedMixResult | null>>({});
   const [narrationEnabled, setNarrationEnabled] = useState(true);
   const [generatingNarrationFor, setGeneratingNarrationFor] = useState<number | null>(null);
@@ -186,6 +196,14 @@ export default function MixtapeApp({
     setBroadcastMomentPulse(true);
     window.setTimeout(() => setBroadcastMomentPulse(false), 900);
   }
+
+  useEffect(() => {
+    const editor = searchParams.get("editor");
+    if (editor === "new") {
+      setEditorMix(null);
+      setEditorOpen(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (initialMixes.length === 0) {
@@ -272,10 +290,23 @@ export default function MixtapeApp({
     setExpandedTracks((current) => ({ ...current, [trackKey]: !current[trackKey] }));
   }
 
+  function handleMixSaved(mix: Mix) {
+    setMixes((current) => {
+      const exists = current.some((entry) => entry.id === mix.id);
+      if (exists) return current.map((entry) => (entry.id === mix.id ? mix : entry));
+      return [mix, ...current];
+    });
+    setSelectedId(mix.id);
+    setStatus(`Saved ${mix.title}`);
+  }
+
   async function copyShareLink() {
-    if (!selectedId || typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("mix", String(selectedId));
+    if (!selected || typeof window === "undefined") return;
+    const url = new URL(window.location.origin);
+    url.pathname = selected.slug ? "/app/m/" + selected.slug : "/app/";
+    if (!selected.slug) {
+      url.searchParams.set("mix", String(selected.id));
+    }
 
     try {
       await navigator.clipboard.writeText(url.toString());
@@ -669,6 +700,16 @@ export default function MixtapeApp({
           </div>
           <div className="hero-actions">
             <SignInButton />
+            <button
+              className="button"
+              onClick={() => {
+                setEditorMix(null);
+                setEditorOpen(true);
+              }}
+              type="button"
+            >
+              New tape
+            </button>
             <Link className="button" href="/dashboard">Host a station →</Link>
           </div>
         </div>
@@ -788,12 +829,34 @@ export default function MixtapeApp({
                 <div className="tape-meta">
                   <span>{selected.duration}</span>
                   <span>{selected.djPersona}</span>
+                  <button
+                    onClick={() => {
+                      setEditorMix(selected);
+                      setEditorOpen(true);
+                    }}
+                    type="button"
+                  >
+                    Edit
+                  </button>
                   <button onClick={() => void copyShareLink()} type="button">
                     Share
                   </button>
+                  {selected.slug ? (
+                    <Link className="button secondary-button" href={`/m/${selected.slug}`}>
+                      Public page
+                    </Link>
+                  ) : null}
                 </div>
               </div>
               {shareStatus ? <p className="share-status">{shareStatus}</p> : null}
+
+              {editorOpen ? (
+                <MixtapeEditor
+                  mix={editorMix}
+                  onClose={() => setEditorOpen(false)}
+                  onSaved={handleMixSaved}
+                />
+              ) : null}
 
               {voiceModalOpen ? (
                 <div className="modal-backdrop" role="presentation">
@@ -964,7 +1027,7 @@ export default function MixtapeApp({
                                   </a>
                                 ) : null}
                               </div>
-                              {track.youtubeUrl ? (
+                              {track.youtubeUrl && track.embedSourceKind !== "link_only" ? (
                                 <div className="track-embed">
                                   <iframe
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -973,6 +1036,18 @@ export default function MixtapeApp({
                                     referrerPolicy="strict-origin-when-cross-origin"
                                     src={youtubeEmbedUrl(track.youtubeUrl)}
                                     title={`${track.title} video`}
+                                  />
+                                </div>
+                              ) : null}
+                              {track.embedSourceKind === "iframe_allowed" && track.embedIframeUrl ? (
+                                <div className="track-embed">
+                                  <iframe
+                                    allow="encrypted-media; fullscreen"
+                                    loading="lazy"
+                                    referrerPolicy="strict-origin-when-cross-origin"
+                                    sandbox="allow-scripts allow-same-origin allow-presentation"
+                                    src={track.embedIframeUrl}
+                                    title={`${track.title} embed`}
                                   />
                                 </div>
                               ) : null}

@@ -7,6 +7,7 @@ import {
   persistDjHostedArtifacts,
   readDjHostedManifest
 } from "../../../../../lib/dj-hosted";
+import { clientLimiterKey, rateLimitHit } from "../../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,6 +39,11 @@ export async function GET(_request: Request, context: Context) {
 }
 
 export async function POST(request: Request, context: Context) {
+  const limitKey = clientLimiterKey(request, "dj-hosted");
+  if (!rateLimitHit(limitKey, 5, 60_000)) {
+    return Response.json({ error: "DJ narration rate limit exceeded." }, { status: 429 });
+  }
+
   const id = await mixId(context);
   if (!Number.isFinite(id) || id <= 0) {
     return Response.json({ error: "Invalid mix id." }, { status: 400 });

@@ -12,6 +12,8 @@ Primary jobs:
 - Track timestamped listening moments, discoveries, and set notes.
 - Suggest tracks or arcs based on what the user already loves.
 - Use MusicBrainz when canonical recording metadata or official song identification would improve accuracy.
+- Research artist news and post short `discovery` timeline moments linked to the user’s mixes.
+- Help broadcasters import mixes into stations, plan voice/text breaks, and keep programming fresh.
 
 ## Songs
 

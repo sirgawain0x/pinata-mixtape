@@ -280,6 +280,67 @@ Keep these distinctions clear:
 
 Do not treat every appearance of a song in a mix as a brand new song record unless it is genuinely a different version or edit that should stand alone.
 
+## Public share pages
+
+Each mix can expose `slug`, `is_public`, and `published_at`. Public listeners use:
+
+```text
+/app/m/{slug}
+```
+
+Legacy query links (`?mix=<id>`) still work on the crate home page.
+
+## Station: import a mixtape
+
+Authenticated station owners can bulk-import a saved mix into programming:
+
+```http
+POST /app/api/stations/{stationId}/segments/import-mix
+Content-Type: application/json
+
+{
+  "mixId": 1,
+  "clearExisting": false
+}
+```
+
+When a station has `seed_mix_id` but zero segments, the listen page materializes that mix once on first load.
+
+## Agent suggestions API
+
+Structured helper for Pinata chat (curate, news, broadcast):
+
+```http
+POST /app/api/agent/suggestions
+Content-Type: application/json
+
+{ "intent": "curate" }
+```
+
+```http
+POST /app/api/agent/suggestions
+Content-Type: application/json
+
+{ "intent": "news", "mixId": 1 }
+```
+
+```http
+POST /app/api/agent/suggestions
+Content-Type: application/json
+
+{ "intent": "broadcast", "mixId": 1 }
+```
+
+Post timeline moments after news research:
+
+```http
+POST /app/api/timeline
+```
+
+## Write protection
+
+Set `MIXTAPE_WRITE_TOKEN` in production and send `Authorization: Bearer <token>` for agent mutations, or sign in with SIWE so mixes can be tied to `creator_id`.
+
 ## Phase One Legal Posture
 
 Keep phase one conservative:

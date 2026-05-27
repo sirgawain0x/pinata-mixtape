@@ -16,6 +16,8 @@ type Segment = {
     title: string;
     artist: string;
     youtubeUrl: string;
+    embedSourceKind?: string;
+    embedIframeUrl?: string;
   } | null;
 };
 
@@ -27,6 +29,7 @@ type Props = {
 };
 
 const TEXT_CARD_DURATION_MS = 12000;
+const IFRAME_EMBED_FALLBACK_MS = 180_000;
 /** postMessage target for YouTube embed commands (avoid `"*"` — reduces internal API races). */
 const YOUTUBE_EMBED_ORIGIN = "https://www.youtube.com";
 
@@ -104,10 +107,20 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
     }
     if (!started || !current) return;
 
-    if (current.kind === "music" && current.song?.youtubeUrl) {
+    if (current.kind === "music" && current.song?.youtubeUrl && youtubeVideoId(current.song.youtubeUrl)) {
       pauseAudio();
       // URL may include autoplay=1 after Start; postMessage is a fallback once the iframe API is ready.
       window.setTimeout(playYoutube, 1200);
+      return;
+    }
+
+    if (current.kind === "music" && current.song?.embedIframeUrl && current.song.embedSourceKind === "iframe_allowed") {
+      pauseYoutube();
+      pauseAudio();
+      const durationMs = current.durationSeconds
+        ? current.durationSeconds * 1000
+        : IFRAME_EMBED_FALLBACK_MS;
+      textTimerRef.current = window.setTimeout(advance, durationMs);
       return;
     }
 
@@ -169,7 +182,12 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
     );
   }
 
-  const isYoutube = current?.kind === "music" && Boolean(current.song?.youtubeUrl);
+  const isYoutube =
+    current?.kind === "music" && Boolean(current.song?.youtubeUrl && youtubeVideoId(current.song.youtubeUrl));
+  const isMusicIframe =
+    current?.kind === "music" &&
+    current.song?.embedSourceKind === "iframe_allowed" &&
+    Boolean(current.song.embedIframeUrl);
   const embedSrc =
     isYoutube && current?.song
       ? youtubeEmbedUrl(current.song.youtubeUrl, {
@@ -208,9 +226,21 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
             suppressHydrationWarning
           />
         ) : null}
+        {isMusicIframe && current?.song?.embedIframeUrl ? (
+          <iframe
+            key={`embed-${current.id}`}
+            allow="encrypted-media; fullscreen"
+            className="station-music-embed"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-scripts allow-same-origin allow-presentation"
+            src={current.song.embedIframeUrl}
+            title="station music embed"
+          />
+        ) : null}
         <audio
           ref={audioRef}
-          controls={!isYoutube}
+          controls={!isYoutube && !isMusicIframe}
           onEnded={advance}
           onError={() => {
             const c = currentRef.current;
@@ -270,6 +300,7 @@ function audioPlayableUrl(segment: Segment): string {
 function segmentIsPlayable(segment: Segment): boolean {
   if (segment.kind === "music") {
     if (segment.song?.youtubeUrl && youtubeVideoId(segment.song.youtubeUrl)) return true;
+    if (segment.song?.embedSourceKind === "iframe_allowed" && segment.song.embedIframeUrl) return true;
     if (segment.audioUrl) return true;
     return false;
   }

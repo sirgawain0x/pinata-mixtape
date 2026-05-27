@@ -1,9 +1,15 @@
 import { searchMusicBrainzRecordings } from "../../../../lib/musicbrainz";
+import { clientLimiterKey, rateLimitHit } from "../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  const key = clientLimiterKey(request, "musicbrainz");
+  if (!rateLimitHit(key, 20, 60_000)) {
+    return Response.json({ error: "MusicBrainz rate limit exceeded. Try again shortly." }, { status: 429 });
+  }
+
   const url = new URL(request.url);
   const title = url.searchParams.get("title") ?? "";
   const artist = url.searchParams.get("artist") ?? "";
