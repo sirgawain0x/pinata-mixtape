@@ -43,6 +43,14 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;600;700&family=Reenie+Beanie&family=Share+Tech+Mono&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         <Providers initialState={initialState}>{children}</Providers>
       </body>
