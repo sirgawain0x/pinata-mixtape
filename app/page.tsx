@@ -24,6 +24,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       initialSongs={await listSongs("", 8)}
       initialStations={await listStations({ publicOnly: true })}
       initialSelectedId={Number.isFinite(initialSelectedId) ? initialSelectedId : null}
+      initialCreator={
+        creator
+          ? {
+              id: creator.id,
+              walletAddress: creator.walletAddress,
+              displayName: creator.displayName
+            }
+          : null
+      }
     />
   );
 }
