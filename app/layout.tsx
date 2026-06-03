@@ -1,11 +1,40 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { Inter, Outfit, Reenie_Beanie, Share_Tech_Mono } from "next/font/google";
 import { cookieToInitialState } from "@account-kit/core";
 import { base, baseSepolia } from "@account-kit/infra";
 import { config } from "../config";
 import { Providers } from "./providers";
 import "@account-kit/react/styles.css";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-inter",
+  display: "swap"
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["300", "400", "600", "700"],
+  variable: "--font-outfit",
+  display: "swap"
+});
+
+const reenieBeanie = Reenie_Beanie({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-reenie-beanie",
+  display: "swap"
+});
+
+const shareTechMono = Share_Tech_Mono({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-share-tech-mono",
+  display: "swap"
+});
 
 export const metadata: Metadata = {
   title: "Pinata Mixtape",
@@ -42,7 +71,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const initialState = safeInitialState(cookieToInitialState(config, cookie));
 
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${outfit.variable} ${inter.variable} ${reenieBeanie.variable} ${shareTechMono.variable}`}
+    >
       <body>
         <Providers initialState={initialState}>{children}</Providers>
       </body>
