@@ -88,7 +88,7 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
         const message = createSiweMessage({
           domain: window.location.host,
           address,
-          statement: "Sign in to Pinata Mixtape Radio.",
+          statement: "Sign in to Mixtape Radio.",
           uri: window.location.origin,
           version: "1",
           chainId,

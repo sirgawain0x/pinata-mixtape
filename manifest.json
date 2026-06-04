@@ -2,16 +2,16 @@
   "$schema": "https://agents.pinata.cloud/schemas/manifest.v1.json",
   "version": 1,
   "agent": {
-    "name": "Pinata Mixtape",
+    "name": "Mixtape",
     "description": "A hosted retro mixtape manager for capturing music taste, building mixes, and sharing track lists with outbound links.",
     "emoji": "📼",
     "vibe": "Retro AI DJ booth with taste tracking and narrative playlist arcs"
   },
   "template": {
-    "slug": "pinata-mixtape",
+    "slug": "mixtape",
     "category": "general",
-    "authorName": "Raid Guild",
-    "tags": ["raidguild", "pinata", "agent", "music", "mixtape", "nextjs", "typescript"]
+    "authorName": "Mixtape",
+    "tags": ["agent", "music", "mixtape", "nextjs", "typescript"]
   },
   "secrets": [],
   "scripts": {

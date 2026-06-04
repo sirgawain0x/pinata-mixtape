@@ -37,8 +37,8 @@ const shareTechMono = Share_Tech_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pinata Mixtape",
-  description: "Retro mixtape manager agent template for Pinata-hosted agents."
+  title: "Mixtape",
+  description: "Retro mixtape manager for capturing taste, building tapes, and hosting radio stations."
 };
 
 const ALLOWED_CHAIN_IDS = new Set<number>([base.id, baseSepolia.id]);

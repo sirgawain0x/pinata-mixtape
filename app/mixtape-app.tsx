@@ -118,12 +118,19 @@ export type Station = {
   tagline: string;
 };
 
+export type Creator = {
+  id: number;
+  walletAddress: string;
+  displayName: string;
+};
+
 type MixtapeAppProps = {
   initialMixes: Mix[];
   initialMoments: MixMoment[];
   initialSongs: Song[];
   initialStations: Station[];
   initialSelectedId: number | null;
+  initialCreator: Creator | null;
 };
 
 export default function MixtapeApp({
@@ -131,11 +138,13 @@ export default function MixtapeApp({
   initialMoments,
   initialSongs,
   initialStations,
-  initialSelectedId
+  initialSelectedId,
+  initialCreator
 }: MixtapeAppProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [creator, setCreator] = useState<Creator | null>(initialCreator);
   const [mixes, setMixes] = useState<Mix[]>(initialMixes);
   const [moments, setMoments] = useState<MixMoment[]>(initialMoments);
   const [songs, setSongs] = useState<Song[]>(initialSongs);
@@ -201,11 +210,11 @@ export default function MixtapeApp({
 
   useEffect(() => {
     const editor = searchParams.get("editor");
-    if (editor === "new") {
+    if (editor === "new" && creator) {
       setEditorMix(null);
       setEditorOpen(true);
     }
-  }, [searchParams]);
+  }, [searchParams, creator]);
 
   useEffect(() => {
     if (initialMixes.length === 0) {
@@ -687,10 +696,9 @@ export default function MixtapeApp({
       <section className="hero">
         <div className="hero-copy">
           <p className="hero-mark">
-            <span>Pinata agent template</span>
-            <span className="raid-stamp" aria-label="by RaidGuild">by RaidGuild</span>
+            <span>Mixtape</span>
           </p>
-          <h1>Pinata Mixtape</h1>
+          <h1>Mixtape</h1>
           <p className="lede">
             Build retro mixtapes, track your taste, and shape an event arc with a DJ persona,
             timeline moments, and share-friendly outbound links.
@@ -701,18 +709,22 @@ export default function MixtapeApp({
             <span>MusicBrainz-ready</span>
           </div>
           <div className="hero-actions">
-            <SignInButton />
-            <button
-              className="button"
-              onClick={() => {
-                setEditorMix(null);
-                setEditorOpen(true);
-              }}
-              type="button"
-            >
-              New tape
-            </button>
-            <Link className="button" href="/dashboard">Host a station →</Link>
+            <SignInButton onChange={setCreator} />
+            {creator ? (
+              <>
+                <button
+                  className="button"
+                  onClick={() => {
+                    setEditorMix(null);
+                    setEditorOpen(true);
+                  }}
+                  type="button"
+                >
+                  New tape
+                </button>
+                <Link className="button" href="/dashboard">Host a station →</Link>
+              </>
+            ) : null}
           </div>
         </div>
 
