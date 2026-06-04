@@ -2657,3 +2657,22 @@ input[type="radio"] {
 .akui-modal .akui-btn-primary {
   color: #ffffff;
 }
+
+/* Footer links (Terms of Service, protected by Alchemy) — global a/button:hover sets color: #fff */
+.akui-modal a,
+.akui-modal a:visited,
+.akui-modal .akui-btn-link {
+  color: var(--akui-fg-accent-brand, #6366f1);
+}
+
+.akui-modal a:hover,
+.akui-modal a:active,
+.akui-modal a:focus-visible,
+.akui-modal .akui-btn-link:hover,
+.akui-modal .akui-btn-link:active,
+.akui-modal .akui-btn-link:focus-visible {
+  color: var(--akui-fg-accent-brand, #6366f1);
+  border-bottom-color: transparent;
+  opacity: 0.85;
+  transform: none;
+}
