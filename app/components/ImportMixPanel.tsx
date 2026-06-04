@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const APP_BASE = "/app";
 
-type MixOption = { id: number; title: string };
+type MixOption = { id: number; title: string; tracks?: unknown[] };
 
 type Props = {
   stationId: number;
@@ -16,17 +16,32 @@ export default function ImportMixPanel({ stationId, onImported }: Props) {
   const [mixId, setMixId] = useState<number | "">("");
   const [clearExisting, setClearExisting] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    void fetch(`${APP_BASE}/api/mixes?all=1`, { cache: "no-store" })
-      .then((response) => response.json())
+    setLoading(true);
+    setError("");
+    void fetch(`${APP_BASE}/api/mixes?mine=1`, { cache: "no-store", credentials: "include" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load mixtapes.");
+        }
+        return response.json();
+      })
       .then((data: { mixes: MixOption[] }) => {
         if (!cancelled) setMixes(data.mixes ?? []);
       })
-      .catch(() => undefined);
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load mixtapes.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -59,21 +74,35 @@ export default function ImportMixPanel({ stationId, onImported }: Props) {
 
   return (
     <div className="import-mix-panel composer-form">
-      <p className="eyebrow">Import mixtape</p>
-      <p className="muted">Pull tracks from a saved mix into this station&apos;s programming.</p>
-      <select onChange={(event) => setMixId(event.target.value ? Number(event.target.value) : "")} value={mixId}>
-        <option value="">Select a mix…</option>
-        {mixes.map((mix) => (
-          <option key={mix.id} value={mix.id}>
-            {mix.title}
-          </option>
-        ))}
+      <p className="eyebrow">Import your mixtape</p>
+      <p className="muted">Pull tracks from a mixtape you created into this station&apos;s programming.</p>
+      {!loading && !error && mixes.length === 0 ? (
+        <p className="muted">
+          You haven&apos;t created any mixtapes yet. Build one from the <a href="/">crate</a> with “New tape,” then
+          come back to import it.
+        </p>
+      ) : null}
+      <select
+        disabled={loading || mixes.length === 0}
+        onChange={(event) => setMixId(event.target.value ? Number(event.target.value) : "")}
+        value={mixId}
+      >
+        <option value="">{loading ? "Loading your mixtapes…" : "Select a mix…"}</option>
+        {mixes.map((mix) => {
+          const count = Array.isArray(mix.tracks) ? mix.tracks.length : 0;
+          return (
+            <option key={mix.id} value={mix.id}>
+              {mix.title}
+              {count ? ` (${count} track${count === 1 ? "" : "s"})` : ""}
+            </option>
+          );
+        })}
       </select>
       <label>
         <input checked={clearExisting} onChange={(event) => setClearExisting(event.target.checked)} type="checkbox" /> Replace
         existing segments
       </label>
-      <button disabled={busy} onClick={() => void importMix()} type="button">
+      <button disabled={busy || loading || mixes.length === 0} onClick={() => void importMix()} type="button">
         {busy ? "Importing…" : "Import mix"}
       </button>
       {status ? <p className="muted">{status}</p> : null}

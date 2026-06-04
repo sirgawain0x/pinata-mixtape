@@ -126,6 +126,7 @@ export type Song = Track & {
 export type MixListFilter = {
   publicOnly?: boolean;
   viewerCreatorId?: number | null;
+  ownerCreatorId?: number | null;
   limit?: number;
 };
 
@@ -675,7 +676,10 @@ async function migrateLegacyTracks(): Promise<void> {
 function mixVisibilityClause(filter: MixListFilter = {}): { sql: string; params: Record<string, unknown> } {
   const parts: string[] = [];
   const params: Record<string, unknown> = {};
-  if (filter.publicOnly) {
+  if (filter.ownerCreatorId) {
+    parts.push("mixes.creator_id = @ownerCreatorId");
+    params.ownerCreatorId = filter.ownerCreatorId;
+  } else if (filter.publicOnly) {
     parts.push("mixes.is_public = 1");
   } else if (filter.viewerCreatorId) {
     parts.push("(mixes.is_public = 1 OR mixes.creator_id = @viewerCreatorId)");
