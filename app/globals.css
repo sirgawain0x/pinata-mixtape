@@ -2233,6 +2233,272 @@ input[type="radio"] {
 }
 
 /* ==========================================================================
+   VINYL TURNTABLE PLAYER
+   Spinning record + swinging tonearm play control. Visual / interaction model
+   adapted from Ryan Mulligan's "CSS Record Player"
+   (https://codepen.io/hexagoncircle/pen/WwOzwq).
+   ========================================================================== */
+.turntable {
+  margin: 14px 0 26px;
+}
+
+.tt-deck {
+  position: relative;
+  width: min(100%, 420px);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+}
+
+.tt-platter {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 36%, #34373f 0%, #191b20 72%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 0 50px rgba(0, 0, 0, 0.6),
+    0 16px 34px rgba(0, 0, 0, 0.5);
+}
+
+.tt-record {
+  position: absolute;
+  inset: 8%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  -webkit-appearance: none;
+  appearance: none;
+  background: radial-gradient(circle at center, #1c1c20 0 27%, #0b0b0d 27% 100%);
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 10px 22px rgba(0, 0, 0, 0.55);
+}
+
+.tt-record:hover {
+  border: 0;
+}
+
+.tt-record:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.is-playing .tt-record {
+  animation: tt-spin 3.6s linear infinite;
+}
+
+.tt-grooves {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.05) 0 1px,
+    transparent 1px 5px
+  );
+  pointer-events: none;
+}
+
+.tt-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44%;
+  height: 44%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 2px;
+  padding: 8px;
+  background: radial-gradient(circle at 50% 34%, #ff5b67 0%, #d8323f 78%);
+  box-shadow:
+    inset 0 0 0 3px rgba(0, 0, 0, 0.12),
+    inset 0 0 14px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.is-playing .tt-label {
+  animation: tt-label-counter 3.6s linear infinite;
+}
+
+.tt-label-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.72rem;
+  line-height: 1.05;
+  color: #2a0a0d;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tt-label-artist {
+  font-size: 0.62rem;
+  line-height: 1.1;
+  color: rgba(42, 10, 13, 0.82);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tt-spindle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #c9ccd2 55%, #9aa0ac);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.tt-tonearm {
+  position: absolute;
+  top: 9%;
+  right: 17%;
+  width: 8px;
+  height: 56%;
+  transform-origin: 50% 6%;
+  transform: rotate(-22deg);
+  transition: transform 0.7s cubic-bezier(0.45, 0.05, 0.2, 1);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.is-playing .tt-tonearm {
+  transform: rotate(17deg);
+  animation: tt-arm-track 4s ease-in-out 0.75s infinite;
+}
+
+.tt-tonearm-rod {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  width: 100%;
+  height: 92%;
+  transform: translateX(-50%);
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef1f5, #9aa0ac 60%, #6f7480);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.tt-tonearm-base {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #5a5f6b, #23252b 70%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 3px 6px rgba(0, 0, 0, 0.55);
+}
+
+.tt-tonearm-head {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  width: 16px;
+  height: 22px;
+  transform: translateX(-62%) rotate(9deg);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #3a3d44, #1b1d22);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.tt-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.tt-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tt-play-icon {
+  display: inline-block;
+}
+
+.tt-play-icon-play {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 0 6px 11px;
+  border-color: transparent transparent transparent currentColor;
+}
+
+.tt-play-icon-pause {
+  width: 11px;
+  height: 12px;
+  border-left: 3px solid currentColor;
+  border-right: 3px solid currentColor;
+}
+
+.tt-track-counter {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  color: var(--led-amber);
+  text-shadow: 0 0 6px var(--led-amber-glow);
+}
+
+@keyframes tt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes tt-label-counter {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(-360deg);
+  }
+}
+
+@keyframes tt-arm-track {
+  0%,
+  100% {
+    transform: rotate(17deg);
+  }
+  50% {
+    transform: rotate(18.4deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-playing .tt-record,
+  .is-playing .tt-label,
+  .is-playing .tt-tonearm {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
    ACCOUNT KIT (Alchemy) AUTH MODAL — readable input fields
    The global dark console theme bleeds its input colors into the Alchemy
    sign-in modal, leaving the email / code fields black-on-black. Force the
