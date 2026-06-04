@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { youtubeEmbedUrl, youtubeVideoId } from "../lib/youtube";
 import MixtapeEditor from "./components/MixtapeEditor";
+import RecordPlayer from "./components/RecordPlayer";
 import SignInButton from "./components/SignInButton";
 
 export type HostedMixResult = {
@@ -45,6 +46,8 @@ type YTPlayer = {
   getVolume: () => number;
   setVolume: (volume: number) => void;
   getVideoData: () => { video_id?: string };
+  playVideo?: () => void;
+  pauseVideo?: () => void;
 };
 
 const NARRATION_VOICES = [
@@ -429,6 +432,18 @@ export default function MixtapeApp({
   }, [selected]);
 
   const mixYoutubeIds = useMemo(() => mixYoutubeTracks.map((track) => track.videoId), [mixYoutubeTracks]);
+  const nowPlayingTrack = mixYoutubeTracks[currentTrackIndex] ?? mixYoutubeTracks[0] ?? null;
+
+  function togglePlayback() {
+    const player = playerRef.current;
+    if (!player) return;
+    if (playlistIsPlaying) {
+      player.pauseVideo?.();
+    } else {
+      player.playVideo?.();
+    }
+  }
+
   const broadcastTrack = selected?.tracks[currentTrackIndex] ?? selected?.tracks[0] ?? null;
   const broadcastQueue = selected?.tracks.slice(currentTrackIndex + 1, currentTrackIndex + 4) ?? [];
   const shareUrl = useMemo(() => {
@@ -889,29 +904,15 @@ export default function MixtapeApp({
               ) : null}
 
 
-              <div className={playlistIsPlaying ? "cassette cassette-playing" : "cassette"} aria-hidden="true">
-                <span className="cassette-screw cassette-screw-tl" />
-                <span className="cassette-screw cassette-screw-tr" />
-                <span className="cassette-screw cassette-screw-bl" />
-                <span className="cassette-screw cassette-screw-br" />
-                <div className="cassette-top-strip" />
-                <div className="cassette-label-block">
-                  <span className="cassette-label-band cassette-label-band-a" />
-                  <span className="cassette-label-band cassette-label-band-b" />
-                  <span className="cassette-label-band cassette-label-band-c" />
-                </div>
-                <div className="cassette-window">
-                  <span className="cassette-reel cassette-reel-left" />
-                  <span className="cassette-tape" />
-                  <span className="cassette-reel cassette-reel-right" />
-                  <span className="cassette-window-bar" />
-                </div>
-                <div className="cassette-bottom">
-                  <span className="cassette-hole cassette-hole-left" />
-                  <span className="cassette-bottom-center" />
-                  <span className="cassette-hole cassette-hole-right" />
-                </div>
-              </div>
+              <RecordPlayer
+                isPlaying={playlistIsPlaying}
+                canPlay={mixYoutubeIds.length > 0}
+                onToggle={togglePlayback}
+                title={nowPlayingTrack?.title ?? selected.title}
+                artist={nowPlayingTrack?.artist ?? selected.djPersona}
+                trackIndex={currentTrackIndex}
+                trackCount={mixYoutubeTracks.length}
+              />
 
               {mixYoutubeIds.length > 0 ? (
                 <div className="mix-player">
