@@ -1,4 +1,5 @@
 import { jsonError, verifySiweAndIssueSession } from "../../../../lib/auth";
+import { parseSiweMessage } from "viem/siwe";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,18 +21,34 @@ function parseSiweSignatureHex(signature: string): `0x${string}` | null {
   return signature as `0x${string}`;
 }
 
+function hostFromEnvValue(value: string): string {
+  return value.includes("://") ? new URL(value).host : value;
+}
+
+function requestHost(request: Request): string | null {
+  const forwarded = request.headers.get("x-forwarded-host");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return request.headers.get("host");
+}
+
 /**
- * Must match the SIWE message `domain` (client uses `window.location.host`).
- * Set SIWE_DOMAIN or NEXT_PUBLIC_APP_URL — never derived from request headers or URL.
+ * Resolves the SIWE domain the server expects. Must match the message `domain`
+ * (client uses `window.location.host` or `NEXT_PUBLIC_SIWE_DOMAIN`).
  */
-function configuredSiweDomain(): string {
-  const configured = process.env.SIWE_DOMAIN || process.env.NEXT_PUBLIC_APP_URL;
-  if (configured) {
-    return configured.includes("://") ? new URL(configured).host : configured;
+function resolveExpectedSiweDomain(request: Request, messageDomain: string): string {
+  const explicit = process.env.SIWE_DOMAIN?.trim();
+  if (explicit) return hostFromEnvValue(explicit);
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (appUrl) {
+    const appHost = hostFromEnvValue(appUrl);
+    if (appHost === messageDomain) return appHost;
   }
-  throw new Error(
-    "SIWE_DOMAIN is not configured. Set SIWE_DOMAIN or NEXT_PUBLIC_APP_URL."
-  );
+
+  const fromHeaders = requestHost(request);
+  if (fromHeaders) return fromHeaders;
+
+  return new URL(request.url).host;
 }
 
 export async function POST(request: Request) {
@@ -48,8 +65,21 @@ export async function POST(request: Request) {
     return jsonError("Invalid signature format.", 400);
   }
 
+  const fields = parseSiweMessage(message);
+  const messageDomain = fields.domain?.trim();
+  if (!messageDomain) {
+    return jsonError("Invalid SIWE message: missing domain.", 400);
+  }
+
+  const expectedDomain = resolveExpectedSiweDomain(request, messageDomain);
+  if (messageDomain !== expectedDomain) {
+    return jsonError(
+      `SIWE domain mismatch: expected ${expectedDomain}, got ${messageDomain}.`,
+      401
+    );
+  }
+
   try {
-    const expectedDomain = configuredSiweDomain();
     const creator = await verifySiweAndIssueSession(message, signatureHex, { expectedDomain });
     return Response.json({ creator });
   } catch (error) {

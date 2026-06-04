@@ -70,6 +70,24 @@ If `workspace/data/generated-mixtapes/<mixId>-dj-hosted/dj-script.json` exists (
 
 **Production (`air.creativeplatform.xyz`):** set `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `PINATA_JWT`, and session KV vars (see [`lib/auth-storage.ts`](lib/auth-storage.ts)). DJ-hosted manifests persist in Turso; clip audio should be uploaded to Pinata via POST from a machine with `workspace/scripts/venice_dj_poc.py`.
 
+### Sign-in (Alchemy Account Kit + SIWE)
+
+The hosted app uses Alchemy Account Kit for wallet connection, then SIWE against `/app/api/auth/*`. CSP in [`next.config.mjs`](next.config.mjs) must allow Alchemy (`api.g.alchemy.com`, `*.g.alchemy.com`) and Turnkey (`auth.turnkey.com`) — defaults are baked in; extend with:
+
+- `MIXTAPE_CSP_CONNECT_HOSTS` — extra `connect-src` origins (space/comma separated)
+- `MIXTAPE_EMBED_IFRAME_HOSTS` — extra `frame-src` origins for embeds and auth iframes
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_ALCHEMY_API_KEY` | Account Kit client |
+| `NEXT_PUBLIC_CHAIN_ID` | `8453` (Base) or `84532` (Base Sepolia) |
+| `ALCHEMY_RPC_URL` | Server-side smart-account signature verification |
+| `SIWE_DOMAIN` | Canonical host for SIWE (optional; must match browser host) |
+| `NEXT_PUBLIC_SIWE_DOMAIN` | Client SIWE domain when it differs from `window.location.host` |
+| `NEXT_PUBLIC_APP_URL` | Used for SIWE when its host matches the signed message |
+| `REDIS_URL` or Upstash REST | Nonce + session storage on serverless (see `lib/auth-storage.ts`) |
+| `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` | Creator rows and app data |
+
 The left sidebar now behaves like a crate search. Queries can match:
 
 - mix metadata such as title, vibe, use case, or tags
