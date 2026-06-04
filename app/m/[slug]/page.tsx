@@ -74,6 +74,11 @@ export default async function PublicMixPage({ params }: PageProps) {
                   <p>{track.artist}</p>
                 </div>
               </div>
+              {track.songId ? (
+                <p>
+                  <Link href={`/songs/${track.songId}`}>Open player →</Link>
+                </p>
+              ) : null}
               {track.notes ? <p>{track.notes}</p> : null}
               <div className="link-row">
                 {track.youtubeUrl ? (

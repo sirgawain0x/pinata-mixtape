@@ -3,6 +3,8 @@ const defaultEmbedFrameHosts = [
   "https://www.youtube.com",
   "https://youtube.com",
   "https://www.youtube-nocookie.com",
+  "https://tv.creativeplatform.xyz",
+  "https://lvpr.tv",
   "https://open.spotify.com",
   "https://soundcloud.com",
   "https://w.soundcloud.com",
@@ -39,7 +41,11 @@ const nextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: `frame-src 'self' ${allFrameHosts.join(" ")};`
+            value: [
+              `frame-src 'self' ${allFrameHosts.join(" ")}`,
+              "media-src 'self' blob: https://livepeercdn.com https://*.livepeercdn.com",
+              "connect-src 'self' https://livepeercdn.com https://livepeer.studio https://*.livepeercdn.com"
+            ].join("; ")
           }
         ]
       }

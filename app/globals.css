@@ -2232,6 +2232,94 @@ input[type="radio"] {
   color: #fff;
 }
 
+.song-page .hero-mark span + span {
+  margin-left: 0.65rem;
+}
+
+.song-player-shell {
+  display: grid;
+  gap: 1.25rem;
+  margin: 0 auto 2rem;
+  max-width: 720px;
+}
+
+.record-player-canvas-wrap {
+  aspect-ratio: 4 / 3;
+  background: radial-gradient(circle at 50% 20%, rgba(255, 157, 0, 0.08), transparent 55%), #0e0c12;
+  border: 1px solid rgba(248, 232, 200, 0.12);
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+}
+
+.record-player-loading {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
+.record-player-hint {
+  bottom: 0.75rem;
+  font-size: 0.85rem;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  text-align: center;
+}
+
+.song-player-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.song-player-progress {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.song-player-progress-bar {
+  background: linear-gradient(90deg, #ff9d00, #ff5a00);
+  border-radius: 999px;
+  height: 4px;
+  margin-bottom: 0.35rem;
+  max-width: 100%;
+}
+
+.song-livepeer-shell,
+.song-yt-shell {
+  height: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 0;
+}
+
+.song-iframe-embed {
+  border: 0;
+  height: 0;
+  position: absolute;
+  visibility: hidden;
+  width: 0;
+}
+
+.song-mix-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.song-mix-list li + li {
+  margin-top: 0.35rem;
+}
+
+.admin-songs-form {
+  display: grid;
+  gap: 1rem;
+  max-width: 420px;
+}
+
 /* ==========================================================================
    VINYL TURNTABLE PLAYER
    Spinning record + swinging tonearm play control. Visual / interaction model
@@ -2499,32 +2587,126 @@ input[type="radio"] {
 }
 
 /* ==========================================================================
-   ACCOUNT KIT (Alchemy) AUTH MODAL — readable input fields
-   The global dark console theme bleeds its input colors into the Alchemy
-   sign-in modal, leaving the email / code fields black-on-black. Force the
-   modal's inputs to a light surface with dark text. Loaded after
-   @account-kit/react/styles.css so these win on equal specificity.
+   ACCOUNT KIT (Alchemy) AUTH MODAL — isolate from dark console theme
+   Global button/input rules in this file load after Account Kit styles and
+   bleed into the sign-in modal (black fields, unreadable auth buttons, clipped
+   email icon). Scope resets under .akui-modal with enough specificity to win.
    ========================================================================== */
-.akui-input,
-.akui-modal .akui-input {
-  background-color: #ffffff;
+.akui-modal {
+  --akui-bg-surface-default: #ffffff;
+  --akui-bg-surface-inset: #f3f4f6;
+  --akui-fg-primary: #11131a;
+  --akui-fg-secondary: #374151;
+  --akui-fg-tertiary: #6b7280;
+  --akui-fg-disabled: #9ca3af;
+  --akui-static: #d1d5db;
+  --akui-active: #6366f1;
+  --akui-btn-auth: #ffffff;
+  --akui-btn-secondary: #f3f4f6;
   color: #11131a;
-  border-color: #c9ced8;
+  background-color: #ffffff;
 }
 
-.akui-input input,
-.akui-modal .akui-input input {
+.akui-modal button,
+.akui-modal .akui-btn {
+  width: auto;
+  min-height: unset;
+  max-height: 2.5rem;
+  padding: 0.75rem;
+  border: 0;
+  border-bottom: 0;
+  border-radius: 8px;
+  box-shadow: none;
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: normal;
+  transform: none;
+  transition: box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.akui-modal button:hover,
+.akui-modal button:active,
+.akui-modal .akui-btn:hover,
+.akui-modal .akui-btn:active {
+  transform: none;
+}
+
+.akui-modal .akui-btn-primary {
+  background-color: var(--akui-btn-primary, #e82594);
+  color: #ffffff;
+}
+
+.akui-modal .akui-btn-primary:hover {
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.akui-modal .akui-btn-secondary {
+  background-color: #e2e8f0;
+  color: #11131a;
+}
+
+.akui-modal .akui-btn-secondary:hover {
+  border-color: transparent;
+  color: #11131a;
+}
+
+.akui-modal .akui-btn-auth {
   background-color: #ffffff;
+  color: #11131a;
+  border: 1px solid #d1d5db;
+}
+
+.akui-modal .akui-btn-auth:hover {
+  background-color: #f9fafb;
+  border-color: #cbd5e1;
+  color: #11131a;
+}
+
+.akui-modal .akui-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  overflow: visible;
+  background-color: #ffffff;
+  color: #11131a;
+  border: 1px solid #c9ced8;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.akui-modal .akui-input svg {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.akui-modal .akui-input svg > * {
+  fill: #6b7280;
+}
+
+.akui-modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.akui-modal .akui-input input {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  background-color: transparent;
   color: #11131a;
   border: 0;
   box-shadow: none;
 }
 
-.akui-input input::placeholder,
+.akui-modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"])::placeholder,
 .akui-modal .akui-input input::placeholder {
   color: #6b7280;
 }
 
-.akui-input svg > * {
-  fill: #11131a;
+.akui-modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.akui-modal .akui-input:focus-within {
+  border-color: #6366f1;
+  outline: none;
 }

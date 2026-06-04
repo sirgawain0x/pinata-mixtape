@@ -1,4 +1,5 @@
 import { parseAllowedEmbedUrl, resolveEmbedSourceKind, type EmbedSourceKind } from "./embed-sources";
+import { isCreativeTvConfigured, parseCreativeTvUrl, resolvePlaybackByAssetId } from "./creative-tv";
 import { searchMusicBrainzRecordings } from "./musicbrainz";
 import Database from "better-sqlite3";
 
@@ -31,6 +32,7 @@ export type TrackInput = {
   listenUrl?: string;
   embedSourceKind?: EmbedSourceKind;
   embedIframeUrl?: string;
+  creativeTvUrl?: string;
 };
 
 export type Track = Required<
@@ -49,6 +51,7 @@ export type Track = Required<
     | "musicbrainzId"
     | "embedSourceKind"
     | "embedIframeUrl"
+    | "creativeTvUrl"
   >
 > & {
   releaseYear: string;
@@ -64,7 +67,16 @@ export type Track = Required<
   listenUrl: string;
   embedSourceKind: EmbedSourceKind;
   embedIframeUrl: string;
+  creativeTvUrl: string;
+  creativeTvPostId: string;
+  livepeerPlaybackId: string;
+  audioCid: string;
+  audioUrl: string;
+  durationSeconds: number | null;
+  isCurated: boolean;
 };
+
+export type MixTrack = Track & { songId: number };
 
 export type MixInput = {
   title: string;
@@ -96,7 +108,7 @@ export type Mix = {
   coverTheme: string;
   shareNote: string;
   tags: string[];
-  tracks: Track[];
+  tracks: MixTrack[];
   creatorId: number | null;
   isPublic: boolean;
   slug: string;
@@ -172,6 +184,13 @@ type SongRow = {
   listen_url: string | null;
   embed_source_kind?: string | null;
   embed_iframe_url?: string | null;
+  audio_cid?: string | null;
+  audio_url?: string | null;
+  duration_seconds?: number | null;
+  is_curated?: number | null;
+  creative_tv_url?: string | null;
+  creative_tv_post_id?: string | null;
+  livepeer_playback_id?: string | null;
 };
 
 type MixSongRow = SongRow & {
@@ -259,9 +278,17 @@ function normalizeTrack(input: TrackInput): Track {
   }
 
   const youtubeUrl = input.youtubeUrl?.trim() || "";
-  const listenUrl = input.listenUrl?.trim() || buildYoutubeSearchUrl(title, artist);
+  const creativeTvRaw = input.creativeTvUrl?.trim() || "";
+  const parsedCreativeTv = parseCreativeTvUrl(creativeTvRaw);
+  const listenUrl =
+    input.listenUrl?.trim() || parsedCreativeTv?.discoverUrl || buildYoutubeSearchUrl(title, artist);
   const embedIframeRaw = input.embedIframeUrl?.trim() || "";
-  const embedSourceKind = resolveEmbedSourceKind(input.embedSourceKind, youtubeUrl, embedIframeRaw);
+  const embedSourceKind = resolveEmbedSourceKind(
+    input.embedSourceKind,
+    youtubeUrl,
+    embedIframeRaw,
+    creativeTvRaw
+  );
   let embedIframeUrl = "";
   if (embedSourceKind === "iframe_allowed") {
     const parsed = parseAllowedEmbedUrl(embedIframeRaw || youtubeUrl || listenUrl);
@@ -270,6 +297,9 @@ function normalizeTrack(input: TrackInput): Track {
     }
     embedIframeUrl = parsed.toString();
   }
+
+  const creativeTvUrl = parsedCreativeTv?.discoverUrl ?? (embedSourceKind === "creativetv" ? creativeTvRaw : "");
+  const creativeTvPostId = parsedCreativeTv?.postId ?? "";
 
   const musicbrainzId = input.musicbrainzId?.trim() || "";
   let musicbrainzUrl = input.musicbrainzUrl?.trim() || "";
@@ -295,7 +325,14 @@ function normalizeTrack(input: TrackInput): Track {
     youtubeUrl,
     listenUrl,
     embedSourceKind,
-    embedIframeUrl
+    embedIframeUrl,
+    creativeTvUrl,
+    creativeTvPostId,
+    livepeerPlaybackId: "",
+    audioCid: "",
+    audioUrl: "",
+    durationSeconds: null,
+    isCurated: false
   };
 }
 
@@ -324,7 +361,9 @@ function mapSong(row: SongRow): Track {
   const artist = row.artist;
   const embedKindRaw = row.embed_source_kind?.trim() || "youtube";
   const embedSourceKind: EmbedSourceKind =
-    embedKindRaw === "iframe_allowed" || embedKindRaw === "link_only" ? embedKindRaw : "youtube";
+    embedKindRaw === "iframe_allowed" || embedKindRaw === "link_only" || embedKindRaw === "creativetv"
+      ? embedKindRaw
+      : "youtube";
 
   return {
     title,
@@ -341,7 +380,24 @@ function mapSong(row: SongRow): Track {
     youtubeUrl: row.youtube_url ?? "",
     listenUrl: row.listen_url?.trim() || buildYoutubeSearchUrl(title, artist),
     embedSourceKind,
-    embedIframeUrl: row.embed_iframe_url?.trim() ?? ""
+    embedIframeUrl: row.embed_iframe_url?.trim() ?? "",
+    creativeTvUrl: row.creative_tv_url?.trim() ?? "",
+    creativeTvPostId: row.creative_tv_post_id?.trim() ?? "",
+    livepeerPlaybackId: row.livepeer_playback_id?.trim() ?? "",
+    audioCid: row.audio_cid?.trim() ?? "",
+    audioUrl: row.audio_url?.trim() ?? "",
+    durationSeconds:
+      typeof row.duration_seconds === "number" && Number.isFinite(row.duration_seconds)
+        ? row.duration_seconds
+        : null,
+    isCurated: row.is_curated === 1
+  };
+}
+
+function mapMixTrack(row: MixSongRow): MixTrack {
+  return {
+    songId: row.id,
+    ...mapSong(row)
   };
 }
 
@@ -364,7 +420,7 @@ function mapLibrarySong(row: SongListRow): Song {
   };
 }
 
-async function listTracksForMix(mixId: number): Promise<Track[]> {
+async function listTracksForMix(mixId: number): Promise<MixTrack[]> {
   const rows = await sqlAll<MixSongRow>(
     `SELECT songs.*, mix_songs.position
      FROM mix_songs
@@ -374,7 +430,7 @@ async function listTracksForMix(mixId: number): Promise<Track[]> {
     [mixId]
   );
 
-  return rows.map(mapSong);
+  return rows.map(mapMixTrack);
 }
 
 async function mapMix(row: MixRow): Promise<Mix> {
@@ -418,9 +474,9 @@ function mapMixMoment(row: MixMomentRow): MixMoment {
 
 
 const UPSERT_SONG_SQL = `INSERT INTO songs (
-    fingerprint, title, artist, musicbrainz_id, release_year, duration, bpm, energy, mood_tags, scene_tags, notes, musicbrainz_url, youtube_url, listen_url, embed_source_kind, embed_iframe_url
+    fingerprint, title, artist, musicbrainz_id, release_year, duration, bpm, energy, mood_tags, scene_tags, notes, musicbrainz_url, youtube_url, listen_url, embed_source_kind, embed_iframe_url, creative_tv_url, creative_tv_post_id
   ) VALUES (
-    @fingerprint, @title, @artist, @musicbrainzId, @releaseYear, @duration, @bpm, @energy, @moodTags, @sceneTags, @notes, @musicbrainzUrl, @youtubeUrl, @listenUrl, @embedSourceKind, @embedIframeUrl
+    @fingerprint, @title, @artist, @musicbrainzId, @releaseYear, @duration, @bpm, @energy, @moodTags, @sceneTags, @notes, @musicbrainzUrl, @youtubeUrl, @listenUrl, @embedSourceKind, @embedIframeUrl, @creativeTvUrl, @creativeTvPostId
   )
   ON CONFLICT(fingerprint) DO UPDATE SET
     title = excluded.title,
@@ -438,6 +494,8 @@ const UPSERT_SONG_SQL = `INSERT INTO songs (
     listen_url = excluded.listen_url,
     embed_source_kind = excluded.embed_source_kind,
     embed_iframe_url = COALESCE(excluded.embed_iframe_url, songs.embed_iframe_url),
+    creative_tv_url = COALESCE(excluded.creative_tv_url, songs.creative_tv_url),
+    creative_tv_post_id = COALESCE(excluded.creative_tv_post_id, songs.creative_tv_post_id),
     updated_at = CURRENT_TIMESTAMP`;
 
 const INSERT_MIX_SONG_SQL = `INSERT INTO mix_songs (mix_id, song_id, position)
@@ -460,7 +518,9 @@ function upsertSongParams(track: Track): Record<string, unknown> {
     youtubeUrl: track.youtubeUrl,
     listenUrl: track.listenUrl,
     embedSourceKind: track.embedSourceKind,
-    embedIframeUrl: track.embedIframeUrl
+    embedIframeUrl: track.embedIframeUrl,
+    creativeTvUrl: track.creativeTvUrl,
+    creativeTvPostId: track.creativeTvPostId
   };
 }
 
@@ -492,7 +552,74 @@ async function upsertSong(track: Track): Promise<number> {
   return upsertSongSQLite(getSqliteDatabase(), track);
 }
 
+export async function syncCreativeTvPlaybackForSong(songId: number): Promise<Song | null> {
+  const song = await getSong(songId);
+  if (!song) return null;
+
+  const postId = song.creativeTvPostId?.trim();
+  if (!postId || !isCreativeTvConfigured()) return song;
+  if (song.livepeerPlaybackId?.trim()) return song;
+
+  try {
+    const playback = await resolvePlaybackByAssetId(postId);
+    await sqlRun(
+      `UPDATE songs
+       SET livepeer_playback_id = @playbackId,
+           creative_tv_url = @creativeTvUrl,
+           duration_seconds = COALESCE(@durationSeconds, duration_seconds),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = @id`,
+      {
+        id: songId,
+        playbackId: playback.playbackId,
+        creativeTvUrl: playback.discoverUrl,
+        durationSeconds: playback.durationSeconds ?? null
+      }
+    );
+  } catch {
+    // Keep discover URL; retry on next page load.
+  }
+
+  return await getSong(songId);
+}
+
+export async function ensureCreativeTvPlaybackForSong(songId: number): Promise<Song | null> {
+  const song = await getSong(songId);
+  if (!song) return null;
+  if (song.livepeerPlaybackId?.trim()) return song;
+  if (!song.creativeTvPostId?.trim()) return song;
+  return syncCreativeTvPlaybackForSong(songId);
+}
+
+export async function setSongAdminAudio(
+  id: number,
+  input: { audioCid: string; audioUrl: string; durationSeconds?: number | null }
+): Promise<Song | null> {
+  const current = await getSong(id);
+  if (!current) return null;
+
+  await sqlRun(
+    `UPDATE songs
+     SET audio_cid = @audioCid,
+         audio_url = @audioUrl,
+         duration_seconds = @durationSeconds,
+         is_curated = 1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = @id`,
+    {
+      id,
+      audioCid: input.audioCid,
+      audioUrl: input.audioUrl,
+      durationSeconds: input.durationSeconds ?? current.durationSeconds
+    }
+  );
+
+  return await getSong(id);
+}
+
 async function replaceMixSongs(mixId: number, tracks: Track[]): Promise<void> {
+  const songIds: number[] = [];
+
   await withWriteTransaction({
     sqlite: () => {
       const database = getSqliteDatabase();
@@ -501,6 +628,7 @@ async function replaceMixSongs(mixId: number, tracks: Track[]): Promise<void> {
         const insertMixSong = database.prepare(INSERT_MIX_SONG_SQL);
         for (const [index, track] of tracks.entries()) {
           const songId = upsertSongSQLite(database, track);
+          songIds.push(songId);
           insertMixSong.run({
             mixId,
             songId,
@@ -513,6 +641,7 @@ async function replaceMixSongs(mixId: number, tracks: Track[]): Promise<void> {
       await txRun(tx, "DELETE FROM mix_songs WHERE mix_id = ?", [mixId]);
       for (const [index, track] of tracks.entries()) {
         const songId = await upsertSongTx(tx, track);
+        songIds.push(songId);
         await txRun(tx, INSERT_MIX_SONG_SQL, {
           mixId,
           songId,
@@ -521,6 +650,10 @@ async function replaceMixSongs(mixId: number, tracks: Track[]): Promise<void> {
       }
     }
   });
+
+  for (const songId of songIds) {
+    await syncCreativeTvPlaybackForSong(songId);
+  }
 }
 
 async function migrateLegacyTracks(): Promise<void> {
@@ -677,7 +810,7 @@ export async function createSong(input: SongInput): Promise<Song> {
   await scheduleLegacyMixMigration();
   const track = normalizeTrack(input);
   const songId = await upsertSong(track);
-  return (await getSong(songId)) as Song;
+  return (await syncCreativeTvPlaybackForSong(songId)) as Song;
 }
 
 export async function updateSong(id: number, input: Partial<SongInput>): Promise<Song | null> {
@@ -700,7 +833,8 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
     youtubeUrl: input.youtubeUrl?.trim() ?? current.youtubeUrl,
     listenUrl: input.listenUrl?.trim() ?? current.listenUrl,
     embedSourceKind: input.embedSourceKind ?? current.embedSourceKind,
-    embedIframeUrl: input.embedIframeUrl?.trim() ?? current.embedIframeUrl
+    embedIframeUrl: input.embedIframeUrl?.trim() ?? current.embedIframeUrl,
+    creativeTvUrl: input.creativeTvUrl?.trim() ?? current.creativeTvUrl
   });
 
   await sqlRun(
@@ -720,6 +854,8 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
          listen_url = @listenUrl,
          embed_source_kind = @embedSourceKind,
          embed_iframe_url = @embedIframeUrl,
+         creative_tv_url = @creativeTvUrl,
+         creative_tv_post_id = @creativeTvPostId,
          updated_at = CURRENT_TIMESTAMP
      WHERE id = @id`,
     {
@@ -738,11 +874,17 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
       youtubeUrl: next.youtubeUrl,
       listenUrl: next.listenUrl,
       embedSourceKind: next.embedSourceKind,
-      embedIframeUrl: next.embedIframeUrl
+      embedIframeUrl: next.embedIframeUrl,
+      creativeTvUrl: next.creativeTvUrl,
+      creativeTvPostId: next.creativeTvPostId
     }
   );
 
-  return await getSong(id);
+  if (next.creativeTvPostId && next.creativeTvPostId !== current.creativeTvPostId) {
+    await sqlRun(`UPDATE songs SET livepeer_playback_id = NULL WHERE id = ?`, [id]);
+  }
+
+  return (await syncCreativeTvPlaybackForSong(id)) as Song | null;
 }
 
 export async function addSongToMix(

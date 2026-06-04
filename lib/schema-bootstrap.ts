@@ -252,6 +252,23 @@ export function bootstrapSqlite(database: SqliteDb): void {
     // exists
   }
 
+  const songExtraColumns = [
+    `ALTER TABLE songs ADD COLUMN audio_cid TEXT`,
+    `ALTER TABLE songs ADD COLUMN audio_url TEXT`,
+    `ALTER TABLE songs ADD COLUMN duration_seconds INTEGER`,
+    `ALTER TABLE songs ADD COLUMN is_curated INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE songs ADD COLUMN creative_tv_url TEXT`,
+    `ALTER TABLE songs ADD COLUMN creative_tv_post_id TEXT`,
+    `ALTER TABLE songs ADD COLUMN livepeer_playback_id TEXT`
+  ];
+  for (const sql of songExtraColumns) {
+    try {
+      database.exec(sql);
+    } catch {
+      // exists
+    }
+  }
+
   database.exec(
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_mixes_slug_unique ON mixes(slug COLLATE NOCASE) WHERE slug IS NOT NULL AND TRIM(slug) <> ''`
   );
@@ -290,6 +307,13 @@ export async function bootstrapLibsql(client: Client): Promise<void> {
   await tryAlter(`ALTER TABLE mixes ADD COLUMN creator_id INTEGER`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN embed_source_kind TEXT NOT NULL DEFAULT 'youtube'`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN embed_iframe_url TEXT`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN audio_cid TEXT`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN audio_url TEXT`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN duration_seconds INTEGER`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN is_curated INTEGER NOT NULL DEFAULT 0`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN creative_tv_url TEXT`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN creative_tv_post_id TEXT`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN livepeer_playback_id TEXT`);
 
   try {
     await client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mixes_slug_unique ON mixes(slug COLLATE NOCASE) WHERE slug IS NOT NULL AND TRIM(slug) <> ''`);

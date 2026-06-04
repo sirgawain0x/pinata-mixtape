@@ -61,6 +61,11 @@ The hosted `/app` crate supports in-browser mixtape editing (New tape / Edit), M
 
 Set `MIXTAPE_WRITE_TOKEN` in production and pass `Authorization: Bearer <token>` for agent writes, or sign in with SIWE so mixes can be owned via `creator_id`.
 
+For Creative TV playback resolution (server-only):
+
+- `MIXTAPE_CRTV_API_KEY` — Bearer token for the Creative TV platform API
+- `MIXTAPE_CRTV_API_URL` — defaults to `https://tv.creativeplatform.xyz`
+
 If `workspace/data/generated-mixtapes/<mixId>-dj-hosted/dj-script.json` exists (or a row in `mix_dj_hosted` after POST generation with Pinata), the app exposes it through `/app/api/mixes/:id/dj-hosted` and renders a broadcast-style player with narrative lower-thirds. Absence of a manifest is normal and returns `200` with `{ result: null }`. Clip audio and compiled broadcast files are optional.
 
 **Production (`air.creativeplatform.xyz`):** set `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `PINATA_JWT`, and session KV vars (see [`lib/auth-storage.ts`](lib/auth-storage.ts)). DJ-hosted manifests persist in Turso; clip audio should be uploaded to Pinata via POST from a machine with `workspace/scripts/venice_dj_poc.py`.

@@ -1,8 +1,10 @@
+import { parseCreativeTvUrl } from "./creative-tv";
 import { youtubeVideoId } from "./youtube";
 
-export type EmbedSourceKind = "youtube" | "iframe_allowed" | "link_only";
+export type EmbedSourceKind = "youtube" | "creativetv" | "iframe_allowed" | "link_only";
 
 const DEFAULT_IFRAME_HOSTS = [
+  "tv.creativeplatform.xyz",
   "open.spotify.com",
   "soundcloud.com",
   "www.soundcloud.com",
@@ -52,11 +54,14 @@ export function parseAllowedEmbedUrl(raw: string): URL | null {
 export function resolveEmbedSourceKind(
   kind: unknown,
   youtubeUrl: string,
-  iframeUrl: string
+  iframeUrl: string,
+  creativeTvUrl = ""
 ): EmbedSourceKind {
   if (kind === "link_only") return "link_only";
+  if (kind === "creativetv") return "creativetv";
   if (kind === "iframe_allowed") return "iframe_allowed";
   if (kind === "youtube") return "youtube";
+  if (parseCreativeTvUrl(creativeTvUrl)) return "creativetv";
   if (youtubeUrl.trim()) {
     return youtubeVideoId(youtubeUrl) ? "youtube" : "iframe_allowed";
   }
