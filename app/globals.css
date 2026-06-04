@@ -2231,3 +2231,34 @@ input[type="radio"] {
   background: linear-gradient(180deg, #4a4e58 0%, #2b2e38 100%);
   color: #fff;
 }
+
+/* ==========================================================================
+   ACCOUNT KIT (Alchemy) AUTH MODAL — readable input fields
+   The global dark console theme bleeds its input colors into the Alchemy
+   sign-in modal, leaving the email / code fields black-on-black. Force the
+   modal's inputs to a light surface with dark text. Loaded after
+   @account-kit/react/styles.css so these win on equal specificity.
+   ========================================================================== */
+.akui-input,
+.akui-modal .akui-input {
+  background-color: #ffffff;
+  color: #11131a;
+  border-color: #c9ced8;
+}
+
+.akui-input input,
+.akui-modal .akui-input input {
+  background-color: #ffffff;
+  color: #11131a;
+  border: 0;
+  box-shadow: none;
+}
+
+.akui-input input::placeholder,
+.akui-modal .akui-input input::placeholder {
+  color: #6b7280;
+}
+
+.akui-input svg > * {
+  fill: #11131a;
+}
