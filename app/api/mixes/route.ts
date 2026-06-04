@@ -11,8 +11,8 @@ export async function GET(request: Request) {
   const creator = await getCurrentCreator();
   const showMine = url.searchParams.get("mine") === "1" && Boolean(creator);
   const showAll = url.searchParams.get("all") === "1" && Boolean(creator);
-  const filter: MixListFilter = showMine
-    ? { ownerCreatorId: creator!.id }
+  const filter: MixListFilter = showMine && creator
+    ? { ownerCreatorId: creator.id }
     : showAll
       ? {}
       : {

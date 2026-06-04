@@ -23,12 +23,22 @@ export default function ImportMixPanel({ stationId, onImported }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError("");
     void fetch(`${APP_BASE}/api/mixes?mine=1`, { cache: "no-store", credentials: "include" })
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load mixtapes.");
+        }
+        return response.json();
+      })
       .then((data: { mixes: MixOption[] }) => {
         if (!cancelled) setMixes(data.mixes ?? []);
       })
-      .catch(() => undefined)
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load mixtapes.");
+        }
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -66,7 +76,7 @@ export default function ImportMixPanel({ stationId, onImported }: Props) {
     <div className="import-mix-panel composer-form">
       <p className="eyebrow">Import your mixtape</p>
       <p className="muted">Pull tracks from a mixtape you created into this station&apos;s programming.</p>
-      {!loading && mixes.length === 0 ? (
+      {!loading && !error && mixes.length === 0 ? (
         <p className="muted">
           You haven&apos;t created any mixtapes yet. Build one from the <a href="/">crate</a> with “New tape,” then
           come back to import it.
