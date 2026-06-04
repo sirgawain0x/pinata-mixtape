@@ -13,15 +13,35 @@ const defaultEmbedFrameHosts = [
   "https://embed.music.apple.com"
 ];
 
-function cspFrameHosts() {
-  const hosts = new Set(defaultEmbedFrameHosts);
-  const raw = process.env.MIXTAPE_EMBED_IFRAME_HOSTS?.trim();
+/** Alchemy Account Kit + Turnkey (required for sign-in modal). */
+const defaultAuthFrameHosts = ["https://auth.turnkey.com", "https://accounts.google.com"];
+
+const defaultAuthConnectHosts = [
+  "https://api.g.alchemy.com",
+  "https://*.g.alchemy.com",
+  "https://auth.turnkey.com",
+  "https://api.turnkey.com",
+  "https://accounts.google.com",
+  "https://oauth2.googleapis.com",
+  "https://www.googleapis.com",
+  "https://*.walletconnect.org",
+  "wss://*.walletconnect.org",
+  "https://relay.walletconnect.org"
+];
+
+function mergeCspHosts(defaults, envKey) {
+  const hosts = new Set(defaults);
+  const raw = process.env[envKey]?.trim();
   if (!raw) return [...hosts];
 
   for (const entry of raw.split(/[\s,]+/)) {
     const trimmed = entry.trim().toLowerCase();
     if (!trimmed) continue;
-    if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+    if (
+      trimmed.startsWith("https://") ||
+      trimmed.startsWith("http://") ||
+      trimmed.startsWith("wss://")
+    ) {
       hosts.add(trimmed);
     } else {
       hosts.add(`https://${trimmed}`);
@@ -30,7 +50,24 @@ function cspFrameHosts() {
   return [...hosts];
 }
 
+function cspFrameHosts() {
+  return mergeCspHosts([...defaultEmbedFrameHosts, ...defaultAuthFrameHosts], "MIXTAPE_EMBED_IFRAME_HOSTS");
+}
+
+function cspConnectHosts() {
+  return mergeCspHosts(
+    [
+      "https://livepeercdn.com",
+      "https://livepeer.studio",
+      "https://*.livepeercdn.com",
+      ...defaultAuthConnectHosts
+    ],
+    "MIXTAPE_CSP_CONNECT_HOSTS"
+  );
+}
+
 const allFrameHosts = cspFrameHosts();
+const allConnectHosts = cspConnectHosts();
 
 const nextConfig = {
   basePath: "/app",
@@ -44,7 +81,7 @@ const nextConfig = {
             value: [
               `frame-src 'self' ${allFrameHosts.join(" ")}`,
               "media-src 'self' blob: https://livepeercdn.com https://*.livepeercdn.com",
-              "connect-src 'self' https://livepeercdn.com https://livepeer.studio https://*.livepeercdn.com"
+              `connect-src 'self' ${allConnectHosts.join(" ")}`
             ].join("; ")
           }
         ]

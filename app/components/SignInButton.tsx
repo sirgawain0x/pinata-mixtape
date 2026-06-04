@@ -18,6 +18,14 @@ type Creator = {
 
 const APP_BASE = "/app";
 
+function siweDomain(): string {
+  const configured = process.env.NEXT_PUBLIC_SIWE_DOMAIN?.trim();
+  if (configured) {
+    return configured.includes("://") ? new URL(configured).host : configured;
+  }
+  return window.location.host;
+}
+
 async function fetchMe(): Promise<Creator | null> {
   const response = await fetch(`${APP_BASE}/api/auth/me`, { cache: "no-store" });
   if (!response.ok) return null;
@@ -86,7 +94,7 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
         const { nonce } = nonceBody;
 
         const message = createSiweMessage({
-          domain: window.location.host,
+          domain: siweDomain(),
           address,
           statement: "Sign in to Mixtape Radio.",
           uri: window.location.origin,
