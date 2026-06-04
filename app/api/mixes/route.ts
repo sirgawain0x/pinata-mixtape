@@ -9,13 +9,16 @@ export async function GET(request: Request) {
   await seedMixes();
   const url = new URL(request.url);
   const creator = await getCurrentCreator();
+  const showMine = url.searchParams.get("mine") === "1" && Boolean(creator);
   const showAll = url.searchParams.get("all") === "1" && Boolean(creator);
-  const filter: MixListFilter = showAll
-    ? {}
-    : {
-        publicOnly: !creator,
-        viewerCreatorId: creator?.id ?? null
-      };
+  const filter: MixListFilter = showMine
+    ? { ownerCreatorId: creator!.id }
+    : showAll
+      ? {}
+      : {
+          publicOnly: !creator,
+          viewerCreatorId: creator?.id ?? null
+        };
   return Response.json({ mixes: await listMixes(url.searchParams.get("q") ?? "", filter) });
 }
 
