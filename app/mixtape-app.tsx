@@ -56,6 +56,7 @@ const NARRATION_VOICES = [
 ] as const;
 
 export type Track = {
+  songId?: number;
   title: string;
   artist: string;
   releaseYear: string;
@@ -69,7 +70,8 @@ export type Track = {
   musicbrainzUrl: string;
   youtubeUrl: string;
   listenUrl: string;
-  embedSourceKind: "youtube" | "iframe_allowed" | "link_only";
+  creativeTvUrl: string;
+  embedSourceKind: "youtube" | "creativetv" | "iframe_allowed" | "link_only";
   embedIframeUrl: string;
 };
 
@@ -1011,6 +1013,14 @@ export default function MixtapeApp({
                                 </div>
                               ) : null}
                               <div className="link-row">
+                                {"songId" in track && track.songId ? (
+                                  <Link href={`/songs/${track.songId}`}>Open player</Link>
+                                ) : null}
+                                {track.creativeTvUrl ? (
+                                  <a href={track.creativeTvUrl} rel="noreferrer" target="_blank">
+                                    Creative TV
+                                  </a>
+                                ) : null}
                                 {track.youtubeUrl ? (
                                   <a href={track.youtubeUrl} rel="noreferrer" target="_blank">
                                     Listen

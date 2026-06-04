@@ -19,6 +19,7 @@ type DraftTrack = {
   artist: string;
   releaseYear: string;
   youtubeUrl: string;
+  creativeTvUrl: string;
   listenUrl: string;
   musicbrainzId: string;
   musicbrainzUrl: string;
@@ -39,6 +40,7 @@ function trackToDraft(track: Track): DraftTrack {
     artist: track.artist,
     releaseYear: track.releaseYear,
     youtubeUrl: track.youtubeUrl,
+    creativeTvUrl: track.creativeTvUrl ?? "",
     listenUrl: track.listenUrl,
     musicbrainzId: track.musicbrainzId ?? "",
     musicbrainzUrl: track.musicbrainzUrl,
@@ -53,6 +55,7 @@ const emptyDraft = (): DraftTrack => ({
   artist: "",
   releaseYear: "",
   youtubeUrl: "",
+  creativeTvUrl: "",
   listenUrl: "",
   musicbrainzId: "",
   musicbrainzUrl: "",
@@ -181,6 +184,7 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
           artist: track.artist,
           releaseYear: track.releaseYear,
           youtubeUrl: track.youtubeUrl,
+          creativeTvUrl: track.creativeTvUrl,
           listenUrl: track.listenUrl,
           musicbrainzId: track.musicbrainzId,
           musicbrainzUrl: track.musicbrainzUrl,
@@ -312,6 +316,12 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
               value={draft.youtubeUrl}
             />
             <input
+              onChange={(event) => setDraft((current) => ({ ...current, creativeTvUrl: event.target.value }))}
+              placeholder="Creative TV discover URL"
+              type="url"
+              value={draft.creativeTvUrl}
+            />
+            <input
               onChange={(event) => setDraft((current) => ({ ...current, listenUrl: event.target.value }))}
               placeholder="Listen / search link"
               type="url"
@@ -333,6 +343,7 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
               value={draft.embedSourceKind}
             >
               <option value="youtube">YouTube playback</option>
+              <option value="creativetv">Creative TV</option>
               <option value="iframe_allowed">Allowed iframe embed</option>
               <option value="link_only">Link only (no embed)</option>
             </select>
