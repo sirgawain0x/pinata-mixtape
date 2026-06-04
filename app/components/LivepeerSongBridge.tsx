@@ -25,7 +25,7 @@ export default function LivepeerSongBridge({ playbackId, isPlaying, onTimeUpdate
     } else {
       video.pause();
     }
-  }, [isPlaying, onPlayingChange]);
+  }, [isPlaying, onPlayingChange, playbackId]);
 
   useEffect(() => {
     const video = shellRef.current?.querySelector("video");

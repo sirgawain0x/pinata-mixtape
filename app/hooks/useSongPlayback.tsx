@@ -33,6 +33,9 @@ export type SongPlaybackControls = {
   youtubeContainerId?: string;
   iframeUrl?: string;
   audioRef: React.RefObject<HTMLAudioElement | null>;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
+  onLivepeerTime?: (current: number, duration: number) => void;
+  onLivepeerPlaying?: (playing: boolean) => void;
 };
 
 export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onProgressChange }: Props): SongPlaybackControls {
@@ -46,6 +49,15 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const onLivepeerTime = useCallback((current: number, dur: number) => {
+    setProgress(current);
+    setDuration(dur);
+  }, []);
+
+  const onLivepeerPlaying = useCallback((playing: boolean) => {
+    setIsPlaying(playing);
+  }, []);
 
   const pinataAudioUrl = useMemo(() => {
     if (source.kind !== "pinata") return "";
@@ -202,7 +214,10 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
     livepeerPlaybackId: source.livepeerPlaybackId,
     youtubeContainerId: source.kind === "youtube" ? ytContainerId : undefined,
     iframeUrl: source.kind === "iframe" ? source.iframeUrl : undefined,
-    audioRef
+    audioRef,
+    iframeRef,
+    onLivepeerTime,
+    onLivepeerPlaying
   };
 }
 
@@ -242,6 +257,7 @@ export function SongPlaybackMedia({
       <iframe
         allow="autoplay; encrypted-media"
         className="song-iframe-embed"
+        ref={controls.iframeRef}
         src={iframeUrl}
         title="Embedded playback"
       />

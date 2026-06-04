@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import RecordPlayerCanvas from "./record-player/RecordPlayerCanvas";
 import { SongPlaybackMedia, useSongPlayback } from "../hooks/useSongPlayback";
 import type { SongPlaybackFields } from "../../lib/song-playback";
@@ -47,7 +47,6 @@ export default function SongPlayerShell({ song, embedOrigin = "" }: Props) {
   );
 
   const controls = useSongPlayback({ song: playbackSong, embedOrigin });
-  const [, setLivepeerTick] = useState(0);
 
   const progressPct =
     controls.duration > 0 ? Math.min(100, (controls.progress / controls.duration) * 100) : 0;
@@ -57,8 +56,8 @@ export default function SongPlayerShell({ song, embedOrigin = "" }: Props) {
       <RecordPlayerCanvas isPlaying={controls.isPlaying} onTogglePlay={controls.togglePlay} />
       <SongPlaybackMedia
         controls={controls}
-        onLivepeerPlaying={() => setLivepeerTick((n) => n + 1)}
-        onLivepeerTime={() => setLivepeerTick((n) => n + 1)}
+        onLivepeerPlaying={controls.onLivepeerPlaying}
+        onLivepeerTime={controls.onLivepeerTime}
       />
 
       <div className="song-player-controls">
