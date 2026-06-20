@@ -357,9 +357,8 @@ Required Vercel environment variables:
 
 | Variable | Purpose |
 |----------|---------|
-| `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` | Mixes, stations, `mix_dj_hosted` |
+| `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` | Mixes, stations, `mix_dj_hosted`, SIWE auth (`siwe_nonces`, `sessions`) |
 | `PINATA_JWT` (+ gateway vars) | DJ clip / segment audio persistence |
-| Session KV / Redis (see `lib/auth-storage.ts`) | Stable creator sessions |
 
 Verify a station handle (e.g. `g2-radio`):
 
