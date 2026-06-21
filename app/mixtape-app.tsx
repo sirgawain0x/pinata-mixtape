@@ -16,6 +16,7 @@ import {
 } from "../lib/song-playback";
 import { youtubeEmbedUrl } from "../lib/youtube";
 import CassettePlayer from "./components/CassettePlayer";
+import LivepeerSongBridge from "./components/LivepeerSongBridge";
 import MixtapeEditor from "./components/MixtapeEditor";
 import SignInButton from "./components/SignInButton";
 
@@ -156,6 +157,10 @@ export default function MixtapeApp({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playedRef = useRef<Record<string, boolean>>({});
   const currentMixRef = useRef<number | null>(null);
+  const narrationIntroPlayedRef = useRef(false);
+  const lastNarrationTrackRef = useRef<number | null>(null);
+  const handleTrackPlayingRef = useRef<(trackIndex: number) => void>(() => {});
+  const handleLastTrackEndedRef = useRef<() => void>(() => {});
   const trackRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const selected = useMemo(
@@ -184,7 +189,9 @@ export default function MixtapeApp({
     mixId: selected?.id ?? null,
     ytElementId,
     initialTrackIndex: urlTrackIndex ?? deepLinkTrackIndex ?? 0,
-    enabled: Boolean(selected)
+    enabled: Boolean(selected),
+    onTrackPlaying: (trackIndex) => handleTrackPlayingRef.current(trackIndex),
+    onLastTrackEnded: () => handleLastTrackEndedRef.current()
   });
 
   const currentTrackIndex = mixPlayback.currentTrackIndex;
@@ -310,6 +317,8 @@ export default function MixtapeApp({
   useEffect(() => {
     if (currentMixRef.current !== selected?.id) {
       playedRef.current = {};
+      narrationIntroPlayedRef.current = false;
+      lastNarrationTrackRef.current = null;
       currentMixRef.current = selected?.id ?? null;
       setDeepLinkTrackIndex(null);
       setExpandedTracks({});
@@ -436,16 +445,15 @@ export default function MixtapeApp({
 
   async function playNarrationClip(kind: string) {
     if (!hosted || !narrationEnabled) return;
-    const ytPlayer = mixPlayback.ytPlayerRef.current;
-    if (!ytPlayer) return;
     if (playedRef.current[kind]) return;
 
     const clipUrl = hosted.clips[kind];
     if (!clipUrl) return;
 
     playedRef.current[kind] = true;
-    const previousVolume = ytPlayer.getVolume();
-    ytPlayer.setVolume(10);
+    const ytPlayer = mixPlayback.ytPlayerRef.current;
+    const previousVolume = ytPlayer?.getVolume?.();
+    ytPlayer?.setVolume?.(10);
 
     const audio = new Audio(clipUrl);
     audio.volume = 1;
@@ -453,7 +461,7 @@ export default function MixtapeApp({
     audio.addEventListener(
       "ended",
       () => {
-        mixPlayback.ytPlayerRef.current?.setVolume(previousVolume);
+        mixPlayback.ytPlayerRef.current?.setVolume?.(previousVolume ?? 100);
         if (audioRef.current === audio) audioRef.current = null;
       },
       { once: true }
@@ -461,16 +469,36 @@ export default function MixtapeApp({
     audio.addEventListener(
       "error",
       () => {
-        mixPlayback.ytPlayerRef.current?.setVolume(previousVolume);
+        mixPlayback.ytPlayerRef.current?.setVolume?.(previousVolume ?? 100);
         if (audioRef.current === audio) audioRef.current = null;
       },
       { once: true }
     );
     await audio.play().catch(() => {
-      mixPlayback.ytPlayerRef.current?.setVolume(previousVolume);
+      mixPlayback.ytPlayerRef.current?.setVolume?.(previousVolume ?? 100);
       if (audioRef.current === audio) audioRef.current = null;
     });
   }
+
+  handleTrackPlayingRef.current = (trackIndex) => {
+    if (!hosted || !narrationEnabled) return;
+    const firstPlayable = mixPlayback.playableQueue[0]?.trackIndex;
+    if (!narrationIntroPlayedRef.current && trackIndex === firstPlayable) {
+      narrationIntroPlayedRef.current = true;
+      void playNarrationClip("intro");
+      lastNarrationTrackRef.current = trackIndex;
+      return;
+    }
+    if (lastNarrationTrackRef.current != null && lastNarrationTrackRef.current !== trackIndex) {
+      void playNarrationClip(`transition_${trackIndex}`);
+    }
+    lastNarrationTrackRef.current = trackIndex;
+  };
+
+  handleLastTrackEndedRef.current = () => {
+    if (!hosted || !narrationEnabled) return;
+    void playNarrationClip("outro");
+  };
 
   const totalTracks = useMemo(
     () => new Set(mixes.flatMap((mix) => mix.tracks.map((track) => `${track.artist}::${track.title}`))).size,
@@ -547,7 +575,7 @@ export default function MixtapeApp({
               <div className="broadcast-stage-backdrop" aria-hidden="true" />
               <div className="broadcast-stage-overlay" />
               <div className="broadcast-player-frame">
-                {mixPlayback.showYoutubeEmbed || mixPlayback.iframeUrl ? (
+                {mixPlayback.showYoutubeEmbed || mixPlayback.iframeUrl || mixPlayback.livepeerPlaybackId ? (
                   <div className="mix-player-embed broadcast-embed">
                     {mixPlayback.showYoutubeEmbed ? (
                       <div className="yt-player-shell" id={`yt-player-broadcast-${selected.id}`} />
@@ -556,8 +584,16 @@ export default function MixtapeApp({
                       <iframe
                         allow="autoplay; encrypted-media; fullscreen"
                         className="mix-iframe-embed"
+                        ref={mixPlayback.iframeRef}
                         src={mixPlayback.iframeUrl}
                         title={`${nowPlayingTrack?.title ?? selected.title} embed`}
+                      />
+                    ) : null}
+                    {mixPlayback.livepeerPlaybackId ? (
+                      <LivepeerSongBridge
+                        isPlaying={playlistIsPlaying}
+                        onPlayingChange={mixPlayback.setIsPlaying}
+                        playbackId={mixPlayback.livepeerPlaybackId}
                       />
                     ) : null}
                     {mixPlayback.error ? (
@@ -969,7 +1005,7 @@ export default function MixtapeApp({
                     </div>
                     {hosted ? <small>Voice: {hosted.voice}</small> : <small>No generated narration yet for this mix.</small>}
                   </div>
-                  {(mixPlayback.showYoutubeEmbed || mixPlayback.iframeUrl) && (
+                  {(mixPlayback.showYoutubeEmbed || mixPlayback.iframeUrl || mixPlayback.livepeerPlaybackId) && (
                     <div className="mix-player-embed">
                       {mixPlayback.showYoutubeEmbed ? (
                         <div className="yt-player-shell" id={`yt-player-${selected.id}`} />
@@ -978,8 +1014,16 @@ export default function MixtapeApp({
                         <iframe
                           allow="autoplay; encrypted-media; fullscreen"
                           className="mix-iframe-embed"
+                          ref={mixPlayback.iframeRef}
                           src={mixPlayback.iframeUrl}
                           title={`${nowPlayingTrack?.title ?? selected.title} embed`}
+                        />
+                      ) : null}
+                      {mixPlayback.livepeerPlaybackId ? (
+                        <LivepeerSongBridge
+                          isPlaying={playlistIsPlaying}
+                          onPlayingChange={mixPlayback.setIsPlaying}
+                          playbackId={mixPlayback.livepeerPlaybackId}
                         />
                       ) : null}
                       {mixPlayback.error ? (

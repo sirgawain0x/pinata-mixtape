@@ -56,7 +56,6 @@ export function findMixForSong(
     if (!mix) continue;
     const trackIndex = findTrackIndexInMix(mix, song.id);
     if (trackIndex >= 0) return { mix, trackIndex };
-    if (mix.tracks.length > 0) return { mix, trackIndex: 0 };
   }
 
   return null;
@@ -75,7 +74,11 @@ export function resolveSongDeepLink(
 
   if (mixIdHint != null) {
     const mix = mixes.find((entry) => entry.id === mixIdHint);
-    if (mix) return { mixId: mix.id, trackIndex: 0 };
+    if (mix) {
+      const trackIndex = findTrackIndexInMix(mix, songId);
+      if (trackIndex >= 0) return { mixId: mix.id, trackIndex };
+    }
+    return null;
   }
 
   for (const mix of mixes) {

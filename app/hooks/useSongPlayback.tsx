@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { onYoutubeIframeApiReady } from "../../lib/youtube-iframe-api";
 import { resolvePlaybackSource, type PlaybackSourceKind, type SongPlaybackFields } from "../../lib/song-playback";
 import LivepeerSongBridge from "../components/LivepeerSongBridge";
 
@@ -156,19 +157,33 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
 
     setPlayerReady(false);
 
+    let tick = 0;
+
+    const cleanup = () => {
+      cancelled = true;
+      window.clearInterval(tick);
+      ytPlayerRef.current?.destroy();
+      ytPlayerRef.current = null;
+      setPlayerReady(false);
+    };
+
     if (window.YT?.Player) {
       setup();
     } else {
-      const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-      if (!existing) {
-        const script = document.createElement("script");
-        script.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(script);
-      }
-      window.onYouTubeIframeAPIReady = setup;
+      const unsubscribe = onYoutubeIframeApiReady(setup);
+      tick = window.setInterval(() => {
+        const player = ytPlayerRef.current;
+        if (!player?.getCurrentTime) return;
+        setProgress(player.getCurrentTime());
+        setDuration(player.getDuration() || 0);
+      }, 500);
+      return () => {
+        unsubscribe();
+        cleanup();
+      };
     }
 
-    const tick = window.setInterval(() => {
+    tick = window.setInterval(() => {
       const player = ytPlayerRef.current;
       if (!player?.getCurrentTime) return;
       setProgress(player.getCurrentTime());
@@ -176,11 +191,7 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
     }, 500);
 
     return () => {
-      cancelled = true;
-      window.clearInterval(tick);
-      ytPlayerRef.current?.destroy();
-      ytPlayerRef.current = null;
-      setPlayerReady(false);
+      cleanup();
     };
   }, [source.kind, source.youtubeVideoId, ytContainerId]);
 

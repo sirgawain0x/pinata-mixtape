@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { onYoutubeIframeApiReady } from "../../lib/youtube-iframe-api";
 import {
   resolvePlaybackSource,
   type PlaybackSourceKind,
@@ -8,23 +9,6 @@ import {
   type SongPlaybackFields
 } from "../../lib/song-playback";
 import { youtubeVideoId } from "../../lib/youtube";
-
-declare global {
-  interface Window {
-    YT?: {
-      Player: new (elementId: string, options: unknown) => MixYtPlayer;
-      PlayerState: {
-        UNSTARTED: number;
-        ENDED: number;
-        PLAYING: number;
-        PAUSED: number;
-        BUFFERING: number;
-        CUED: number;
-      };
-    };
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
 
 export type MixYtPlayer = {
   destroy: () => void;
@@ -65,6 +49,8 @@ type Options = {
   ytElementId: string | null;
   initialTrackIndex?: number;
   enabled?: boolean;
+  onTrackPlaying?: (trackIndex: number) => void;
+  onLastTrackEnded?: () => void;
 };
 
 function isPlayableSource(source: ResolvedPlaybackSource): boolean {
@@ -76,7 +62,9 @@ export function useMixPlayback({
   mixId,
   ytElementId,
   initialTrackIndex = 0,
-  enabled = true
+  enabled = true,
+  onTrackPlaying,
+  onLastTrackEnded
 }: Options) {
   const queue = useMemo<MixQueueItem[]>(() => {
     return tracks.map((track, trackIndex) => {
@@ -98,8 +86,14 @@ export function useMixPlayback({
   const [error, setError] = useState<MixPlaybackError | null>(null);
 
   const ytPlayerRef = useRef<MixYtPlayer | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mixIdRef = useRef(mixId);
+  const lastSeekRef = useRef<{ mixId: number | null; trackIndex: number }>({ mixId: null, trackIndex: -1 });
+  const onTrackPlayingRef = useRef(onTrackPlaying);
+  const onLastTrackEndedRef = useRef(onLastTrackEnded);
+  onTrackPlayingRef.current = onTrackPlaying;
+  onLastTrackEndedRef.current = onLastTrackEnded;
 
   const currentItem = playableQueue[queuePosition] ?? null;
   const currentTrackIndex = currentItem?.trackIndex ?? initialTrackIndex;
@@ -117,6 +111,7 @@ export function useMixPlayback({
       audioRef.current.pause();
       audioRef.current = null;
     }
+    lastSeekRef.current = { mixId: null, trackIndex: -1 };
   }, []);
 
   useEffect(() => {
@@ -128,6 +123,11 @@ export function useMixPlayback({
 
   useEffect(() => {
     if (!enabled) return;
+    const mixChanged = lastSeekRef.current.mixId !== mixId;
+    const trackTargetChanged = lastSeekRef.current.trackIndex !== initialTrackIndex;
+    if (!mixChanged && !trackTargetChanged) return;
+
+    lastSeekRef.current = { mixId, trackIndex: initialTrackIndex };
     const playableIndex = playableQueue.findIndex((item) => item.trackIndex === initialTrackIndex);
     if (playableIndex >= 0) setQueuePosition(playableIndex);
   }, [enabled, initialTrackIndex, mixId, playableQueue]);
@@ -152,6 +152,10 @@ export function useMixPlayback({
   const skip = useCallback(() => {
     advanceQueue();
   }, [advanceQueue]);
+
+  const notifyTrackPlaying = useCallback((trackIndex: number) => {
+    onTrackPlayingRef.current?.(trackIndex);
+  }, []);
 
   // YouTube player setup
   useEffect(() => {
@@ -191,6 +195,7 @@ export function useMixPlayback({
             if (event.data === window.YT.PlayerState.PLAYING) {
               setIsPlaying(true);
               setError(null);
+              notifyTrackPlaying(currentItem.trackIndex);
             } else if (
               event.data === window.YT.PlayerState.PAUSED ||
               event.data === window.YT.PlayerState.BUFFERING ||
@@ -200,23 +205,27 @@ export function useMixPlayback({
               setIsPlaying(false);
             } else if (event.data === window.YT.PlayerState.ENDED) {
               setIsPlaying(false);
+              if (queuePosition >= playableQueue.length - 1) {
+                onLastTrackEndedRef.current?.();
+              }
               advanceQueue();
             }
           }
         }
-      });
+      }) as MixYtPlayer;
     };
 
     if (window.YT?.Player) {
       setup();
     } else {
-      const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-      if (!existing) {
-        const script = document.createElement("script");
-        script.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(script);
-      }
-      window.onYouTubeIframeAPIReady = setup;
+      const unsubscribe = onYoutubeIframeApiReady(setup);
+      return () => {
+        cancelled = true;
+        unsubscribe();
+        ytPlayerRef.current?.destroy();
+        ytPlayerRef.current = null;
+        setPlayerReady(false);
+      };
     }
 
     return () => {
@@ -225,7 +234,16 @@ export function useMixPlayback({
       ytPlayerRef.current = null;
       setPlayerReady(false);
     };
-  }, [advanceQueue, currentItem, currentSource, enabled, ytElementId]);
+  }, [
+    advanceQueue,
+    currentItem,
+    currentSource,
+    enabled,
+    notifyTrackPlaying,
+    playableQueue.length,
+    queuePosition,
+    ytElementId
+  ]);
 
   // Pinata / hosted audio
   useEffect(() => {
@@ -239,10 +257,16 @@ export function useMixPlayback({
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
 
-    const onPlay = () => setIsPlaying(true);
+    const onPlay = () => {
+      setIsPlaying(true);
+      notifyTrackPlaying(currentItem.trackIndex);
+    };
     const onPause = () => setIsPlaying(false);
     const onEnded = () => {
       setIsPlaying(false);
+      if (queuePosition >= playableQueue.length - 1) {
+        onLastTrackEndedRef.current?.();
+      }
       advanceQueue();
     };
     const onError = () => {
@@ -269,19 +293,22 @@ export function useMixPlayback({
       audioRef.current = null;
       setPlayerReady(false);
     };
-  }, [advanceQueue, currentItem, currentSource, enabled]);
+  }, [advanceQueue, currentItem, currentSource, enabled, notifyTrackPlaying, playableQueue.length, queuePosition]);
 
-  // Iframe tracks are ready immediately
+  // Iframe / livepeer tracks are ready immediately
   useEffect(() => {
     if (!enabled || !currentItem) return;
-    if (currentSource?.kind === "iframe") {
-      setPlayerReady(true);
-      return;
-    }
-    if (currentSource?.kind === "livepeer") {
+    if (currentSource?.kind === "iframe" || currentSource?.kind === "livepeer") {
       setPlayerReady(true);
     }
   }, [currentItem, currentSource, enabled]);
+
+  const postIframeCommand = useCallback((command: "playVideo" | "pauseVideo") => {
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func: command, args: [] }),
+      "*"
+    );
+  }, []);
 
   const play = useCallback(() => {
     setError(null);
@@ -307,10 +334,18 @@ export function useMixPlayback({
       return;
     }
 
-    if (currentSource.kind === "iframe" || currentSource.kind === "livepeer") {
+    if (currentSource.kind === "iframe") {
+      postIframeCommand("playVideo");
       setIsPlaying(true);
+      notifyTrackPlaying(currentItem.trackIndex);
+      return;
     }
-  }, [currentItem, currentSource]);
+
+    if (currentSource.kind === "livepeer") {
+      setIsPlaying(true);
+      notifyTrackPlaying(currentItem.trackIndex);
+    }
+  }, [currentItem, currentSource, notifyTrackPlaying, postIframeCommand]);
 
   const pause = useCallback(() => {
     if (currentSource?.kind === "youtube") {
@@ -321,10 +356,15 @@ export function useMixPlayback({
       audioRef.current?.pause();
       return;
     }
-    if (currentSource?.kind === "iframe" || currentSource?.kind === "livepeer") {
+    if (currentSource?.kind === "iframe") {
+      postIframeCommand("pauseVideo");
+      setIsPlaying(false);
+      return;
+    }
+    if (currentSource?.kind === "livepeer") {
       setIsPlaying(false);
     }
-  }, [currentSource]);
+  }, [currentSource, postIframeCommand]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) pause();
@@ -335,6 +375,8 @@ export function useMixPlayback({
   const canPlay = playableQueue.length > 0;
   const showYoutubeEmbed = currentSourceKind === "youtube" && Boolean(ytElementId);
   const iframeUrl = currentSourceKind === "iframe" ? currentSource?.iframeUrl : undefined;
+  const livepeerPlaybackId =
+    currentSourceKind === "livepeer" ? currentSource?.livepeerPlaybackId : undefined;
 
   return {
     queue,
@@ -350,7 +392,10 @@ export function useMixPlayback({
     error,
     showYoutubeEmbed,
     iframeUrl,
+    livepeerPlaybackId,
     ytPlayerRef,
+    iframeRef,
+    setIsPlaying,
     play,
     pause,
     togglePlay,

@@ -111,7 +111,12 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
 
   function removeTrack(index: number) {
     setTracks((current) => current.filter((_, i) => i !== index));
-    if (previewTrackIndex === index) setPreviewTrackIndex(null);
+    setPreviewTrackIndex((current) => {
+      if (current == null) return null;
+      if (current === index) return null;
+      if (current > index) return current - 1;
+      return current;
+    });
   }
 
   async function save(event: FormEvent) {
