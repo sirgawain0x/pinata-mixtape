@@ -4,16 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMixPlayback } from "./hooks/useMixPlayback";
-import {
-  buildCrateUrl,
-  buildSongUrl,
-  findMixForSong,
-  resolveSongDeepLink
-} from "../lib/mixtape-nav";
-import {
-  getTrackPlaybackStatus,
-  trackPlaybackStatusLabel
-} from "../lib/song-playback";
+import { buildCrateUrl, buildSongUrl, findMixForSong, resolveSongDeepLink } from "../lib/mixtape-nav";
 import { youtubeEmbedUrl } from "../lib/youtube";
 import CassettePlayer from "./components/CassettePlayer";
 import LivepeerSongBridge from "./components/LivepeerSongBridge";
@@ -732,7 +723,7 @@ export default function MixtapeApp({
             {creator ? (
               <>
                 <button
-                  className="button new-tape-button"
+                  className="button btn-led btn-led-green"
                   onClick={() => {
                     setEditorMix(null);
                     setEditorOpen(true);
@@ -952,18 +943,12 @@ export default function MixtapeApp({
                   <div className="mix-player-head">
                     <div>
                       <p className="eyebrow">Mix Playback</p>
-                      <h3>Playback queue</h3>
-                      {nowPlayingTrack ? (
-                        <p className="mix-now-playing">
-                          Now playing: <strong>{nowPlayingTrack.title}</strong> — {nowPlayingTrack.artist}
-                          {mixPlayback.currentSourceKind ? (
-                            <span className="track-status-pill">{mixPlayback.currentSourceKind.replace("_", " ")}</span>
-                          ) : null}
-                        </p>
-                      ) : null}
+                      <h3>Playback</h3>
                     </div>
                     <span>
-                      {playableCount} playable / {selected.tracks.length} track{selected.tracks.length === 1 ? "" : "s"}
+                      {playableCount > 0
+                        ? `${playableCount} playable link${playableCount === 1 ? "" : "s"}`
+                        : `${selected.tracks.length} track${selected.tracks.length === 1 ? "" : "s"}`}
                     </span>
                   </div>
                   <div className="player-toolbar">
@@ -1050,7 +1035,6 @@ export default function MixtapeApp({
                       const trackKey = `${track.artist}-${track.title}-${index}`;
                       const isExpanded = !!expandedTracks[trackKey];
                       const isPlayingTrack = index === currentTrackIndex && playlistIsPlaying;
-                      const playbackStatus = getTrackPlaybackStatus(track);
                       const trackMeta = [track.releaseYear, track.duration, track.energy].filter(Boolean);
                       const tags = track.moodTags.concat(track.sceneTags).filter(Boolean);
 
@@ -1083,9 +1067,6 @@ export default function MixtapeApp({
                                 <p>{track.artist}</p>
                               </div>
                             </div>
-                            <span className={`track-status-pill track-status-${playbackStatus}`}>
-                              {trackPlaybackStatusLabel(playbackStatus)}
-                            </span>
                             <span className="track-toggle-indicator">{isExpanded ? "Hide" : "Expand"}</span>
                           </button>
 
@@ -1097,6 +1078,34 @@ export default function MixtapeApp({
                             </div>
                           ) : null}
 
+                          <div className="link-row">
+                            {"songId" in track && track.songId ? (
+                              <Link href={buildSongUrl(track.songId, { fromMix: selected.id, track: index })}>
+                                Open player
+                              </Link>
+                            ) : null}
+                            {track.creativeTvUrl ? (
+                              <a href={track.creativeTvUrl} rel="noreferrer" target="_blank">
+                                Creative TV
+                              </a>
+                            ) : null}
+                            {track.youtubeUrl ? (
+                              <a href={track.youtubeUrl} rel="noreferrer" target="_blank">
+                                Listen
+                              </a>
+                            ) : null}
+                            {!track.youtubeUrl && track.listenUrl ? (
+                              <a href={track.listenUrl} rel="noreferrer" target="_blank">
+                                Search
+                              </a>
+                            ) : null}
+                            {track.musicbrainzUrl ? (
+                              <a href={track.musicbrainzUrl} rel="noreferrer" target="_blank">
+                                MusicBrainz
+                              </a>
+                            ) : null}
+                          </div>
+
                           {isExpanded ? (
                             <div className="track-body">
                               {track.notes ? <p>{track.notes}</p> : null}
@@ -1107,33 +1116,6 @@ export default function MixtapeApp({
                                   ))}
                                 </div>
                               ) : null}
-                              <div className="link-row">
-                                {"songId" in track && track.songId ? (
-                                  <Link href={buildSongUrl(track.songId, { fromMix: selected.id, track: index })}>
-                                    Open player
-                                  </Link>
-                                ) : null}
-                                {track.creativeTvUrl ? (
-                                  <a href={track.creativeTvUrl} rel="noreferrer" target="_blank">
-                                    Creative TV
-                                  </a>
-                                ) : null}
-                                {track.youtubeUrl ? (
-                                  <a href={track.youtubeUrl} rel="noreferrer" target="_blank">
-                                    Listen
-                                  </a>
-                                ) : null}
-                                {!track.youtubeUrl && track.listenUrl ? (
-                                  <a href={track.listenUrl} rel="noreferrer" target="_blank">
-                                    Search
-                                  </a>
-                                ) : null}
-                                {track.musicbrainzUrl ? (
-                                  <a href={track.musicbrainzUrl} rel="noreferrer" target="_blank">
-                                    MusicBrainz
-                                  </a>
-                                ) : null}
-                              </div>
                               {track.youtubeUrl && track.embedSourceKind !== "link_only" ? (
                                 <div className="track-embed">
                                   <iframe

@@ -316,14 +316,28 @@ export function useMixPlayback({
 
     if (currentSource.kind === "youtube") {
       const player = ytPlayerRef.current;
-      if (!player?.playVideo) return;
+      if (!player?.playVideo) {
+        setError({
+          title: currentItem.track.title,
+          artist: currentItem.track.artist,
+          message: "Player is still loading. Please try again in a moment."
+        });
+        return;
+      }
       player.playVideo();
       return;
     }
 
     if (currentSource.kind === "pinata") {
       const audio = audioRef.current;
-      if (!audio) return;
+      if (!audio) {
+        setError({
+          title: currentItem.track.title,
+          artist: currentItem.track.artist,
+          message: "Audio is still loading. Please try again in a moment."
+        });
+        return;
+      }
       void audio.play().catch(() => {
         setError({
           title: currentItem.track.title,

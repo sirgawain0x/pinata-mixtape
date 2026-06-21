@@ -2685,39 +2685,41 @@ input[type="radio"] {
   margin: 8px 0 18px;
 }
 
-.cassette-player {
-  width: min(100%, 420px);
-  aspect-ratio: 420 / 262;
-  height: auto;
+.cassette-player-scale {
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
-.cassette-label-text {
+.cassette.cassette-player {
+  margin: 0;
+}
+
+.cassette-now-playing {
   display: grid;
-  align-content: center;
   gap: 4px;
-  padding: 0 6px;
-  z-index: 2;
+  justify-items: center;
+  max-width: 420px;
+  text-align: center;
 }
 
-.cassette-label-title,
-.cassette-label-artist {
-  display: block;
+.cassette-now-playing-title {
   font-family: "Courier New", monospace;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cassette-label-title {
-  color: #1a1410;
-  font-size: 0.72rem;
+  font-size: 0.92rem;
   font-weight: 700;
 }
 
-.cassette-label-artist {
-  color: #3d2f28;
-  font-size: 0.62rem;
+.cassette-now-playing-artist {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.cassette-player-wrap-mini {
+  margin: 0;
+}
+
+.cassette-player-wrap-mini .cassette-now-playing {
+  display: none;
 }
 
 .cassette-controls {
@@ -2879,32 +2881,34 @@ a.mix-card {
   margin-top: 0;
 }
 
-.signin-button {
-  border-color: var(--led-amber);
-  border-bottom-color: var(--led-amber);
+.btn-led {
+  position: relative;
+  padding-left: 28px;
 }
 
-.signout-button {
-  border-color: var(--led-red);
-  border-bottom-color: var(--led-red);
+.btn-led::before {
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+  content: "";
+  height: 8px;
+  left: 12px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
 }
 
-.new-tape-button {
-  border-color: var(--led-green);
-  border-bottom-color: var(--led-green);
+.btn-led-amber::before {
+  background: var(--led-amber);
+  color: var(--led-amber);
 }
 
-.signin-button:hover {
-  border-color: var(--led-amber);
-  border-bottom-color: var(--led-amber);
+.btn-led-red::before {
+  background: var(--led-red);
+  color: var(--led-red);
 }
 
-.signout-button:hover {
-  border-color: var(--led-red);
-  border-bottom-color: var(--led-red);
-}
-
-.new-tape-button:hover {
-  border-color: var(--led-green);
-  border-bottom-color: var(--led-green);
+.btn-led-green::before {
+  background: var(--led-green);
+  color: var(--led-green);
 }
