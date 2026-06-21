@@ -15,7 +15,9 @@ export async function issueNonceStorage(): Promise<string> {
 
 export async function purgeExpiredNoncesStorage(): Promise<void> {
   await dbReady();
-  await sqlRun(`DELETE FROM siwe_nonces WHERE issued_at < ?`, [Date.now() - NONCE_TTL_MS]);
+  const now = Date.now();
+  await sqlRun(`DELETE FROM siwe_nonces WHERE issued_at < ?`, [now - NONCE_TTL_MS]);
+  await sqlRun(`DELETE FROM sessions WHERE expires_at < ?`, [now]);
 }
 
 export async function consumeNonceStorage(nonce: string): Promise<boolean> {

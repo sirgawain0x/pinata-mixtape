@@ -9,7 +9,7 @@ import {
   revokeSessionStorage,
   SESSION_TTL_MS
 } from "./auth-storage";
-import { getCreator, upsertCreatorByWallet, type Creator } from "./stations";
+import { upsertCreatorByWallet, getCreator, type Creator } from "./stations";
 
 const SESSION_COOKIE = "mixtape_session";
 
@@ -41,7 +41,9 @@ export async function getCurrentCreator(): Promise<Creator | null> {
   const token = await getSessionToken();
   const session = await lookupSessionStorage(token);
   if (!session) return null;
-  return getCreator(session.creatorId);
+  const fromDb = await getCreator(session.creatorId);
+  if (fromDb) return fromDb;
+  return null;
 }
 
 export async function requireCreator(): Promise<Creator> {
