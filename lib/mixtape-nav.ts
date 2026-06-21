@@ -66,22 +66,16 @@ export function resolveSongDeepLink(
   songId: number,
   mixIdHint?: number | null
 ): { mixId: number; trackIndex: number } | null {
-  for (const mix of mixes) {
-    if (mixIdHint != null && mix.id !== mixIdHint) continue;
-    const trackIndex = findTrackIndexInMix(mix, songId);
-    if (trackIndex >= 0) return { mixId: mix.id, trackIndex };
-  }
-
   if (mixIdHint != null) {
     const mix = mixes.find((entry) => entry.id === mixIdHint);
     if (mix) {
       const trackIndex = findTrackIndexInMix(mix, songId);
       if (trackIndex >= 0) return { mixId: mix.id, trackIndex };
     }
-    return null;
   }
 
   for (const mix of mixes) {
+    if (mix.id === mixIdHint) continue;
     const trackIndex = findTrackIndexInMix(mix, songId);
     if (trackIndex >= 0) return { mixId: mix.id, trackIndex };
   }

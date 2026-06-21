@@ -177,7 +177,10 @@ export function useMixPlayback({
         playerVars: { rel: 0, modestbranding: 1 },
         events: {
           onReady: () => {
-            if (!cancelled) setPlayerReady(true);
+            if (!cancelled) {
+              setPlayerReady(true);
+              setError(null);
+            }
           },
           onError: () => {
             if (cancelled) return;
@@ -283,6 +286,7 @@ export function useMixPlayback({
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
     setPlayerReady(true);
+    setError(null);
 
     return () => {
       audio.pause();
@@ -316,14 +320,28 @@ export function useMixPlayback({
 
     if (currentSource.kind === "youtube") {
       const player = ytPlayerRef.current;
-      if (!player?.playVideo) return;
+      if (!player?.playVideo) {
+        setError({
+          title: currentItem.track.title,
+          artist: currentItem.track.artist,
+          message: "Player is still loading. Please try again in a moment."
+        });
+        return;
+      }
       player.playVideo();
       return;
     }
 
     if (currentSource.kind === "pinata") {
       const audio = audioRef.current;
-      if (!audio) return;
+      if (!audio) {
+        setError({
+          title: currentItem.track.title,
+          artist: currentItem.track.artist,
+          message: "Audio is still loading. Please try again in a moment."
+        });
+        return;
+      }
       void audio.play().catch(() => {
         setError({
           title: currentItem.track.title,

@@ -152,7 +152,7 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
     return (
       <div className="signin">
         <span className="signin-pill">{creator.displayName || short}</span>
-        <button className="signout-button" onClick={signOut} disabled={busy} type="button">
+        <button className="btn-led btn-led-red" onClick={signOut} disabled={busy} type="button">
           Sign out
         </button>
       </div>
@@ -174,7 +174,7 @@ export default function SignInButton({ onChange }: { onChange?: (creator: Creato
   return (
     <div className="signin">
       <button
-        className="signin-button"
+        className="btn-led btn-led-amber"
         onClick={handlePrimaryClick}
         disabled={busy || signerStatus.isInitializing}
         type="button"

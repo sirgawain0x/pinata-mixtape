@@ -26,10 +26,13 @@ type Props = {
   segments: Segment[];
   /** From the incoming request so YouTube embed `src` matches SSR and client (avoids hydration mismatch). */
   embedOrigin?: string;
+  /** Begin playback when the queue loads (may still need a tap if the browser blocks autoplay). */
+  autoStart?: boolean;
 };
 
 const TEXT_CARD_DURATION_MS = 12000;
 const IFRAME_EMBED_FALLBACK_MS = 180_000;
+const YOUTUBE_AUTOPLAY_VERIFY_MS = 3500;
 /** postMessage target for YouTube embed commands (avoid `"*"` — reduces internal API races). */
 const YOUTUBE_EMBED_ORIGIN = "https://www.youtube.com";
 
@@ -51,12 +54,21 @@ function isTrustedYoutubeMessageOrigin(origin: string): boolean {
   }
 }
 
-export default function StationPlayer({ stationName, segments, embedOrigin = "" }: Props) {
+export default function StationPlayer({
+  stationName,
+  segments,
+  embedOrigin = "",
+  autoStart = true
+}: Props) {
   const [index, setIndex] = useState(0);
   const [started, setStarted] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [playbackNonce, setPlaybackNonce] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const textTimerRef = useRef<number | null>(null);
+  const youtubeVerifyRef = useRef<number | null>(null);
+  const youtubePlayingRef = useRef(false);
   const currentRef = useRef<(typeof segments)[number] | null>(null);
   const audioSourceKeyRef = useRef("");
   const lastAudioSegmentIdRef = useRef<number | null>(null);
@@ -83,6 +95,58 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
     );
   }
 
+  function clearYoutubeVerifyTimer() {
+    if (youtubeVerifyRef.current) {
+      window.clearTimeout(youtubeVerifyRef.current);
+      youtubeVerifyRef.current = null;
+    }
+  }
+
+  function scheduleYoutubeAutoplayVerify(segmentId: number) {
+    clearYoutubeVerifyTimer();
+    youtubePlayingRef.current = false;
+    youtubeVerifyRef.current = window.setTimeout(() => {
+      youtubeVerifyRef.current = null;
+      if (youtubePlayingRef.current) return;
+      if (currentRef.current?.id !== segmentId) return;
+      setAutoplayBlocked(true);
+    }, YOUTUBE_AUTOPLAY_VERIFY_MS);
+  }
+
+  function playYoutubeWithRetry(segmentId: number) {
+    scheduleYoutubeAutoplayVerify(segmentId);
+    const delays = [400, 1200, 2400];
+    for (const delay of delays) {
+      window.setTimeout(playYoutube, delay);
+    }
+  }
+
+  const requestPlayback = useCallback(() => {
+    setPlaybackNonce((current) => current + 1);
+  }, []);
+
+  const beginPlayback = useCallback(() => {
+    setAutoplayBlocked(false);
+    setStarted(true);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.muted = false;
+      audio.volume = 1;
+    }
+  }, []);
+
+  function selectSegment(segmentIndex: number) {
+    beginPlayback();
+    setIndex(segmentIndex);
+    requestPlayback();
+  }
+
+  useEffect(() => {
+    if (!autoStart || queue.length === 0) return;
+    beginPlayback();
+    requestPlayback();
+  }, [autoStart, beginPlayback, queue.length, requestPlayback]);
+
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (typeof event.data !== "string") return;
@@ -91,7 +155,14 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
       if (!isTrustedYoutubeMessageOrigin(origin)) return;
       try {
         const data = JSON.parse(event.data);
-        if (data?.event === "onStateChange" && data.info === 0) advance();
+        if (data?.event === "onStateChange") {
+          if (data.info === 1) {
+            youtubePlayingRef.current = true;
+            clearYoutubeVerifyTimer();
+            setAutoplayBlocked(false);
+          }
+          if (data.info === 0) advance();
+        }
       } catch {
         // ignore non-JSON postMessage
       }
@@ -105,12 +176,12 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
       window.clearTimeout(textTimerRef.current);
       textTimerRef.current = null;
     }
+    clearYoutubeVerifyTimer();
     if (!started || !current) return;
 
     if (current.kind === "music" && current.song?.youtubeUrl && youtubeVideoId(current.song.youtubeUrl)) {
       pauseAudio();
-      // URL may include autoplay=1 after Start; postMessage is a fallback once the iframe API is ready.
-      window.setTimeout(playYoutube, 1200);
+      playYoutubeWithRetry(current.id);
       return;
     }
 
@@ -141,7 +212,7 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
       }
       lastAudioSegmentIdRef.current = current.id;
       const tryPlay = () => {
-        void audio.play().catch(() => undefined);
+        void audio.play().then(() => setAutoplayBlocked(false)).catch(() => setAutoplayBlocked(true));
       };
       if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) tryPlay();
       else {
@@ -156,7 +227,13 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
       pauseAudio();
       textTimerRef.current = window.setTimeout(advance, TEXT_CARD_DURATION_MS);
     }
-  }, [advance, current, started]);
+  }, [advance, current, playbackNonce, started]);
+
+  useEffect(() => {
+    return () => {
+      clearYoutubeVerifyTimer();
+    };
+  }, []);
 
   function pauseAudio() {
     const audio = audioRef.current;
@@ -165,13 +242,8 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
   }
 
   function start() {
-    setStarted(true);
-    const audio = audioRef.current;
-    if (audio) {
-      // Do not use muted "priming": play() with no src rejects and leaves muted=true, so listeners hear nothing.
-      audio.muted = false;
-      audio.volume = 1;
-    }
+    beginPlayback();
+    requestPlayback();
   }
 
   if (queue.length === 0) {
@@ -199,9 +271,9 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
 
   return (
     <div className="station-player">
-      {!started ? (
+      {!started || autoplayBlocked ? (
         <button className="start-station" onClick={start} type="button">
-          ▶ Start {stationName}
+          ▶ {autoplayBlocked ? `Resume ${stationName}` : `Start ${stationName}`}
         </button>
       ) : null}
 
@@ -219,6 +291,7 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
             ref={iframeRef}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
+            onLoad={() => current && playYoutubeWithRetry(current.id)}
             referrerPolicy="strict-origin-when-cross-origin"
             src={embedSrc}
             title="station video"
@@ -257,7 +330,7 @@ export default function StationPlayer({ stationName, segments, embedOrigin = "" 
       <ol className="queue">
         {queue.map((segment, segmentIndex) => (
           <li key={segment.id} className={segmentIndex === index ? "active" : ""}>
-            <button onClick={() => setIndex(segmentIndex)} type="button">
+            <button onClick={() => selectSegment(segmentIndex)} type="button">
               <span className="queue-kind">{segment.kind}</span>
               <span>{segment.title || segmentLabel(segment)}</span>
             </button>
