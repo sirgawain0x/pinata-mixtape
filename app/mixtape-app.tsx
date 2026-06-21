@@ -3,9 +3,21 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { youtubeEmbedUrl, youtubeVideoId } from "../lib/youtube";
+import { useMixPlayback } from "./hooks/useMixPlayback";
+import {
+  buildCrateUrl,
+  buildSongUrl,
+  findMixForSong,
+  resolveSongDeepLink
+} from "../lib/mixtape-nav";
+import {
+  getTrackPlaybackStatus,
+  trackPlaybackStatusLabel
+} from "../lib/song-playback";
+import { youtubeEmbedUrl } from "../lib/youtube";
+import CassettePlayer from "./components/CassettePlayer";
+import LivepeerSongBridge from "./components/LivepeerSongBridge";
 import MixtapeEditor from "./components/MixtapeEditor";
-import RecordPlayer from "./components/RecordPlayer";
 import SignInButton from "./components/SignInButton";
 
 export type HostedMixResult = {
@@ -20,34 +32,6 @@ export type HostedMixResult = {
   clips: Record<string, string>;
   segments: Record<string, string>;
   sourceTracks?: Array<Record<string, unknown>>;
-};
-
-declare global {
-  interface Window {
-    YT?: {
-      Player: new (elementId: string, options: unknown) => YTPlayer;
-      PlayerState: {
-        UNSTARTED: number;
-        ENDED: number;
-        PLAYING: number;
-        PAUSED: number;
-        BUFFERING: number;
-        CUED: number;
-      };
-    };
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-type YTPlayer = {
-  destroy: () => void;
-  getPlaylistIndex: () => number;
-  getPlayerState: () => number;
-  getVolume: () => number;
-  setVolume: (volume: number) => void;
-  getVideoData: () => { video_id?: string };
-  playVideo?: () => void;
-  pauseVideo?: () => void;
 };
 
 const NARRATION_VOICES = [
@@ -166,15 +150,18 @@ export default function MixtapeApp({
   const [generatingNarrationFor, setGeneratingNarrationFor] = useState<number | null>(null);
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [pendingVoice, setPendingVoice] = useState("am_adam");
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [expandedTracks, setExpandedTracks] = useState<Record<string, boolean>>({});
   const [latestBroadcastMoment, setLatestBroadcastMoment] = useState<MixMoment | null>(initialMoments[0] ?? null);
   const [broadcastMomentPulse, setBroadcastMomentPulse] = useState(false);
-  const [playlistIsPlaying, setPlaylistIsPlaying] = useState(false);
-  const playerRef = useRef<YTPlayer | null>(null);
+  const [deepLinkTrackIndex, setDeepLinkTrackIndex] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playedRef = useRef<Record<string, boolean>>({});
   const currentMixRef = useRef<number | null>(null);
+  const narrationIntroPlayedRef = useRef(false);
+  const lastNarrationTrackRef = useRef<number | null>(null);
+  const handleTrackPlayingRef = useRef<(trackIndex: number) => void>(() => {});
+  const handleLastTrackEndedRef = useRef<() => void>(() => {});
+  const trackRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const selected = useMemo(
     () => mixes.find((mix) => mix.id === selectedId) ?? mixes[0] ?? null,
@@ -182,6 +169,33 @@ export default function MixtapeApp({
   );
 
   const viewMode = searchParams.get("view") === "broadcast" ? "broadcast" : "explorer";
+
+  const urlTrackIndex = useMemo(() => {
+    const raw = searchParams.get("track");
+    if (raw == null) return null;
+    const parsed = Number(raw);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  }, [searchParams]);
+
+  const ytElementId =
+    selected && viewMode === "broadcast"
+      ? `yt-player-broadcast-${selected.id}`
+      : selected
+        ? `yt-player-${selected.id}`
+        : null;
+
+  const mixPlayback = useMixPlayback({
+    tracks: selected?.tracks ?? [],
+    mixId: selected?.id ?? null,
+    ytElementId,
+    initialTrackIndex: urlTrackIndex ?? deepLinkTrackIndex ?? 0,
+    enabled: Boolean(selected),
+    onTrackPlaying: (trackIndex) => handleTrackPlayingRef.current(trackIndex),
+    onLastTrackEnded: () => handleLastTrackEndedRef.current()
+  });
+
+  const currentTrackIndex = mixPlayback.currentTrackIndex;
+  const playlistIsPlaying = mixPlayback.isPlaying;
 
   async function loadMixes(query = search) {
     const response = await fetch(`/app/api/search?q=${encodeURIComponent(query)}`);
@@ -220,6 +234,41 @@ export default function MixtapeApp({
   }, [searchParams, creator]);
 
   useEffect(() => {
+    const mixParam = searchParams.get("mix");
+    const songParam = searchParams.get("song");
+    if (mixParam) {
+      const mixId = Number(mixParam);
+      if (Number.isInteger(mixId) && mixes.some((mix) => mix.id === mixId)) {
+        setSelectedId(mixId);
+      }
+    }
+
+    if (songParam) {
+      const songId = Number(songParam);
+      if (Number.isInteger(songId)) {
+        const resolved = resolveSongDeepLink(mixes, songId, mixParam ? Number(mixParam) : null);
+        if (resolved) {
+          setSelectedId(resolved.mixId);
+          setDeepLinkTrackIndex(resolved.trackIndex);
+        }
+      }
+    }
+
+    if (urlTrackIndex != null) {
+      setDeepLinkTrackIndex(urlTrackIndex);
+      const mix = mixes.find((entry) => entry.id === (mixParam ? Number(mixParam) : selectedId));
+      if (mix?.tracks[urlTrackIndex]) {
+        const track = mix.tracks[urlTrackIndex];
+        const trackKey = `${track.artist}-${track.title}-${urlTrackIndex}`;
+        setExpandedTracks((current) => ({ ...current, [trackKey]: true }));
+        window.requestAnimationFrame(() => {
+          trackRefs.current[trackKey]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      }
+    }
+  }, [mixes, searchParams, selectedId, urlTrackIndex]);
+
+  useEffect(() => {
     if (initialMixes.length === 0) {
       void loadMixes("");
     }
@@ -232,8 +281,13 @@ export default function MixtapeApp({
     if (!selectedId) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("mix", String(selectedId));
+    if (deepLinkTrackIndex != null && deepLinkTrackIndex >= 0) {
+      params.set("track", String(deepLinkTrackIndex));
+    } else {
+      params.delete("track");
+    }
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [pathname, router, searchParams, selectedId]);
+  }, [deepLinkTrackIndex, pathname, router, searchParams, selectedId]);
 
   useEffect(() => {
     if (!selected || hostedMixes[selected.id] !== undefined) return;
@@ -263,10 +317,11 @@ export default function MixtapeApp({
   useEffect(() => {
     if (currentMixRef.current !== selected?.id) {
       playedRef.current = {};
+      narrationIntroPlayedRef.current = false;
+      lastNarrationTrackRef.current = null;
       currentMixRef.current = selected?.id ?? null;
-      setCurrentTrackIndex(0);
+      setDeepLinkTrackIndex(null);
       setExpandedTracks({});
-      setPlaylistIsPlaying(false);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -284,15 +339,14 @@ export default function MixtapeApp({
     await loadMixes(term);
   }
 
-  async function openSong(song: Song) {
-    setSearch(song.artist);
-    const mixId = song.mixIds.find((id) => mixes.some((mix) => mix.id === id)) ?? song.mixIds[0] ?? null;
-    if (mixId) {
-      setSelectedId(mixId);
-      return;
+  function navigateToMix(mixId: number, trackIndex?: number | null) {
+    setSelectedId(mixId);
+    if (trackIndex != null && trackIndex >= 0) {
+      setDeepLinkTrackIndex(trackIndex);
     }
-    await loadMixes(song.artist);
+    router.push(buildCrateUrl({ mixId, trackIndex, view: viewMode === "broadcast" ? "broadcast" : undefined }));
   }
+
 
   function randomMix() {
     if (mixes.length === 0) return;
@@ -390,15 +444,16 @@ export default function MixtapeApp({
   }
 
   async function playNarrationClip(kind: string) {
-    if (!hosted || !narrationEnabled || !playerRef.current) return;
+    if (!hosted || !narrationEnabled) return;
     if (playedRef.current[kind]) return;
 
     const clipUrl = hosted.clips[kind];
     if (!clipUrl) return;
 
     playedRef.current[kind] = true;
-    const previousVolume = playerRef.current.getVolume();
-    playerRef.current.setVolume(10);
+    const ytPlayer = mixPlayback.ytPlayerRef.current;
+    const previousVolume = ytPlayer?.getVolume?.();
+    ytPlayer?.setVolume?.(10);
 
     const audio = new Audio(clipUrl);
     audio.volume = 1;
@@ -406,7 +461,7 @@ export default function MixtapeApp({
     audio.addEventListener(
       "ended",
       () => {
-        playerRef.current?.setVolume(previousVolume);
+        mixPlayback.ytPlayerRef.current?.setVolume?.(previousVolume ?? 100);
         if (audioRef.current === audio) audioRef.current = null;
       },
       { once: true }
@@ -414,46 +469,44 @@ export default function MixtapeApp({
     audio.addEventListener(
       "error",
       () => {
-        playerRef.current?.setVolume(previousVolume);
+        mixPlayback.ytPlayerRef.current?.setVolume?.(previousVolume ?? 100);
         if (audioRef.current === audio) audioRef.current = null;
       },
       { once: true }
     );
     await audio.play().catch(() => {
-      playerRef.current?.setVolume(previousVolume);
+      mixPlayback.ytPlayerRef.current?.setVolume?.(previousVolume ?? 100);
       if (audioRef.current === audio) audioRef.current = null;
     });
   }
+
+  handleTrackPlayingRef.current = (trackIndex) => {
+    if (!hosted || !narrationEnabled) return;
+    const firstPlayable = mixPlayback.playableQueue[0]?.trackIndex;
+    if (!narrationIntroPlayedRef.current && trackIndex === firstPlayable) {
+      narrationIntroPlayedRef.current = true;
+      void playNarrationClip("intro");
+      lastNarrationTrackRef.current = trackIndex;
+      return;
+    }
+    if (lastNarrationTrackRef.current != null && lastNarrationTrackRef.current !== trackIndex) {
+      void playNarrationClip(`transition_${trackIndex}`);
+    }
+    lastNarrationTrackRef.current = trackIndex;
+  };
+
+  handleLastTrackEndedRef.current = () => {
+    if (!hosted || !narrationEnabled) return;
+    void playNarrationClip("outro");
+  };
 
   const totalTracks = useMemo(
     () => new Set(mixes.flatMap((mix) => mix.tracks.map((track) => `${track.artist}::${track.title}`))).size,
     [mixes]
   );
 
-  const mixYoutubeTracks = useMemo(() => {
-    if (!selected) return [] as Array<{ videoId: string; title: string; artist: string; index: number }>;
-    return selected.tracks
-      .map((track, index) => ({
-        videoId: youtubeVideoId(track.youtubeUrl),
-        title: track.title,
-        artist: track.artist,
-        index
-      }))
-      .filter((track) => track.videoId);
-  }, [selected]);
-
-  const mixYoutubeIds = useMemo(() => mixYoutubeTracks.map((track) => track.videoId), [mixYoutubeTracks]);
-  const nowPlayingTrack = mixYoutubeTracks[currentTrackIndex] ?? mixYoutubeTracks[0] ?? null;
-
-  function togglePlayback() {
-    const player = playerRef.current;
-    if (!player) return;
-    if (playlistIsPlaying) {
-      player.pauseVideo?.();
-    } else {
-      player.playVideo?.();
-    }
-  }
+  const nowPlayingTrack = mixPlayback.nowPlaying ?? selected?.tracks[currentTrackIndex] ?? null;
+  const playableCount = mixPlayback.playableQueue.length;
 
   const broadcastTrack = selected?.tracks[currentTrackIndex] ?? selected?.tracks[0] ?? null;
   const broadcastQueue = selected?.tracks.slice(currentTrackIndex + 1, currentTrackIndex + 4) ?? [];
@@ -508,95 +561,59 @@ export default function MixtapeApp({
     };
   }, [viewMode]);
 
-  useEffect(() => {
-    if (!selected || mixYoutubeIds.length === 0) return;
-
-    const elementId = viewMode === "broadcast" ? `yt-player-broadcast-${selected.id}` : `yt-player-${selected.id}`;
-    const setupPlayer = () => {
-      if (!window.YT?.Player) return;
-      playerRef.current?.destroy();
-      playerRef.current = new window.YT.Player(elementId, {
-        videoId: mixYoutubeIds[0],
-        playerVars: {
-          playlist: mixYoutubeIds.slice(1).join(","),
-          rel: 0,
-          modestbranding: 1
-        },
-        events: {
-          onStateChange: (event: { data: number }) => {
-            if (!window.YT || !playerRef.current) return;
-
-            const currentVideoId = playerRef.current.getVideoData?.().video_id ?? "";
-            const resolvedIndex = mixYoutubeTracks.findIndex((track) => track.videoId === currentVideoId);
-            const index = resolvedIndex >= 0 ? resolvedIndex : playerRef.current.getPlaylistIndex?.() ?? 0;
-            const lastIndex = mixYoutubeTracks.length - 1;
-            setCurrentTrackIndex(Math.max(0, index));
-
-            if (event.data === window.YT.PlayerState.PLAYING) {
-              setPlaylistIsPlaying(true);
-            } else if (
-              event.data === window.YT.PlayerState.PAUSED ||
-              event.data === window.YT.PlayerState.ENDED ||
-              event.data === window.YT.PlayerState.BUFFERING ||
-              event.data === window.YT.PlayerState.CUED ||
-              event.data === window.YT.PlayerState.UNSTARTED
-            ) {
-              setPlaylistIsPlaying(false);
-            }
-
-            if (event.data === window.YT.PlayerState.ENDED) {
-              if (index === lastIndex) {
-                void playNarrationClip("outro");
-              }
-              return;
-            }
-
-            if (event.data !== window.YT.PlayerState.PLAYING) return;
-
-            if (index === 0) {
-              void playNarrationClip("intro");
-            } else if (index > 0) {
-              void playNarrationClip(`transition_${index}`);
-            }
-          }
-        }
-      });
-    };
-
-    if (window.YT?.Player) {
-      setupPlayer();
-    } else {
-      const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-      if (!existingScript) {
-        const script = document.createElement("script");
-        script.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(script);
-      }
-      window.onYouTubeIframeAPIReady = setupPlayer;
-    }
-
-    return () => {
-      playerRef.current?.destroy();
-      playerRef.current = null;
-    };
-  }, [mixYoutubeIds, narrationEnabled, selected?.id, hosted?.clips.intro, mixYoutubeTracks, viewMode]);
-
   if (viewMode === "broadcast") {
     return (
       <main className="broadcast-shell">
         {selected ? (
           <section className="broadcast-deck">
+            <div className="broadcast-nav">
+              <button className="secondary-button" onClick={() => switchView("explorer")} type="button">
+                ← Back to crate
+              </button>
+            </div>
             <div className="broadcast-stage">
               <div className="broadcast-stage-backdrop" aria-hidden="true" />
               <div className="broadcast-stage-overlay" />
               <div className="broadcast-player-frame">
-                {mixYoutubeIds.length > 0 ? (
+                {mixPlayback.showYoutubeEmbed || mixPlayback.iframeUrl || mixPlayback.livepeerPlaybackId ? (
                   <div className="mix-player-embed broadcast-embed">
-                    <div className="yt-player-shell" id={`yt-player-broadcast-${selected.id}`} />
+                    {mixPlayback.showYoutubeEmbed ? (
+                      <div className="yt-player-shell" id={`yt-player-broadcast-${selected.id}`} />
+                    ) : null}
+                    {mixPlayback.iframeUrl ? (
+                      <iframe
+                        allow="autoplay; encrypted-media; fullscreen"
+                        className="mix-iframe-embed"
+                        ref={mixPlayback.iframeRef}
+                        src={mixPlayback.iframeUrl}
+                        title={`${nowPlayingTrack?.title ?? selected.title} embed`}
+                      />
+                    ) : null}
+                    {mixPlayback.livepeerPlaybackId ? (
+                      <LivepeerSongBridge
+                        isPlaying={playlistIsPlaying}
+                        onPlayingChange={mixPlayback.setIsPlaying}
+                        playbackId={mixPlayback.livepeerPlaybackId}
+                      />
+                    ) : null}
+                    {mixPlayback.error ? (
+                      <div className="yt-player-error">
+                        <strong>{mixPlayback.error.title}</strong> — {mixPlayback.error.artist}
+                        <p>{mixPlayback.error.message}</p>
+                        {mixPlayback.error.url ? (
+                          <a href={mixPlayback.error.url} rel="noreferrer" target="_blank">
+                            {mixPlayback.error.videoId ?? mixPlayback.error.url}
+                          </a>
+                        ) : null}
+                        <button className="secondary-button" onClick={mixPlayback.skip} type="button">
+                          Skip track
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="broadcast-fallback-art">
-                    <span className="eyebrow">No direct video links</span>
+                    <span className="eyebrow">No in-app playback sources</span>
                     <h2>{selected.title}</h2>
                     <p>{selected.description}</p>
                   </div>
@@ -630,29 +647,16 @@ export default function MixtapeApp({
 
               <div className="broadcast-rail-block">
                 <p className="eyebrow">Deck accent</p>
-                <div className={playlistIsPlaying ? "cassette cassette-mini cassette-playing" : "cassette cassette-mini"} aria-hidden="true">
-                  <span className="cassette-screw cassette-screw-tl" />
-                  <span className="cassette-screw cassette-screw-tr" />
-                  <span className="cassette-screw cassette-screw-bl" />
-                  <span className="cassette-screw cassette-screw-br" />
-                  <div className="cassette-top-strip" />
-                  <div className="cassette-label-block">
-                    <span className="cassette-label-band cassette-label-band-a" />
-                    <span className="cassette-label-band cassette-label-band-b" />
-                    <span className="cassette-label-band cassette-label-band-c" />
-                  </div>
-                  <div className="cassette-window">
-                    <span className="cassette-reel cassette-reel-left" />
-                    <span className="cassette-tape" />
-                    <span className="cassette-reel cassette-reel-right" />
-                    <span className="cassette-window-bar" />
-                  </div>
-                  <div className="cassette-bottom">
-                    <span className="cassette-hole cassette-hole-left" />
-                    <span className="cassette-bottom-center" />
-                    <span className="cassette-hole cassette-hole-right" />
-                  </div>
-                </div>
+                <CassettePlayer
+                  artist={nowPlayingTrack?.artist ?? selected.djPersona}
+                  canPlay={mixPlayback.canPlay}
+                  isPlaying={playlistIsPlaying}
+                  onToggle={mixPlayback.togglePlay}
+                  size="mini"
+                  title={nowPlayingTrack?.title ?? selected.title}
+                  trackCount={playableCount}
+                  trackIndex={mixPlayback.queuePosition}
+                />
               </div>
 
               <div className="broadcast-rail-block">
@@ -728,7 +732,7 @@ export default function MixtapeApp({
             {creator ? (
               <>
                 <button
-                  className="button"
+                  className="button new-tape-button"
                   onClick={() => {
                     setEditorMix(null);
                     setEditorOpen(true);
@@ -783,15 +787,15 @@ export default function MixtapeApp({
             <p className="eyebrow">Mixes</p>
             <div className="mix-list">
               {mixes.map((mix) => (
-                <button
+                <Link
                   className={mix.id === selected?.id ? "mix-card active" : "mix-card"}
+                  href={buildCrateUrl({ mixId: mix.id })}
                   key={mix.id}
                   onClick={() => setSelectedId(mix.id)}
-                  type="button"
                 >
                   <span>{mix.title}</span>
                   <small>{[mix.vibe, mix.useCase].filter(Boolean).join(" / ") || "saved tape"}</small>
-                </button>
+                </Link>
               ))}
             </div>
           </div>
@@ -800,13 +804,28 @@ export default function MixtapeApp({
             <p className="eyebrow">Songs</p>
             <div className="song-list">
               {songs.length > 0 ? (
-                songs.map((song) => (
-                  <button className="song-card" key={song.id} onClick={() => void openSong(song)} type="button">
-                    <span>{song.title}</span>
-                    <small>{song.artist}</small>
-                    <small>{[song.energy, `${song.mixCount} mix${song.mixCount === 1 ? "" : "es"}`].filter(Boolean).join(" / ")}</small>
-                  </button>
-                ))
+                songs.map((song) => {
+                  const inCrate = findMixForSong(mixes, song, selectedId);
+                  return (
+                    <div className="song-card song-card-link" key={song.id}>
+                      <Link className="song-card-main" href={buildSongUrl(song.id, { fromMix: selectedId ?? inCrate?.mix.id })}>
+                        <span>{song.title}</span>
+                        <small>{song.artist}</small>
+                        <small>
+                          {[song.energy, `${song.mixCount} mix${song.mixCount === 1 ? "" : "es"}`].filter(Boolean).join(" / ")}
+                        </small>
+                      </Link>
+                      {inCrate ? (
+                        <Link
+                          className="song-card-crate-link"
+                          href={buildCrateUrl({ mixId: inCrate.mix.id, trackIndex: inCrate.trackIndex })}
+                        >
+                          In crate →
+                        </Link>
+                      ) : null}
+                    </div>
+                  );
+                })
               ) : (
                 <span className="muted">No song hits yet.</span>
               )}
@@ -856,7 +875,7 @@ export default function MixtapeApp({
                   <p>{selected.description}</p>
                 </div>
                 <div className="tape-meta">
-                  <span>{selected.duration}</span>
+                  {selected.duration ? <span>{selected.duration}</span> : null}
                   <span>{selected.djPersona}</span>
                   <button
                     onClick={() => {
@@ -918,25 +937,33 @@ export default function MixtapeApp({
               ) : null}
 
 
-              <RecordPlayer
-                isPlaying={playlistIsPlaying}
-                canPlay={mixYoutubeIds.length > 0}
-                onToggle={togglePlayback}
-                title={nowPlayingTrack?.title ?? selected.title}
+              <CassettePlayer
                 artist={nowPlayingTrack?.artist ?? selected.djPersona}
-                trackIndex={currentTrackIndex}
-                trackCount={mixYoutubeTracks.length}
+                canPlay={mixPlayback.canPlay}
+                isPlaying={playlistIsPlaying}
+                onToggle={mixPlayback.togglePlay}
+                title={nowPlayingTrack?.title ?? selected.title}
+                trackCount={playableCount}
+                trackIndex={mixPlayback.queuePosition}
               />
 
-              {mixYoutubeIds.length > 0 ? (
+              {selected.tracks.length > 0 ? (
                 <div className="mix-player">
                   <div className="mix-player-head">
                     <div>
                       <p className="eyebrow">Mix Playback</p>
-                      <h3>YouTube Queue</h3>
+                      <h3>Playback queue</h3>
+                      {nowPlayingTrack ? (
+                        <p className="mix-now-playing">
+                          Now playing: <strong>{nowPlayingTrack.title}</strong> — {nowPlayingTrack.artist}
+                          {mixPlayback.currentSourceKind ? (
+                            <span className="track-status-pill">{mixPlayback.currentSourceKind.replace("_", " ")}</span>
+                          ) : null}
+                        </p>
+                      ) : null}
                     </div>
                     <span>
-                      {mixYoutubeIds.length} direct link{mixYoutubeIds.length === 1 ? "" : "s"}
+                      {playableCount} playable / {selected.tracks.length} track{selected.tracks.length === 1 ? "" : "s"}
                     </span>
                   </div>
                   <div className="player-toolbar">
@@ -970,12 +997,48 @@ export default function MixtapeApp({
                       <button className="secondary-button" onClick={() => switchView("broadcast")} type="button">
                         Open Broadcast Deck
                       </button>
+                      {mixPlayback.error ? (
+                        <button className="secondary-button" onClick={mixPlayback.skip} type="button">
+                          Skip unavailable track
+                        </button>
+                      ) : null}
                     </div>
                     {hosted ? <small>Voice: {hosted.voice}</small> : <small>No generated narration yet for this mix.</small>}
                   </div>
-                  <div className="mix-player-embed">
-                    <div className="yt-player-shell" id={`yt-player-${selected.id}`} />
-                  </div>
+                  {(mixPlayback.showYoutubeEmbed || mixPlayback.iframeUrl || mixPlayback.livepeerPlaybackId) && (
+                    <div className="mix-player-embed">
+                      {mixPlayback.showYoutubeEmbed ? (
+                        <div className="yt-player-shell" id={`yt-player-${selected.id}`} />
+                      ) : null}
+                      {mixPlayback.iframeUrl ? (
+                        <iframe
+                          allow="autoplay; encrypted-media; fullscreen"
+                          className="mix-iframe-embed"
+                          ref={mixPlayback.iframeRef}
+                          src={mixPlayback.iframeUrl}
+                          title={`${nowPlayingTrack?.title ?? selected.title} embed`}
+                        />
+                      ) : null}
+                      {mixPlayback.livepeerPlaybackId ? (
+                        <LivepeerSongBridge
+                          isPlaying={playlistIsPlaying}
+                          onPlayingChange={mixPlayback.setIsPlaying}
+                          playbackId={mixPlayback.livepeerPlaybackId}
+                        />
+                      ) : null}
+                      {mixPlayback.error ? (
+                        <div className="yt-player-error">
+                          <strong>{mixPlayback.error.title}</strong> — {mixPlayback.error.artist}
+                          <p>{mixPlayback.error.message}</p>
+                          {mixPlayback.error.url ? (
+                            <a href={mixPlayback.error.url} rel="noreferrer" target="_blank">
+                              {mixPlayback.error.videoId ?? mixPlayback.error.url}
+                            </a>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               ) : null}
 
@@ -986,11 +1049,27 @@ export default function MixtapeApp({
                     {selected.tracks.map((track, index) => {
                       const trackKey = `${track.artist}-${track.title}-${index}`;
                       const isExpanded = !!expandedTracks[trackKey];
+                      const isPlayingTrack = index === currentTrackIndex && playlistIsPlaying;
+                      const playbackStatus = getTrackPlaybackStatus(track);
                       const trackMeta = [track.releaseYear, track.duration, track.energy].filter(Boolean);
                       const tags = track.moodTags.concat(track.sceneTags).filter(Boolean);
 
                       return (
-                        <article className={isExpanded ? "track track-expanded" : "track"} key={trackKey}>
+                        <article
+                          className={
+                            isExpanded
+                              ? isPlayingTrack
+                                ? "track track-expanded track-playing"
+                                : "track track-expanded"
+                              : isPlayingTrack
+                                ? "track track-playing"
+                                : "track"
+                          }
+                          key={trackKey}
+                          ref={(element) => {
+                            trackRefs.current[trackKey] = element;
+                          }}
+                        >
                           <button
                             aria-expanded={isExpanded}
                             className="track-toggle"
@@ -1004,6 +1083,9 @@ export default function MixtapeApp({
                                 <p>{track.artist}</p>
                               </div>
                             </div>
+                            <span className={`track-status-pill track-status-${playbackStatus}`}>
+                              {trackPlaybackStatusLabel(playbackStatus)}
+                            </span>
                             <span className="track-toggle-indicator">{isExpanded ? "Hide" : "Expand"}</span>
                           </button>
 
@@ -1027,7 +1109,9 @@ export default function MixtapeApp({
                               ) : null}
                               <div className="link-row">
                                 {"songId" in track && track.songId ? (
-                                  <Link href={`/songs/${track.songId}`}>Open player</Link>
+                                  <Link href={buildSongUrl(track.songId, { fromMix: selected.id, track: index })}>
+                                    Open player
+                                  </Link>
                                 ) : null}
                                 {track.creativeTvUrl ? (
                                   <a href={track.creativeTvUrl} rel="noreferrer" target="_blank">
@@ -1139,7 +1223,7 @@ export default function MixtapeApp({
               <button
                 key={moment.id}
                 onClick={() => {
-                  if (moment.mixId) setSelectedId(moment.mixId);
+                  if (moment.mixId) navigateToMix(moment.mixId);
                 }}
                 type="button"
               >

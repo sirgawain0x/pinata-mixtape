@@ -41,7 +41,6 @@ export async function getCurrentCreator(): Promise<Creator | null> {
   const token = await getSessionToken();
   const session = await lookupSessionStorage(token);
   if (!session) return null;
-
   const fromDb = await getCreator(session.creatorId);
   if (fromDb) return fromDb;
   return null;

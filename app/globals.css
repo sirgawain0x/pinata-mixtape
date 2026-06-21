@@ -2676,3 +2676,235 @@ input[type="radio"] {
   opacity: 0.85;
   transform: none;
 }
+
+/* ---- Mix playback / cassette / editor / nav additions -------------------- */
+.cassette-player-wrap {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  margin: 8px 0 18px;
+}
+
+.cassette-player {
+  width: min(100%, 420px);
+  aspect-ratio: 420 / 262;
+  height: auto;
+}
+
+.cassette-label-text {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  z-index: 2;
+}
+
+.cassette-label-title,
+.cassette-label-artist {
+  display: block;
+  font-family: "Courier New", monospace;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cassette-label-title {
+  color: #1a1410;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cassette-label-artist {
+  color: #3d2f28;
+  font-size: 0.62rem;
+}
+
+.cassette-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.mix-card,
+a.mix-card {
+  display: grid;
+  gap: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.song-card-link {
+  display: grid;
+  gap: 6px;
+}
+
+.song-card-main {
+  color: inherit;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  text-decoration: none;
+  width: 100%;
+}
+
+.song-card-crate-link {
+  color: var(--gold);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.editor-mb-section,
+.editor-links-section,
+.editor-preview-section {
+  border: 1px solid rgba(248, 232, 200, 0.14);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.editor-mb-section {
+  background: rgba(255, 157, 0, 0.06);
+}
+
+.editor-links-section {
+  background: rgba(20, 15, 32, 0.35);
+}
+
+.editor-preview-section {
+  background: rgba(97, 218, 251, 0.05);
+}
+
+.editor-mb-hint {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.track-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.track-preview-compact {
+  margin-top: 10px;
+}
+
+.track-preview-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.track-preview-warning {
+  margin: 0;
+}
+
+.yt-player-error {
+  background: rgba(20, 10, 10, 0.92);
+  border: 1px solid var(--pink);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px 14px;
+}
+
+.mix-now-playing {
+  font-size: 0.92rem;
+  margin: 6px 0 0;
+}
+
+.track-status-pill {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  display: inline-block;
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  margin-left: 8px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+}
+
+.track-status-playable {
+  color: var(--mint);
+}
+
+.track-status-embed {
+  color: var(--blue);
+}
+
+.track-status-link_only {
+  color: var(--gold);
+}
+
+.track-status-missing {
+  color: var(--pink);
+}
+
+.track-playing {
+  border-color: var(--gold);
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+
+.mix-iframe-embed {
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 8px;
+  min-height: 220px;
+  width: 100%;
+}
+
+.broadcast-nav {
+  margin-bottom: 14px;
+}
+
+.song-back-link {
+  margin: 0 0 10px;
+}
+
+.song-back-link a {
+  color: var(--gold);
+  text-decoration: none;
+}
+
+.song-link-only-note {
+  margin-top: 0;
+}
+
+.signin-button {
+  border-color: var(--led-amber);
+  border-bottom-color: var(--led-amber);
+}
+
+.signout-button {
+  border-color: var(--led-red);
+  border-bottom-color: var(--led-red);
+}
+
+.new-tape-button {
+  border-color: var(--led-green);
+  border-bottom-color: var(--led-green);
+}
+
+.signin-button:hover {
+  border-color: var(--led-amber);
+  border-bottom-color: var(--led-amber);
+}
+
+.signout-button:hover {
+  border-color: var(--led-red);
+  border-bottom-color: var(--led-red);
+}
+
+.new-tape-button:hover {
+  border-color: var(--led-green);
+  border-bottom-color: var(--led-green);
+}
