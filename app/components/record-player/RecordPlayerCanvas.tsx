@@ -7,4 +7,13 @@ const RecordPlayerScene = dynamic(() => import("./RecordPlayerScene"), {
   loading: () => <div className="record-player-canvas-wrap record-player-loading">Loading turntable…</div>
 });
 
-export default RecordPlayerScene;
+type Props = {
+  isPlaying: boolean;
+  onTogglePlay: () => void;
+  title: string;
+  artist?: string;
+};
+
+export default function RecordPlayerCanvas({ isPlaying, onTogglePlay, title, artist }: Props) {
+  return <RecordPlayerScene artist={artist} isPlaying={isPlaying} onTogglePlay={onTogglePlay} title={title} />;
+}

@@ -3,11 +3,15 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SongPlayerShell from "../../components/SongPlayerShell";
-import { ensureCreativeTvPlaybackForSong, getSong } from "../../../lib/mixtapes";
+import { buildCrateUrl, findTrackIndexInMix } from "../../../lib/mixtape-nav";
+import { ensureCreativeTvPlaybackForSong, getMix, getSong } from "../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { params: Promise<{ id: string }> };
+type PageProps = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ fromMix?: string; track?: string }>;
+};
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
@@ -19,7 +23,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function SongPage({ params }: PageProps) {
+export default async function SongPage({ params, searchParams }: PageProps) {
   const { id: idRaw } = await params;
   const id = Number(idRaw);
   if (!Number.isInteger(id) || id <= 0) notFound();
@@ -29,15 +33,38 @@ export default async function SongPage({ params }: PageProps) {
 
   song = (await ensureCreativeTvPlaybackForSong(id)) ?? song;
 
+  const query = searchParams ? await searchParams : {};
+  const fromMixId = query.fromMix ? Number(query.fromMix) : null;
+  const trackParam = query.track != null ? Number(query.track) : null;
+
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "";
   const proto = headerStore.get("x-forwarded-proto") ?? "https";
   const embedOrigin = host ? `${proto}://${host}` : "";
 
-  const mixLinks = song.mixIds.map((mixId) => ({
-    id: mixId,
-    href: `/?mix=${mixId}`
-  }));
+  const mixLinks = await Promise.all(
+    song.mixIds.map(async (mixId) => {
+      const mix = await getMix(mixId);
+      const trackIndex = mix ? findTrackIndexInMix(mix, id) : -1;
+      return {
+        id: mixId,
+        title: mix?.title ?? `Mix #${mixId}`,
+        href: buildCrateUrl({ mixId, trackIndex: trackIndex >= 0 ? trackIndex : null })
+      };
+    })
+  );
+
+  let backMix: { id: number; title: string; trackIndex?: number | null } | undefined;
+  if (fromMixId && Number.isInteger(fromMixId)) {
+    const mix = await getMix(fromMixId);
+    if (mix) {
+      backMix = {
+        id: mix.id,
+        title: mix.title,
+        trackIndex: Number.isInteger(trackParam) ? trackParam : findTrackIndexInMix(mix, id)
+      };
+    }
+  }
 
   return (
     <main className="shell song-page">
@@ -56,7 +83,7 @@ export default async function SongPage({ params }: PageProps) {
         </div>
       </section>
 
-      <SongPlayerShell embedOrigin={embedOrigin} song={song} />
+      <SongPlayerShell backMix={backMix} embedOrigin={embedOrigin} song={song} />
 
       {mixLinks.length > 0 ? (
         <section className="workspace">
@@ -64,7 +91,7 @@ export default async function SongPage({ params }: PageProps) {
           <ul className="song-mix-list">
             {mixLinks.map((mix) => (
               <li key={mix.id}>
-                <Link href={mix.href}>Mix #{mix.id}</Link>
+                <Link href={mix.href}>{mix.title}</Link>
               </li>
             ))}
           </ul>

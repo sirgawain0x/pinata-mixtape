@@ -23,10 +23,12 @@ type YtPlayerInstance = {
 export type SongPlaybackControls = {
   sourceKind: PlaybackSourceKind;
   isPlaying: boolean;
+  playerReady: boolean;
   progress: number;
   duration: number;
   error: string | null;
   togglePlay: () => void;
+  openOutbound: () => void;
   seek: (seconds: number) => void;
   outboundUrl?: string;
   livepeerPlaybackId?: string;
@@ -46,6 +48,7 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playerReady, setPlayerReady] = useState(source.kind === "link_only");
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +76,14 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
   }, [progress, onProgressChange]);
 
   useEffect(() => {
+    setPlayerReady(source.kind === "link_only");
+    setIsPlaying(false);
+    setProgress(0);
+    setDuration(0);
+    setError(null);
+  }, [source.kind, source.youtubeVideoId, pinataAudioUrl, source.iframeUrl, source.livepeerPlaybackId]);
+
+  useEffect(() => {
     if (source.kind !== "pinata" || !pinataAudioUrl) return;
     const audio = new Audio(pinataAudioUrl);
     audioRef.current = audio;
@@ -94,6 +105,7 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
+    setPlayerReady(true);
 
     return () => {
       audio.pause();
@@ -103,14 +115,17 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
       audioRef.current = null;
+      setPlayerReady(false);
     };
   }, [pinataAudioUrl, source.kind]);
 
   useEffect(() => {
     if (source.kind !== "youtube" || !source.youtubeVideoId) return;
 
+    let cancelled = false;
+
     const setup = () => {
-      if (!window.YT?.Player) return;
+      if (cancelled || !window.YT?.Player) return;
       ytPlayerRef.current?.destroy();
       ytPlayerRef.current = new window.YT!.Player(ytContainerId, {
         height: "0",
@@ -118,6 +133,17 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
         videoId: source.youtubeVideoId,
         playerVars: { autoplay: 0, controls: 0, modestbranding: 1 },
         events: {
+          onReady: () => {
+            if (!cancelled) setPlayerReady(true);
+          },
+          onError: () => {
+            if (!cancelled) {
+              setError(
+                `YouTube video unavailable${source.youtubeVideoId ? ` (${source.youtubeVideoId})` : ""}. Check the URL or embedding settings.`
+              );
+              setIsPlaying(false);
+            }
+          },
           onStateChange: (event: { data: number }) => {
             const YT = window.YT;
             if (!YT) return;
@@ -127,6 +153,8 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
         }
       }) as unknown as YtPlayerInstance;
     };
+
+    setPlayerReady(false);
 
     if (window.YT?.Player) {
       setup();
@@ -148,14 +176,34 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
     }, 500);
 
     return () => {
+      cancelled = true;
       window.clearInterval(tick);
       ytPlayerRef.current?.destroy();
       ytPlayerRef.current = null;
+      setPlayerReady(false);
     };
   }, [source.kind, source.youtubeVideoId, ytContainerId]);
 
+  useEffect(() => {
+    if (source.kind === "iframe" && source.iframeUrl) {
+      setPlayerReady(true);
+    }
+    if (source.kind === "livepeer" && source.livepeerPlaybackId) {
+      setPlayerReady(true);
+    }
+  }, [source]);
+
+  const openOutbound = useCallback(() => {
+    if (!source.outboundUrl) return;
+    window.open(source.outboundUrl, "_blank", "noopener,noreferrer");
+  }, [source.outboundUrl]);
+
   const togglePlay = useCallback(() => {
     setError(null);
+    if (source.kind === "link_only") {
+      openOutbound();
+      return;
+    }
     if (source.kind === "pinata") {
       const audio = audioRef.current;
       if (!audio) return;
@@ -165,7 +213,10 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
     }
     if (source.kind === "youtube") {
       const player = ytPlayerRef.current;
-      if (!player) return;
+      if (!player) {
+        setError("Player still loading. Try again in a moment.");
+        return;
+      }
       const state = player.getPlayerState();
       if (state === window.YT?.PlayerState.PLAYING) player.pauseVideo();
       else player.playVideo();
@@ -181,9 +232,8 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
     }
     if (source.kind === "livepeer") {
       setIsPlaying((prev) => !prev);
-      return;
     }
-  }, [isPlaying, source.kind]);
+  }, [isPlaying, openOutbound, source.kind]);
 
   const seek = useCallback(
     (seconds: number) => {
@@ -205,10 +255,12 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
   return {
     sourceKind: source.kind,
     isPlaying,
+    playerReady,
     progress,
     duration,
     error,
     togglePlay,
+    openOutbound,
     seek,
     outboundUrl: source.outboundUrl,
     livepeerPlaybackId: source.livepeerPlaybackId,

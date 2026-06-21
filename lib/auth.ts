@@ -7,12 +7,9 @@ import {
   issueSessionStorage,
   lookupSessionStorage,
   revokeSessionStorage,
-  SESSION_TTL_MS,
-  isKvAuthEnabled
+  SESSION_TTL_MS
 } from "./auth-storage";
-import { upsertCreatorByWallet, getCreator, getCreatorByWallet, type Creator } from "./stations";
-
-export { isKvAuthEnabled };
+import { getCreator, upsertCreatorByWallet, type Creator } from "./stations";
 
 const SESSION_COOKIE = "mixtape_session";
 
@@ -44,20 +41,7 @@ export async function getCurrentCreator(): Promise<Creator | null> {
   const token = await getSessionToken();
   const session = await lookupSessionStorage(token);
   if (!session) return null;
-
-  // Always resolve by wallet when the session carries it (Redis/KV). Stale creatorId values
-  // from the pre-Turso ephemeral DB caused stations to be written under one id and listed
-  // under another (or not at all).
-  const wallet = session.creatorFallback?.walletAddress?.trim();
-  if (wallet) {
-    const byWallet = await getCreatorByWallet(wallet);
-    if (byWallet) return byWallet;
-    return await upsertCreatorByWallet(wallet);
-  }
-
-  const fromDb = await getCreator(session.creatorId);
-  if (fromDb) return fromDb;
-  return null;
+  return getCreator(session.creatorId);
 }
 
 export async function requireCreator(): Promise<Creator> {

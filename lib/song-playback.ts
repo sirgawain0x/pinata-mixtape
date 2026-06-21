@@ -65,3 +65,27 @@ export function resolvePlaybackSource(song: SongPlaybackFields): ResolvedPlaybac
 
   return { kind: "link_only" };
 }
+
+export type TrackPlaybackStatus = "playable" | "embed" | "link_only" | "missing";
+
+export function getTrackPlaybackStatus(song: SongPlaybackFields): TrackPlaybackStatus {
+  const source = resolvePlaybackSource(song);
+  if (source.kind === "link_only") {
+    return source.outboundUrl ? "link_only" : "missing";
+  }
+  if (source.kind === "iframe") return "embed";
+  return "playable";
+}
+
+export function trackPlaybackStatusLabel(status: TrackPlaybackStatus): string {
+  switch (status) {
+    case "playable":
+      return "Playable";
+    case "embed":
+      return "Embed";
+    case "link_only":
+      return "Link only";
+    default:
+      return "Missing source";
+  }
+}

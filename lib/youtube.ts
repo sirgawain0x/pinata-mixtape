@@ -3,16 +3,30 @@ export function youtubeVideoId(url: string): string {
 
   try {
     const parsed = new URL(url);
-    if (parsed.hostname.includes("youtu.be")) {
-      return parsed.pathname.replaceAll("/", "");
+    const host = parsed.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      return parsed.pathname.replaceAll("/", "").split("?")[0] ?? "";
     }
-    if (parsed.hostname.includes("youtube.com")) {
+
+    if (host === "youtube.com" || host === "music.youtube.com" || host === "m.youtube.com") {
       const id = parsed.searchParams.get("v");
       if (id) return id;
+
       const segments = parsed.pathname.split("/").filter(Boolean);
+      const shortsIndex = segments.findIndex((segment) => segment === "shorts");
+      if (shortsIndex >= 0 && segments[shortsIndex + 1]) {
+        return segments[shortsIndex + 1];
+      }
+
       const embedIndex = segments.findIndex((segment) => segment === "embed");
       if (embedIndex >= 0 && segments[embedIndex + 1]) {
         return segments[embedIndex + 1];
+      }
+
+      const liveIndex = segments.findIndex((segment) => segment === "live");
+      if (liveIndex >= 0 && segments[liveIndex + 1]) {
+        return segments[liveIndex + 1];
       }
     }
   } catch {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentCreator } from "../../../lib/auth";
 import { canViewMix } from "../../../lib/mixtape-access";
+import { buildCrateUrl, buildSongUrl } from "../../../lib/mixtape-nav";
 import { getMixBySlug } from "../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
@@ -53,10 +54,10 @@ export default async function PublicMixPage({ params }: PageProps) {
             {[mix.vibe, mix.useCase, mix.djPersona].filter(Boolean).join(" · ")}
           </p>
           <p>
-            <Link className="button" href={`/?mix=${mix.id}`}>
+            <Link className="button" href={buildCrateUrl({ mixId: mix.id })}>
               Open in crate →
             </Link>
-            <Link className="button secondary-button" href={`/?mix=${mix.id}&view=broadcast`}>
+            <Link className="button secondary-button" href={buildCrateUrl({ mixId: mix.id, view: "broadcast" })}>
               Broadcast deck
             </Link>
           </p>
@@ -76,7 +77,7 @@ export default async function PublicMixPage({ params }: PageProps) {
               </div>
               {track.songId ? (
                 <p>
-                  <Link href={`/songs/${track.songId}`}>Open player →</Link>
+                  <Link href={buildSongUrl(track.songId, { fromMix: mix.id, track: index })}>Open player →</Link>
                 </p>
               ) : null}
               {track.notes ? <p>{track.notes}</p> : null}

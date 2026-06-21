@@ -85,8 +85,7 @@ The hosted app uses Alchemy Account Kit for wallet connection, then SIWE against
 | `SIWE_DOMAIN` | **Required in production** — canonical host for SIWE (must match browser host) |
 | `NEXT_PUBLIC_SIWE_DOMAIN` | Client SIWE domain when it differs from `window.location.host` |
 | `NEXT_PUBLIC_APP_URL` | Used for SIWE when its host matches the signed message (alternative to `SIWE_DOMAIN`) |
-| `REDIS_URL` or Upstash REST | Nonce + session storage on serverless (see `lib/auth-storage.ts`) |
-| `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` | Creator rows and app data |
+| `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` | App data, SIWE nonces, and sessions |
 
 The left sidebar now behaves like a crate search. Queries can match:
 

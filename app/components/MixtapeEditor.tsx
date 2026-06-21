@@ -1,18 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import type { EmbedSourceKind } from "../../lib/embed-sources";
+import { getTrackPlaybackStatus } from "../../lib/song-playback";
 import type { Mix, Track } from "../mixtape-app";
+import MusicBrainzLookup, { type MbRecording } from "./MusicBrainzLookup";
+import TrackPreview from "./TrackPreview";
 
 const APP_BASE = "/app";
-
-type MbRecording = {
-  id: string;
-  title: string;
-  artistCredit: string;
-  firstReleaseDate: string;
-  url: string;
-};
 
 type DraftTrack = {
   title: string;
@@ -78,49 +73,9 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
   const [slug, setSlug] = useState(mix?.slug ?? "");
   const [tracks, setTracks] = useState<DraftTrack[]>(mix?.tracks.map(trackToDraft) ?? []);
   const [draft, setDraft] = useState<DraftTrack>(emptyDraft());
-  const [mbTitle, setMbTitle] = useState("");
-  const [mbArtist, setMbArtist] = useState("");
-  const [mbResults, setMbResults] = useState<MbRecording[]>([]);
-  const [mbBusy, setMbBusy] = useState(false);
+  const [previewTrackIndex, setPreviewTrackIndex] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const searchMb = useCallback(async (signal?: AbortSignal) => {
-    if (!mbTitle.trim() && !mbArtist.trim()) return;
-    setMbBusy(true);
-    setError("");
-    try {
-      const params = new URLSearchParams();
-      if (mbTitle.trim()) params.set("title", mbTitle.trim());
-      if (mbArtist.trim()) params.set("artist", mbArtist.trim());
-      params.set("limit", "6");
-      const response = await fetch(`${APP_BASE}/api/musicbrainz/recordings?${params}`, { signal });
-      const data = await readJson<{ recordings: MbRecording[] }>(response);
-      if (!response.ok) throw new Error(data.error ?? "MusicBrainz search failed.");
-      setMbResults(data.recordings ?? []);
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      setError((err as Error).message);
-      setMbResults([]);
-    } finally {
-      if (!signal?.aborted) setMbBusy(false);
-    }
-  }, [mbArtist, mbTitle]);
-
-  useEffect(() => {
-    if (!mbTitle.trim() && !mbArtist.trim()) {
-      setMbResults([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void searchMb(controller.signal);
-    }, 500);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [mbArtist, mbTitle, searchMb]);
 
   function applyMb(recording: MbRecording) {
     setDraft((current) => ({
@@ -131,7 +86,6 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
       musicbrainzId: recording.id,
       musicbrainzUrl: recording.url
     }));
-    setMbResults([]);
   }
 
   function addDraftTrack() {
@@ -141,8 +95,6 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
     }
     setTracks((current) => [...current, { ...draft }]);
     setDraft(emptyDraft());
-    setMbTitle("");
-    setMbArtist("");
     setError("");
   }
 
@@ -159,6 +111,7 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
 
   function removeTrack(index: number) {
     setTracks((current) => current.filter((_, i) => i !== index));
+    if (previewTrackIndex === index) setPreviewTrackIndex(null);
   }
 
   async function save(event: FormEvent) {
@@ -167,6 +120,12 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
       setError("Mix title is required.");
       return;
     }
+
+    const linkOnlyCount = tracks.filter((track) => getTrackPlaybackStatus(track) === "link_only").length;
+    if (linkOnlyCount > 0 && !window.confirm(`${linkOnlyCount} track(s) only have search/listen links and won't play in-app. Save anyway?`)) {
+      return;
+    }
+
     setBusy(true);
     setError("");
     try {
@@ -262,6 +221,9 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
                   {String(index + 1).padStart(2, "0")} {track.title} — {track.artist}
                 </span>
                 <span className="editor-track-actions">
+                  <button onClick={() => setPreviewTrackIndex(previewTrackIndex === index ? null : index)} type="button">
+                    {previewTrackIndex === index ? "Hide" : "Preview"}
+                  </button>
                   <button onClick={() => moveTrack(index, -1)} type="button">
                     ↑
                   </button>
@@ -272,84 +234,76 @@ export default function MixtapeEditor({ mix, onClose, onSaved }: Props) {
                     Remove
                   </button>
                 </span>
+                {previewTrackIndex === index ? <TrackPreview compact track={track} /> : null}
               </li>
             ))}
           </ol>
 
           <div className="editor-add-track">
-            <p className="eyebrow">MusicBrainz lookup</p>
-            <div className="editor-grid">
-              <input onChange={(event) => setMbTitle(event.target.value)} placeholder="Track title" type="text" value={mbTitle} />
-              <input onChange={(event) => setMbArtist(event.target.value)} placeholder="Artist" type="text" value={mbArtist} />
-            </div>
-            {mbBusy ? <p className="muted">Searching MusicBrainz…</p> : null}
-            {mbResults.length > 0 ? (
-              <ul className="mb-results">
-                {mbResults.map((recording) => (
-                  <li key={recording.id}>
-                    <button onClick={() => applyMb(recording)} type="button">
-                      {recording.title} — {recording.artistCredit}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            <MusicBrainzLookup onSelect={applyMb} />
 
-            <div className="editor-grid">
+            <section className="editor-links-section">
+              <p className="eyebrow">Playback links</p>
+              <div className="editor-grid">
+                <input
+                  onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                  placeholder="Title"
+                  type="text"
+                  value={draft.title}
+                />
+                <input
+                  onChange={(event) => setDraft((current) => ({ ...current, artist: event.target.value }))}
+                  placeholder="Artist"
+                  type="text"
+                  value={draft.artist}
+                />
+              </div>
               <input
-                onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Title"
-                type="text"
-                value={draft.title}
+                onChange={(event) => setDraft((current) => ({ ...current, youtubeUrl: event.target.value }))}
+                placeholder="YouTube URL (playback)"
+                type="url"
+                value={draft.youtubeUrl}
               />
               <input
-                onChange={(event) => setDraft((current) => ({ ...current, artist: event.target.value }))}
-                placeholder="Artist"
-                type="text"
-                value={draft.artist}
+                onChange={(event) => setDraft((current) => ({ ...current, creativeTvUrl: event.target.value }))}
+                placeholder="Creative TV discover URL"
+                type="url"
+                value={draft.creativeTvUrl}
               />
-            </div>
-            <input
-              onChange={(event) => setDraft((current) => ({ ...current, youtubeUrl: event.target.value }))}
-              placeholder="YouTube URL (playback)"
-              type="url"
-              value={draft.youtubeUrl}
-            />
-            <input
-              onChange={(event) => setDraft((current) => ({ ...current, creativeTvUrl: event.target.value }))}
-              placeholder="Creative TV discover URL"
-              type="url"
-              value={draft.creativeTvUrl}
-            />
-            <input
-              onChange={(event) => setDraft((current) => ({ ...current, listenUrl: event.target.value }))}
-              placeholder="Listen / search link"
-              type="url"
-              value={draft.listenUrl}
-            />
-            <input
-              onChange={(event) => setDraft((current) => ({ ...current, embedIframeUrl: event.target.value }))}
-              placeholder="Spotify / SoundCloud / Bandcamp embed URL (optional)"
-              type="url"
-              value={draft.embedIframeUrl}
-            />
-            <select
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  embedSourceKind: event.target.value as EmbedSourceKind
-                }))
-              }
-              value={draft.embedSourceKind}
-            >
-              <option value="youtube">YouTube playback</option>
-              <option value="creativetv">Creative TV</option>
-              <option value="iframe_allowed">Allowed iframe embed</option>
-              <option value="link_only">Link only (no embed)</option>
-            </select>
-            <button onClick={addDraftTrack} type="button">
-              Add track to tape
-            </button>
+              <input
+                onChange={(event) => setDraft((current) => ({ ...current, listenUrl: event.target.value }))}
+                placeholder="Listen / search link"
+                type="url"
+                value={draft.listenUrl}
+              />
+              <input
+                onChange={(event) => setDraft((current) => ({ ...current, embedIframeUrl: event.target.value }))}
+                placeholder="Spotify / SoundCloud / Bandcamp embed URL (optional)"
+                type="url"
+                value={draft.embedIframeUrl}
+              />
+              <select
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    embedSourceKind: event.target.value as EmbedSourceKind
+                  }))
+                }
+                value={draft.embedSourceKind}
+              >
+                <option value="youtube">YouTube playback</option>
+                <option value="creativetv">Creative TV</option>
+                <option value="iframe_allowed">Allowed iframe embed</option>
+                <option value="link_only">Link only (no embed)</option>
+              </select>
+            </section>
+
+            <section className="editor-preview-section">
+              <TrackPreview label="Preview track" track={draft} />
+              <button onClick={addDraftTrack} type="button">
+                Add track to tape
+              </button>
+            </section>
           </div>
         </div>
 
