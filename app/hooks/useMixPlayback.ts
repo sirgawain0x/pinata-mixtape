@@ -177,7 +177,10 @@ export function useMixPlayback({
         playerVars: { rel: 0, modestbranding: 1 },
         events: {
           onReady: () => {
-            if (!cancelled) setPlayerReady(true);
+            if (!cancelled) {
+              setPlayerReady(true);
+              setError(null);
+            }
           },
           onError: () => {
             if (cancelled) return;
@@ -283,6 +286,7 @@ export function useMixPlayback({
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
     setPlayerReady(true);
+    setError(null);
 
     return () => {
       audio.pause();

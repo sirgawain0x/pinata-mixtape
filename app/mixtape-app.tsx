@@ -592,7 +592,7 @@ export default function MixtapeApp({
                         <strong>{mixPlayback.error.title}</strong> — {mixPlayback.error.artist}
                         <p>{mixPlayback.error.message}</p>
                         {mixPlayback.error.url ? (
-                          <a href={mixPlayback.error.url} rel="noreferrer" target="_blank">
+                          <a href={mixPlayback.error.url} rel="noopener noreferrer" target="_blank">
                             {mixPlayback.error.videoId ?? mixPlayback.error.url}
                           </a>
                         ) : null}
@@ -1016,7 +1016,7 @@ export default function MixtapeApp({
                           <strong>{mixPlayback.error.title}</strong> — {mixPlayback.error.artist}
                           <p>{mixPlayback.error.message}</p>
                           {mixPlayback.error.url ? (
-                            <a href={mixPlayback.error.url} rel="noreferrer" target="_blank">
+                            <a href={mixPlayback.error.url} rel="noopener noreferrer" target="_blank">
                               {mixPlayback.error.videoId ?? mixPlayback.error.url}
                             </a>
                           ) : null}
@@ -1085,22 +1085,22 @@ export default function MixtapeApp({
                               </Link>
                             ) : null}
                             {track.creativeTvUrl ? (
-                              <a href={track.creativeTvUrl} rel="noreferrer" target="_blank">
+                              <a href={track.creativeTvUrl} rel="noopener noreferrer" target="_blank">
                                 Creative TV
                               </a>
                             ) : null}
                             {track.youtubeUrl ? (
-                              <a href={track.youtubeUrl} rel="noreferrer" target="_blank">
+                              <a href={track.youtubeUrl} rel="noopener noreferrer" target="_blank">
                                 Listen
                               </a>
                             ) : null}
                             {!track.youtubeUrl && track.listenUrl ? (
-                              <a href={track.listenUrl} rel="noreferrer" target="_blank">
+                              <a href={track.listenUrl} rel="noopener noreferrer" target="_blank">
                                 Search
                               </a>
                             ) : null}
                             {track.musicbrainzUrl ? (
-                              <a href={track.musicbrainzUrl} rel="noreferrer" target="_blank">
+                              <a href={track.musicbrainzUrl} rel="noopener noreferrer" target="_blank">
                                 MusicBrainz
                               </a>
                             ) : null}
