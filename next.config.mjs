@@ -14,7 +14,7 @@ const defaultEmbedFrameHosts = [
 ];
 
 /** Alchemy Account Kit + Turnkey (required for sign-in modal). */
-const defaultAuthFrameHosts = ["https://auth.turnkey.com", "https://accounts.google.com"];
+const defaultAuthFrameHosts = ["https://auth.turnkey.com", "https://accounts.google.com", "https://auth.privy.io", "https://*.auth.privy.io"];
 
 const defaultAuthConnectHosts = [
   "https://api.g.alchemy.com",
@@ -24,6 +24,11 @@ const defaultAuthConnectHosts = [
   "https://accounts.google.com",
   "https://oauth2.googleapis.com",
   "https://www.googleapis.com",
+  "https://auth.privy.io",
+  "https://*.auth.privy.io",
+  "https://api.privy.io",
+  "https://*.privy.io",
+  "https://verify.walletconnect.com",
   "https://*.walletconnect.org",
   "wss://*.walletconnect.org",
   "https://relay.walletconnect.org"

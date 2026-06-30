@@ -1,20 +1,34 @@
 "use client";
 
-import type { AlchemyClientState } from "@account-kit/core";
 import { AlchemyAccountProvider } from "@account-kit/react";
+import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { type PropsWithChildren } from "react";
-import { config, queryClient } from "../config";
+import { ReactNode } from "react";
+import { alchemyMigrationConfig, queryClient } from "../config";
 
-export function Providers({
-  initialState,
-  children
-}: PropsWithChildren<{ initialState?: AlchemyClientState }>) {
+const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "missing-privy-app-id";
+
+export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <AlchemyAccountProvider config={config} queryClient={queryClient} initialState={initialState}>
-        {children}
-      </AlchemyAccountProvider>
+      <PrivyProvider
+        appId={PRIVY_APP_ID}
+        config={{
+          appearance: {
+            theme: "dark",
+            accentColor: "#676FFF",
+          },
+          embeddedWallets: {
+            ethereum: {
+              createOnLogin: "users-without-wallets",
+            },
+          },
+        }}
+      >
+        <AlchemyAccountProvider config={alchemyMigrationConfig} queryClient={queryClient}>
+          {children}
+        </AlchemyAccountProvider>
+      </PrivyProvider>
     </QueryClientProvider>
   );
 }

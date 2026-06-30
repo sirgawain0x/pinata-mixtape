@@ -1,4 +1,4 @@
-import { type AlchemyAccountsUIConfig, cookieStorage, createConfig } from "@account-kit/react";
+import { type AlchemyAccountsUIConfig, createConfig } from "@account-kit/react";
 import { alchemy, base, baseSepolia } from "@account-kit/infra";
 import { QueryClient } from "@tanstack/react-query";
 
@@ -39,12 +39,16 @@ const uiConfig: AlchemyAccountsUIConfig = {
   }
 };
 
-export const config = createConfig(
+/**
+ * Alchemy Account Kit config used ONLY by the migration SDK. Privy is now the
+ * primary signer; existing users are walked through re-authenticating with
+ * Alchemy so their wallet keys can be imported into Privy.
+ */
+export const alchemyMigrationConfig = createConfig(
   {
     transport: alchemy({ apiKey: API_KEY }),
     chain,
     ssr: true,
-    storage: cookieStorage,
     enablePopupOauth: true,
     ...(POLICY_ID ? { policyId: POLICY_ID } : {})
   },
