@@ -1,5 +1,3 @@
-"use client";
-
 import { usePrivy, useLogin, useLogout, useWallets, toViemAccount } from "@privy-io/react-auth";
 import { useMutation } from "@tanstack/react-query";
 import { createSmartWalletClient, alchemyWalletTransport } from "@alchemy/wallet-apis";
@@ -7,10 +5,13 @@ import { base, baseSepolia } from "viem/chains";
 import type { LocalAccount } from "viem/accounts";
 import { useEffect, useMemo, useState } from "react";
 
-const API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "missing-alchemy-api-key";
-const POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_POLICY_ID;
-const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 8453);
-const chain = CHAIN_ID === 84532 ? baseSepolia : base;
+const key =
+  (typeof process !== "undefined" ? process.env["NEXT_PUBLIC_ALCHEMY_API_KEY"] : undefined) ||
+  "PLACEHOLDER_VALUE_NOT_SET";
+const policyId = process.env.NEXT_PUBLIC_ALCHEMY_POLICY_ID;
+const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 8453);
+const chain = chainId === 84532 ? baseSepolia : base;
+const rpcUrl = `https://${chainId === 84532 ? "base-sepolia" : "base-mainnet"}.g.alchemy.com/v2/${key}`;
 
 type SignInButtonProps = {
   onChange?: (creator: { address: string } | null) => void;
@@ -27,26 +28,23 @@ export function SignInButton({ onChange, initialCreator }: SignInButtonProps) {
   );
 
   const signerWallet = useMemo(() => {
-    return (
-      wallets.find(
-        (w) =>
-          w.type === "ethereum" &&
-          (w.walletClientType === "privy" || w.walletClientType === "privy-v2")
-      ) ?? null
+    const active = wallets.find((w) => w.type === "ethereum" && w.address);
+    const embedded = wallets.find(
+      (w) => w.type === "ethereum" && (w.walletClientType === "privy" || w.walletClientType === "privy-v2")
     );
+    return embedded ?? active ?? null;
   }, [wallets]);
 
-  // Create / refresh the Alchemy smart wallet whenever the embedded wallet changes.
   const { mutate: resolveSmartWallet, isPending } = useMutation({
     mutationFn: async () => {
       if (!signerWallet) return null;
       const account = await toViemAccount({ wallet: signerWallet });
-      const transport = alchemyWalletTransport({ apiKey: API_KEY });
+      const transport = alchemyWalletTransport({ url: rpcUrl });
       const client = createSmartWalletClient({
         signer: account as unknown as LocalAccount,
         transport,
         chain,
-        ...(POLICY_ID ? { paymaster: { policyId: POLICY_ID } } : {}),
+        ...(policyId ? { paymaster: { policyId: policyId } } : {}),
       });
       const accountList = await client.requestAccount();
       return accountList.address ?? null;
@@ -69,6 +67,11 @@ export function SignInButton({ onChange, initialCreator }: SignInButtonProps) {
     onChange?.(smartAccountAddress ? { address: smartAccountAddress } : null);
   }, [smartAccountAddress, onChange]);
 
+  const handleLogout = async () => {
+    await logout();
+    setSmartAccountAddress(null);
+  };
+
   if (!ready) {
     return (
       <button className="btn-led" disabled>
@@ -81,7 +84,7 @@ export function SignInButton({ onChange, initialCreator }: SignInButtonProps) {
     return (
       <button
         className="btn-led"
-        onClick={() => logout()}
+        onClick={() => void handleLogout()}
         disabled={isPending}
       >
         {isPending ? "Connecting…" : `Signed in ${smartAccountAddress.slice(0, 6)}…${smartAccountAddress.slice(-4)}`}
