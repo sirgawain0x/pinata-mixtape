@@ -1,34 +1,37 @@
 "use client";
 
-import { AlchemyAccountProvider } from "@account-kit/react";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode } from "react";
-import { alchemyMigrationConfig, queryClient } from "../config";
+import { queryClient } from "../config";
 
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "missing-privy-app-id";
+type Props = {
+  children: ReactNode;
+};
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({ children }: Props) {
+  const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "missing-privy-app-id";
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <PrivyProvider
-        appId={PRIVY_APP_ID}
-        config={{
-          appearance: {
-            theme: "dark",
-            accentColor: "#676FFF",
+    <PrivyProvider
+      appId={privyAppId}
+      config={{
+        appearance: {
+          accentColor: "#676FFF",
+          theme: "#000000",
+          showWalletLoginFirst: false,
+        },
+        embeddedWallets: {
+          ethereum: {
+            createOnLogin: "users-without-wallets",
           },
-          embeddedWallets: {
-            ethereum: {
-              createOnLogin: "users-without-wallets",
-            },
-          },
-        }}
-      >
-        <AlchemyAccountProvider config={alchemyMigrationConfig} queryClient={queryClient}>
-          {children}
-        </AlchemyAccountProvider>
-      </PrivyProvider>
-    </QueryClientProvider>
+        },
+        loginMethods: ["email", "wallet", "farcaster"],
+      }}
+    >
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    </PrivyProvider>
   );
 }
