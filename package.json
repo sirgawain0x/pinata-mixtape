@@ -19,7 +19,6 @@
     "@account-kit/infra": "^4.88.1",
     "@account-kit/react": "^4.88.1",
     "@alchemy/wallet-apis": "^5.0.6",
-    "@farcaster/mini-app-solana": "^2.0.0",
     "@farcaster/miniapp-sdk": "^0.3.0",
     "@libsql/client": "^0.15.15",
     "@livepeer/react": "^4.3.6",
