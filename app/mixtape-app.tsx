@@ -719,7 +719,23 @@ export default function MixtapeApp({
             <span>MusicBrainz-ready</span>
           </div>
           <div className="hero-actions">
-            <SignInButton onChange={setCreator} />
+            <SignInButton
+              onChange={(signedIn) => {
+                if (!signedIn) {
+                  setCreator(null);
+                  return;
+                }
+                setCreator((prev) =>
+                  prev?.walletAddress === signedIn.address
+                    ? prev
+                    : {
+                        id: prev?.id ?? 0,
+                        walletAddress: signedIn.address,
+                        displayName: prev?.displayName ?? ""
+                      }
+                );
+              }}
+            />
             {creator ? (
               <>
                 <button

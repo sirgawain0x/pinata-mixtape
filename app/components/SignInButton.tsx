@@ -1,187 +1,99 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createSiweMessage } from "viem/siwe";
-import {
-  useAuthModal,
-  useLogout,
-  useSignMessage,
-  useSignerStatus,
-  useSmartAccountClient
-} from "@account-kit/react";
+import { usePrivy, useLogin, useLogout, useWallets, toViemAccount } from "@privy-io/react-auth";
+import { useMutation } from "@tanstack/react-query";
+import { createSmartWalletClient, alchemyWalletTransport } from "@alchemy/wallet-apis";
+import { base, baseSepolia } from "viem/chains";
+import type { LocalAccount } from "viem/accounts";
+import { useEffect, useMemo, useState } from "react";
 
-type Creator = {
-  id: number;
-  walletAddress: string;
-  displayName: string;
+const API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "missing-alchemy-api-key";
+const POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_POLICY_ID;
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 8453);
+const chain = CHAIN_ID === 84532 ? baseSepolia : base;
+
+type SignInButtonProps = {
+  onChange?: (creator: { address: string } | null) => void;
+  initialCreator?: { address: string } | null;
 };
 
-const APP_BASE = "/app";
-
-function siweDomain(): string {
-  const configured = process.env.NEXT_PUBLIC_SIWE_DOMAIN?.trim();
-  if (configured) {
-    return configured.includes("://") ? new URL(configured).host : configured;
-  }
-  return window.location.host;
-}
-
-async function fetchMe(): Promise<Creator | null> {
-  const response = await fetch(`${APP_BASE}/api/auth/me`, { cache: "no-store" });
-  if (!response.ok) return null;
-  const data = (await response.json()) as { creator: Creator | null };
-  return data.creator;
-}
-
-export default function SignInButton({ onChange }: { onChange?: (creator: Creator | null) => void }) {
-  const [creator, setCreator] = useState<Creator | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [siweBlocked, setSiweBlocked] = useState(false);
-
-  const signerStatus = useSignerStatus();
-  const { client } = useSmartAccountClient({});
-  const { signMessageAsync } = useSignMessage({ client });
-  const { openAuthModal } = useAuthModal();
+export function SignInButton({ onChange, initialCreator }: SignInButtonProps) {
+  const { ready, authenticated } = usePrivy();
+  const { login } = useLogin();
   const { logout } = useLogout();
+  const { wallets } = useWallets();
+  const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(
+    initialCreator?.address ?? null
+  );
 
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  const signMessageAsyncRef = useRef(signMessageAsync);
-  signMessageAsyncRef.current = signMessageAsync;
-
-  const address = client?.account?.address as `0x${string}` | undefined;
-  const chainId = client?.chain?.id;
-
-  useEffect(() => {
-    void fetchMe().then((value) => {
-      setCreator(value);
-      onChangeRef.current?.(value);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!signerStatus.isConnected) setSiweBlocked(false);
-  }, [signerStatus.isConnected]);
-
-  const inFlightRef = useRef(false);
-  useEffect(() => {
-    if (creator) return;
-    if (siweBlocked) return;
-    if (!signerStatus.isConnected) return;
-    if (!address || !chainId) return;
-    if (inFlightRef.current) return;
-
-    inFlightRef.current = true;
-    setBusy(true);
-    setError("");
-
-    (async () => {
-      try {
-        const nonceResponse = await fetch(`${APP_BASE}/api/auth/nonce`, { cache: "no-store" });
-        if (!nonceResponse.ok) {
-          throw new Error(
-            nonceResponse.status >= 500
-              ? "Server error while starting sign-in. Use Retry when the app is ready, or try again later."
-              : `Could not start sign-in (${nonceResponse.status}).`
-          );
-        }
-        const nonceBody = (await nonceResponse.json()) as { nonce?: string };
-        if (!nonceBody.nonce) {
-          throw new Error("Invalid response from sign-in server.");
-        }
-        const { nonce } = nonceBody;
-
-        const message = createSiweMessage({
-          domain: siweDomain(),
-          address,
-          statement: "Sign in to Mixtape Radio.",
-          uri: window.location.origin,
-          version: "1",
-          chainId,
-          nonce,
-          issuedAt: new Date()
-        });
-
-        const signature = await signMessageAsyncRef.current({ message });
-
-        const verifyResponse = await fetch(`${APP_BASE}/api/auth/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, signature })
-        });
-
-        const data = (await verifyResponse.json()) as { creator?: Creator; error?: string };
-        if (!verifyResponse.ok || !data.creator) {
-          throw new Error(data.error ?? "Sign-in failed.");
-        }
-
-        setCreator(data.creator);
-        onChangeRef.current?.(data.creator);
-      } catch (err) {
-        setError((err as Error).message);
-        setSiweBlocked(true);
-      } finally {
-        setBusy(false);
-        inFlightRef.current = false;
-      }
-    })();
-  }, [creator, signerStatus.isConnected, siweBlocked, address, chainId]);
-
-  function handlePrimaryClick() {
-    setError("");
-    setSiweBlocked(false);
-    if (!signerStatus.isConnected) openAuthModal();
-  }
-
-  async function signOut() {
-    setBusy(true);
-    try {
-      await fetch(`${APP_BASE}/api/auth/signout`, { method: "POST" });
-      logout();
-      setCreator(null);
-      onChangeRef.current?.(null);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (creator) {
-    const short = `${creator.walletAddress.slice(0, 6)}…${creator.walletAddress.slice(-4)}`;
+  const signerWallet = useMemo(() => {
     return (
-      <div className="signin">
-        <span className="signin-pill">{creator.displayName || short}</span>
-        <button className="btn-led btn-led-red" onClick={signOut} disabled={busy} type="button">
-          Sign out
-        </button>
-      </div>
+      wallets.find(
+        (w) =>
+          w.type === "ethereum" &&
+          (w.walletClientType === "privy" || w.walletClientType === "privy-v2")
+      ) ?? null
+    );
+  }, [wallets]);
+
+  // Create / refresh the Alchemy smart wallet whenever the embedded wallet changes.
+  const { mutate: resolveSmartWallet, isPending } = useMutation({
+    mutationFn: async () => {
+      if (!signerWallet) return null;
+      const account = await toViemAccount({ wallet: signerWallet });
+      const transport = alchemyWalletTransport({ apiKey: API_KEY });
+      const client = createSmartWalletClient({
+        signer: account as unknown as LocalAccount,
+        transport,
+        chain,
+        ...(POLICY_ID ? { paymaster: { policyId: POLICY_ID } } : {}),
+      });
+      const accountList = await client.requestAccount();
+      return accountList.address ?? null;
+    },
+    onSuccess: (address) => {
+      setSmartAccountAddress(address);
+    },
+    onError: (err) => {
+      console.error("Smart wallet resolution failed:", err);
+    },
+  });
+
+  useEffect(() => {
+    if (signerWallet && authenticated) {
+      resolveSmartWallet();
+    }
+  }, [signerWallet, authenticated, resolveSmartWallet]);
+
+  useEffect(() => {
+    onChange?.(smartAccountAddress ? { address: smartAccountAddress } : null);
+  }, [smartAccountAddress, onChange]);
+
+  if (!ready) {
+    return (
+      <button className="btn-led" disabled>
+        Loading…
+      </button>
     );
   }
 
-  const buttonLabel = busy
-    ? "Signing in…"
-    : signerStatus.isConnected && siweBlocked
-    ? "Retry sign-in"
-    : signerStatus.isConnected
-    ? "Finalizing…"
-    : signerStatus.isAuthenticating
-    ? "Authenticating…"
-    : signerStatus.isInitializing
-    ? "Loading…"
-    : "Sign in";
+  if (authenticated && smartAccountAddress) {
+    return (
+      <button
+        className="btn-led"
+        onClick={() => logout()}
+        disabled={isPending}
+      >
+        {isPending ? "Connecting…" : `Signed in ${smartAccountAddress.slice(0, 6)}…${smartAccountAddress.slice(-4)}`}
+      </button>
+    );
+  }
 
   return (
-    <div className="signin">
-      <button
-        className="btn-led btn-led-amber"
-        onClick={handlePrimaryClick}
-        disabled={busy || signerStatus.isInitializing}
-        type="button"
-      >
-        {buttonLabel}
-      </button>
-      {error ? <span className="signin-error">{error}</span> : null}
-    </div>
+    <button className="btn-led" onClick={() => login()} disabled={isPending}>
+      {isPending ? "Connecting…" : "Sign In"}
+    </button>
   );
 }
+
+export default SignInButton;

@@ -83,7 +83,7 @@ export default function VoiceClient({
   }, []);
 
   const syncDefaultFromServer = useCallback(async () => {
-    const response = await fetch(`${APP_BASE}/api/auth/me`, { cache: "no-store" });
+    const response = await fetch(`${APP_BASE}/api/creators/me`, { cache: "no-store" });
     const data = (await response.json()) as { creator: Creator | null };
     if (data.creator?.ttsVoiceId) setDefaultVoiceId(data.creator.ttsVoiceId);
   }, []);
