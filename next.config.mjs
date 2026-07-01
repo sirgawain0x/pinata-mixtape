@@ -97,6 +97,11 @@ const nextConfig = {
           {
             key: "Content-Security-Policy",
             value: [
+              "default-src 'self'",
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${allConnectHosts.join(" ")}`,
+              `style-src 'self' 'unsafe-inline'`,
+              `img-src 'self' blob: data: ${allFrameHosts.join(" ")} ${allConnectHosts.join(" ")}`,
+              `font-src 'self'`,
               `frame-src 'self' ${allFrameHosts.join(" ")}`,
               "media-src 'self' blob: https://livepeercdn.com https://*.livepeercdn.com",
               `connect-src 'self' ${allConnectHosts.join(" ")}`
