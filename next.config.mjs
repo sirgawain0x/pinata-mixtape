@@ -14,7 +14,7 @@ const defaultEmbedFrameHosts = [
 ];
 
 /** Alchemy Account Kit + Turnkey (required for sign-in modal). */
-const defaultAuthFrameHosts = ["https://auth.turnkey.com", "https://accounts.google.com", "https://auth.privy.io", "https://*.auth.privy.io"];
+const defaultAuthFrameHosts = ["https://auth.turnkey.com", "https://accounts.google.com", "https://auth.privy.io", "https://*.auth.privy.io", "https://hcaptcha.com", "https://*.hcaptcha.com"];
 
 const defaultAuthConnectHosts = [
   "https://api.g.alchemy.com",
@@ -31,7 +31,9 @@ const defaultAuthConnectHosts = [
   "https://verify.walletconnect.com",
   "https://*.walletconnect.org",
   "wss://*.walletconnect.org",
-  "https://relay.walletconnect.org"
+  "https://relay.walletconnect.org",
+  "https://hcaptcha.com",
+  "https://*.hcaptcha.com"
 ];
 
 function mergeCspHosts(defaults, envKey) {
