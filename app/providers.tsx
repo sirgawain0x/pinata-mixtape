@@ -26,7 +26,7 @@ export function Providers({ children }: Props) {
             createOnLogin: "users-without-wallets",
           },
         },
-        loginMethods: ["email", "wallet", "farcaster"],
+        loginMethods: ["email", "wallet", "farcaster", "google"],
       }}
     >
       <QueryClientProvider client={queryClient}>

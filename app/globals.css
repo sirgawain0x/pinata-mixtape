@@ -31,14 +31,14 @@ body {
   font-family: "Trebuchet MS", "Gill Sans", sans-serif;
 }
 
-button,
-input,
-a {
+button:not([class*="privy"]):not([data-testid*="privy"]),
+input:not([class*="privy"]):not([data-testid*="privy"]),
+a:not([class*="privy"]):not([data-testid*="privy"]) {
   font: inherit;
 }
 
-button,
-a {
+button:not([class*="privy"]):not([data-testid*="privy"]),
+a:not([class*="privy"]):not([data-testid*="privy"]) {
   min-height: 42px;
   border: 1px solid var(--text);
   background: linear-gradient(180deg, rgba(248, 232, 200, 0.14), rgba(248, 232, 200, 0.02));
@@ -52,19 +52,19 @@ a {
   transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 
-button:hover,
-a:hover {
+button:not([class*="privy"]):not([data-testid*="privy"]):hover,
+a:not([class*="privy"]):not([data-testid*="privy"]):hover {
   transform: translateY(-1px);
   border-color: var(--mint);
 }
 
-button:disabled {
+button:not([class*="privy"]):not([data-testid*="privy"]):disabled {
   opacity: 0.6;
   cursor: wait;
   transform: none;
 }
 
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([class*="privy"]):not([data-testid*="privy"]) {
   width: 100%;
   border: 1px solid var(--line);
   background: rgba(20, 15, 32, 0.88);
@@ -72,8 +72,8 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
   padding: 11px 12px;
 }
 
-input[type="checkbox"],
-input[type="radio"] {
+input[type="checkbox"]:not([class*="privy"]):not([data-testid*="privy"]),
+input[type="radio"]:not([class*="privy"]):not([data-testid*="privy"]) {
   width: 1rem;
   height: 1rem;
   margin: 0;
@@ -82,7 +82,7 @@ input[type="radio"] {
   flex-shrink: 0;
 }
 
-input[type="file"] {
+input[type="file"]:not([class*="privy"]):not([data-testid*="privy"]) {
   width: auto;
   max-width: 100%;
   padding: 8px 0;
