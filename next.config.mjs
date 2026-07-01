@@ -35,6 +35,7 @@ const defaultAuthConnectHosts = [
   "https://www.googleapis.com",
   "https://auth.privy.io",
   "https://*.auth.privy.io",
+  "https://privy.air.creativeplatform.xyz",
   "https://api.privy.io",
   "https://*.privy.io",
   "https://verify.walletconnect.com",
