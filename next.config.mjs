@@ -14,7 +14,16 @@ const defaultEmbedFrameHosts = [
 ];
 
 /** Alchemy Account Kit + Turnkey (required for sign-in modal). */
-const defaultAuthFrameHosts = ["https://auth.turnkey.com", "https://accounts.google.com", "https://auth.privy.io", "https://*.auth.privy.io"];
+const defaultAuthFrameHosts = [
+  "https://auth.turnkey.com",
+  "https://accounts.google.com",
+  "https://auth.privy.io",
+  "https://*.auth.privy.io",
+  "https://privy.air.creativeplatform.xyz",
+  "https://hcaptcha.com",
+  "https://*.hcaptcha.com",
+  "https://newassets.hcaptcha.com"
+];
 
 const defaultAuthConnectHosts = [
   "https://api.g.alchemy.com",
@@ -31,7 +40,30 @@ const defaultAuthConnectHosts = [
   "https://verify.walletconnect.com",
   "https://*.walletconnect.org",
   "wss://*.walletconnect.org",
-  "https://relay.walletconnect.org"
+  "https://relay.walletconnect.org",
+  "https://explorer-api.walletconnect.com",
+  "https://hcaptcha.com",
+  "https://*.hcaptcha.com",
+  "https://newassets.hcaptcha.com"
+];
+
+/** Hosts allowed to execute scripts via script-src. Keep minimal to avoid XSS bypasses. */
+const defaultScriptHosts = [
+  "https://auth.turnkey.com",
+  "https://accounts.google.com",
+  "https://auth.privy.io",
+  "https://*.auth.privy.io",
+  "https://privy.air.creativeplatform.xyz",
+  "https://hcaptcha.com",
+  "https://*.hcaptcha.com",
+  "https://newassets.hcaptcha.com"
+];
+
+/** Hosts allowed to load styles via style-src (hCaptcha injects inline stylesheet rules). */
+const defaultStyleHosts = [
+  "https://hcaptcha.com",
+  "https://*.hcaptcha.com",
+  "https://newassets.hcaptcha.com"
 ];
 
 function mergeCspHosts(defaults, envKey) {
@@ -71,8 +103,24 @@ function cspConnectHosts() {
   );
 }
 
+function cspScriptHosts() {
+  return mergeCspHosts(defaultScriptHosts, "MIXTAPE_CSP_SCRIPT_HOSTS");
+}
+
+function cspStyleHosts() {
+  return mergeCspHosts(defaultStyleHosts, "MIXTAPE_CSP_STYLE_HOSTS");
+}
+
+function cspImgHosts() {
+  const imgHosts = new Set([...cspFrameHosts(), ...cspConnectHosts()]);
+  return [...imgHosts];
+}
+
 const allFrameHosts = cspFrameHosts();
 const allConnectHosts = cspConnectHosts();
+const allScriptHosts = cspScriptHosts();
+const allStyleHosts = cspStyleHosts();
+const allImgHosts = cspImgHosts();
 
 const nextConfig = {
   basePath: "/app",
@@ -84,6 +132,11 @@ const nextConfig = {
           {
             key: "Content-Security-Policy",
             value: [
+              "default-src 'self'",
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${allScriptHosts.join(" ")}`,
+              `style-src 'self' 'unsafe-inline' ${allStyleHosts.join(" ")}`,
+              `img-src 'self' blob: data: ${allImgHosts.join(" ")}`,
+              `font-src 'self'`,
               `frame-src 'self' ${allFrameHosts.join(" ")}`,
               "media-src 'self' blob: https://livepeercdn.com https://*.livepeercdn.com",
               `connect-src 'self' ${allConnectHosts.join(" ")}`
