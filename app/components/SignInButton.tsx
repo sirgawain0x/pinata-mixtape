@@ -19,13 +19,14 @@ type SignInButtonProps = {
 };
 
 export function SignInButton({ onChange, initialCreator }: SignInButtonProps) {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, user } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
   const { wallets } = useWallets();
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(
     initialCreator?.address ?? null
   );
+  const [isOpen, setIsOpen] = useState(false);
 
   const signerWallet = useMemo(() => {
     const active = wallets.find((w) => w.type === "ethereum" && w.address);
@@ -70,7 +71,14 @@ export function SignInButton({ onChange, initialCreator }: SignInButtonProps) {
   const handleLogout = async () => {
     await logout();
     setSmartAccountAddress(null);
+    setIsOpen(false);
   };
+
+  const displayAddress =
+    smartAccountAddress ??
+    signerWallet?.address ??
+    user?.wallet?.address ??
+    null;
 
   if (!ready) {
     return (
@@ -80,15 +88,38 @@ export function SignInButton({ onChange, initialCreator }: SignInButtonProps) {
     );
   }
 
-  if (authenticated && smartAccountAddress) {
+  if (authenticated) {
     return (
-      <button
-        className="btn-led"
-        onClick={() => void handleLogout()}
-        disabled={isPending}
-      >
-        {isPending ? "Connecting…" : `Signed in ${smartAccountAddress.slice(0, 6)}…${smartAccountAddress.slice(-4)}`}
-      </button>
+      <div className="relative inline-block">
+        <button
+          className="btn-led"
+          onClick={() => setIsOpen((v) => !v)}
+          disabled={isPending}
+        >
+          {isPending && !displayAddress
+            ? "Connecting…"
+            : displayAddress
+              ? `My Account ${displayAddress.slice(0, 6)}…${displayAddress.slice(-4)}`
+              : "My Account"}
+        </button>
+        {isOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              aria-hidden="true"
+              onClick={() => setIsOpen(false)}
+            />
+            <div className="absolute right-0 top-full mt-2 w-48 rounded border border-[var(--line)] bg-[var(--panel)] p-2 shadow-lg z-50">
+              <button
+                className="btn-led w-full"
+                onClick={() => void handleLogout()}
+              >
+                Log out
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     );
   }
 
