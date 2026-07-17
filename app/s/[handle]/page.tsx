@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import StationPlayer from "../../components/StationPlayer";
+import { StationSupportButton } from "../../components/StationSupportButton";
 import { getCurrentCreator } from "../../../lib/auth";
-import { getStationByHandle, listStationSegments, materializeSeedMixIfEmpty } from "../../../lib/stations";
+import {
+  getCreator,
+  getStationByHandle,
+  listStationSegments,
+  materializeSeedMixIfEmpty
+} from "../../../lib/stations";
 import { getSong } from "../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +77,7 @@ export default async function StationListenPage({ params }: PageProps) {
   }
 
   await materializeSeedMixIfEmpty(station.id);
+  const stationCreator = await getCreator(station.creatorId);
   const rawSegments = await listStationSegments(station.id);
   const segments = await Promise.all(
     rawSegments.map(async (segment) => {
@@ -111,11 +118,19 @@ export default async function StationListenPage({ params }: PageProps) {
               <Link href={`/dashboard/stations/${station.id}`}>editor</Link>.
             </p>
           )}
-          {isOwner && (
-            <p>
-              <Link className="button" href={`/dashboard/stations/${station.id}`}>Edit station →</Link>
-            </p>
-          )}
+          <div className="hero-actions">
+            {stationCreator?.meTokenAddress ? (
+              <StationSupportButton
+                meTokenAddress={stationCreator.meTokenAddress}
+                stationName={station.name}
+              />
+            ) : null}
+            {isOwner ? (
+              <Link className="button" href={`/dashboard/stations/${station.id}`}>
+                Edit station →
+              </Link>
+            ) : null}
+          </div>
         </div>
       </section>
 

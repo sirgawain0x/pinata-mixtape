@@ -11,6 +11,7 @@ export type Creator = {
   bio: string;
   ttsProvider: string;
   ttsVoiceId: string;
+  meTokenAddress: string;
   createdAt: string;
 };
 
@@ -84,6 +85,7 @@ type CreatorRow = {
   bio: string | null;
   tts_provider: string | null;
   tts_voice_id: string | null;
+  metoken_address: string | null;
   created_at: string;
 };
 
@@ -156,6 +158,7 @@ function mapCreator(row: CreatorRow): Creator {
     bio: row.bio ?? "",
     ttsProvider: row.tts_provider ?? "",
     ttsVoiceId: row.tts_voice_id ?? "",
+    meTokenAddress: row.metoken_address ?? "",
     createdAt: row.created_at
   };
 }
@@ -258,18 +261,32 @@ export async function getCreatorByWallet(walletAddress: string): Promise<Creator
 
 export async function updateCreator(
   id: number,
-  patch: { displayName?: string; avatarUrl?: string; bio?: string; ttsProvider?: string; ttsVoiceId?: string }
+  patch: {
+    displayName?: string;
+    avatarUrl?: string;
+    bio?: string;
+    ttsProvider?: string;
+    ttsVoiceId?: string;
+    meTokenAddress?: string | null;
+  }
 ): Promise<Creator | null> {
   await dbReady();
   const current = await getCreator(id);
   if (!current) return null;
+  const nextMeToken =
+    patch.meTokenAddress === undefined
+      ? current.meTokenAddress
+      : patch.meTokenAddress === null || patch.meTokenAddress === ""
+        ? ""
+        : patch.meTokenAddress;
   await sqlRun(
     `UPDATE creators
      SET display_name = @displayName,
          avatar_url = @avatarUrl,
          bio = @bio,
          tts_provider = @ttsProvider,
-         tts_voice_id = @ttsVoiceId
+         tts_voice_id = @ttsVoiceId,
+         metoken_address = @meTokenAddress
      WHERE id = @id`,
     {
       id,
@@ -277,7 +294,8 @@ export async function updateCreator(
       avatarUrl: patch.avatarUrl ?? current.avatarUrl,
       bio: patch.bio ?? current.bio,
       ttsProvider: patch.ttsProvider ?? current.ttsProvider,
-      ttsVoiceId: patch.ttsVoiceId ?? current.ttsVoiceId
+      ttsVoiceId: patch.ttsVoiceId ?? current.ttsVoiceId,
+      meTokenAddress: nextMeToken || null
     }
   );
   return await getCreator(id);

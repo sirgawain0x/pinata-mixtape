@@ -81,6 +81,7 @@ export const STATION_SCHEMA_DDL = `
     bio TEXT,
     tts_provider TEXT,
     tts_voice_id TEXT,
+    metoken_address TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -240,6 +241,11 @@ export function bootstrapSqlite(database: SqliteDb): void {
   } catch {
     // exists
   }
+  try {
+    database.exec(`ALTER TABLE creators ADD COLUMN metoken_address TEXT`);
+  } catch {
+    // exists
+  }
 
   try {
     database.exec(`ALTER TABLE songs ADD COLUMN embed_source_kind TEXT NOT NULL DEFAULT 'youtube'`);
@@ -305,6 +311,7 @@ export async function bootstrapLibsql(client: Client): Promise<void> {
   await tryAlter(`ALTER TABLE mixes ADD COLUMN slug TEXT`);
   await tryAlter(`ALTER TABLE mixes ADD COLUMN published_at TEXT`);
   await tryAlter(`ALTER TABLE mixes ADD COLUMN creator_id INTEGER`);
+  await tryAlter(`ALTER TABLE creators ADD COLUMN metoken_address TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN embed_source_kind TEXT NOT NULL DEFAULT 'youtube'`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN embed_iframe_url TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN audio_cid TEXT`);

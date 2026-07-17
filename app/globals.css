@@ -1473,6 +1473,293 @@ h2 {
   margin: 6px 0 0;
 }
 
+.account-menu {
+  position: relative;
+  display: inline-block;
+  z-index: 50;
+}
+
+.account-menu-trigger {
+  max-width: min(100vw - 32px, 280px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: transparent;
+}
+
+.account-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 50;
+  width: min(320px, calc(100vw - 24px));
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(28, 22, 42, 0.98), rgba(14, 12, 22, 0.96));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 10px;
+}
+
+.account-menu-header {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.account-menu-label {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #9a93a8);
+}
+
+.account-menu-address {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--gold);
+  font-family: "Courier New", monospace;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-menu-address em {
+  font-style: normal;
+  color: var(--pink);
+  font-size: 0.72rem;
+}
+
+.account-menu-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.account-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.account-menu-item:hover,
+.account-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(212, 175, 55, 0.35);
+  outline: none;
+}
+
+.account-menu-item-danger {
+  color: var(--pink);
+}
+
+.account-menu-back {
+  border: 0;
+  background: transparent;
+  color: var(--gold);
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.account-metoken {
+  display: grid;
+  gap: 10px;
+}
+
+.account-metoken-help {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted, #9a93a8);
+  line-height: 1.4;
+}
+
+.account-metoken-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.account-metoken-save {
+  width: 100%;
+}
+
+.account-metoken-status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--gold);
+}
+
+.fund-usdc {
+  display: grid;
+  gap: 4px;
+}
+
+.fund-usdc-error,
+.tip-modal-status.error {
+  margin: 0;
+  color: var(--pink);
+  font-size: 0.85rem;
+}
+
+.tip-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: end center;
+}
+
+.tip-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 4, 12, 0.72);
+}
+
+.tip-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(480px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  margin: 0;
+  padding: 20px 18px 28px;
+  border: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(180deg, rgba(30, 24, 44, 0.98), rgba(12, 10, 18, 0.98));
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 14px;
+}
+
+.tip-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tip-modal-header h2 {
+  margin: 4px 0 0;
+  font-size: 1.35rem;
+}
+
+.tip-modal-close {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tip-modal-address {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted, #9a93a8);
+}
+
+.tip-modal-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.tip-modal-field input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  font: inherit;
+}
+
+.tip-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tip-modal-status {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.tip-modal-status.muted {
+  color: var(--muted, #9a93a8);
+}
+
+.tip-steps {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: var(--muted, #9a93a8);
+  font-size: 0.85rem;
+}
+
+.tip-steps .active {
+  color: var(--gold);
+}
+
+@media (min-width: 720px) {
+  .tip-modal-root {
+    place-items: center;
+  }
+
+  .tip-modal-panel {
+    border-radius: 18px;
+    padding: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .account-menu-panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    top: auto;
+    width: auto;
+    border-radius: 16px;
+  }
+
+  .hero-actions {
+    flex-wrap: wrap;
+  }
+}
+
 .station-grid {
   list-style: none;
   margin: 12px 0 0;

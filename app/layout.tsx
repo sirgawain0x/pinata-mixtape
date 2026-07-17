@@ -6,8 +6,8 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Pinata Mixtape",
-  description: "A music mixtape app powered by Pinata",
+  title: "Creative Mixtape",
+  description: "A music mixtape app for curators and stations",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

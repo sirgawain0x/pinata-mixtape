@@ -10,6 +10,7 @@ import CassettePlayer from "./components/CassettePlayer";
 import LivepeerSongBridge from "./components/LivepeerSongBridge";
 import MixtapeEditor from "./components/MixtapeEditor";
 import SignInButton from "./components/SignInButton";
+import { TipMeTokenModal } from "./components/TipMeTokenModal";
 
 export type HostedMixResult = {
   mixId: number;
@@ -100,6 +101,7 @@ export type Creator = {
   id: number;
   walletAddress: string;
   displayName: string;
+  meTokenAddress?: string;
 };
 
 type MixtapeAppProps = {
@@ -123,6 +125,12 @@ export default function MixtapeApp({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [creator, setCreator] = useState<Creator | null>(initialCreator);
+  const [isSignedIn, setIsSignedIn] = useState(Boolean(initialCreator));
+  const [tipTarget, setTipTarget] = useState<{
+    meTokenAddress: string;
+    label?: string;
+  } | null>(null);
+  const [selectedCreatorMeToken, setSelectedCreatorMeToken] = useState("");
   const [mixes, setMixes] = useState<Mix[]>(initialMixes);
   const [moments, setMoments] = useState<MixMoment[]>(initialMoments);
   const [songs, setSongs] = useState<Song[]>(initialSongs);
@@ -218,11 +226,40 @@ export default function MixtapeApp({
 
   useEffect(() => {
     const editor = searchParams.get("editor");
-    if (editor === "new" && creator) {
+    if (editor === "new" && isSignedIn) {
       setEditorMix(null);
       setEditorOpen(true);
     }
-  }, [searchParams, creator]);
+  }, [searchParams, isSignedIn]);
+
+  useEffect(() => {
+    const creatorId = selected?.creatorId;
+    if (!creatorId) {
+      setSelectedCreatorMeToken("");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(`/app/api/creators/${creatorId}`, { cache: "no-store" });
+        if (!response.ok) {
+          if (!cancelled) setSelectedCreatorMeToken("");
+          return;
+        }
+        const data = (await response.json()) as {
+          creator?: { meTokenAddress?: string };
+        };
+        if (!cancelled) {
+          setSelectedCreatorMeToken(data.creator?.meTokenAddress || "");
+        }
+      } catch {
+        if (!cancelled) setSelectedCreatorMeToken("");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.creatorId]);
 
   useEffect(() => {
     const mixParam = searchParams.get("mix");
@@ -706,9 +743,9 @@ export default function MixtapeApp({
       <section className="hero">
         <div className="hero-copy">
           <p className="hero-mark">
-            <span>Mixtape</span>
+            <span>Creative Mixtape</span>
           </p>
-          <h1>Mixtape</h1>
+          <h1>Creative Mixtape</h1>
           <p className="lede">
             Build retro mixtapes, track your taste, and shape an event arc with a DJ persona,
             timeline moments, and share-friendly outbound links.
@@ -720,23 +757,34 @@ export default function MixtapeApp({
           </div>
           <div className="hero-actions">
             <SignInButton
+              onNewTape={() => {
+                setEditorMix(null);
+                setEditorOpen(true);
+              }}
+              onTipOwnMeToken={(meTokenAddress) => {
+                setTipTarget({ meTokenAddress, label: "Your meToken" });
+              }}
               onChange={(signedIn) => {
                 if (!signedIn) {
                   setCreator(null);
+                  setIsSignedIn(false);
                   return;
                 }
+                setIsSignedIn(Boolean(signedIn.sessionReady && signedIn.address));
+                if (!signedIn.address) return;
                 setCreator((prev) =>
                   prev?.walletAddress === signedIn.address
                     ? prev
                     : {
                         id: prev?.id ?? 0,
                         walletAddress: signedIn.address,
-                        displayName: prev?.displayName ?? ""
+                        displayName: prev?.displayName ?? "",
+                        meTokenAddress: prev?.meTokenAddress
                       }
                 );
               }}
             />
-            {creator ? (
+            {isSignedIn ? (
               <>
                 <button
                   className="button btn-led btn-led-green"
@@ -896,6 +944,20 @@ export default function MixtapeApp({
                   <button onClick={() => void copyShareLink()} type="button">
                     Share
                   </button>
+                  {selectedCreatorMeToken ? (
+                    <button
+                      type="button"
+                      className="button btn-led btn-led-green"
+                      onClick={() =>
+                        setTipTarget({
+                          meTokenAddress: selectedCreatorMeToken,
+                          label: selected.title
+                        })
+                      }
+                    >
+                      Support / Buy meToken
+                    </button>
+                  ) : null}
                   {selected.slug ? (
                     <Link className="button secondary-button" href={`/m/${selected.slug}`}>
                       Public page
@@ -1232,6 +1294,13 @@ export default function MixtapeApp({
           </div>
         </aside>
       </section>
+
+      <TipMeTokenModal
+        open={Boolean(tipTarget)}
+        meTokenAddress={tipTarget?.meTokenAddress || ""}
+        curatorLabel={tipTarget?.label}
+        onClose={() => setTipTarget(null)}
+      />
     </main>
   );
 }

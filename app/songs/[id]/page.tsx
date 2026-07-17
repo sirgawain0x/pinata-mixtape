@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const song = await getSong(Number(id));
   if (!song) return { title: "Song not found" };
   return {
-    title: `${song.title} · ${song.artist} · Pinata Mixtape`,
+    title: `${song.title} · ${song.artist} · Creative Mixtape`,
     description: `Listen to ${song.title} by ${song.artist} on the mixtape turntable.`
   };
 }
