@@ -1,5 +1,5 @@
 {
-  "name": "pinata-mixtape",
+  "name": "creative-mixtape",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "start:web": "node server.js",
     "start:daemon": "pm2 start ecosystem.config.cjs",
     "pm2:reload": "pm2 reload ecosystem.config.cjs --update-env",
-    "pm2:stop": "pm2 delete pinata-mixtape",
-    "pm2:logs": "pm2 logs pinata-mixtape --lines 100",
+    "pm2:stop": "pm2 delete creative-mixtape",
+    "pm2:logs": "pm2 logs creative-mixtape --lines 100",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,11 +19,13 @@
     "@account-kit/infra": "^4.88.1",
     "@account-kit/react": "^4.88.1",
     "@alchemy/wallet-apis": "^5.0.6",
+    "@coinbase/cdp-sdk": "^1.53.0",
     "@farcaster/miniapp-sdk": "^0.3.0",
     "@libsql/client": "^0.15.15",
     "@livepeer/react": "^4.3.6",
     "@privy-io/alchemy-migration": "^0.0.5",
     "@privy-io/react-auth": "^3.32.2",
+    "@privy-io/server-auth": "^1.32.5",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@tanstack/react-query": "^5.100.4",

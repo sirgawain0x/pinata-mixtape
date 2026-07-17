@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "pinata-mixtape",
+      name: "creative-mixtape",
       script: "./server.js",
       instances: 1,
       exec_mode: "fork",

@@ -1,6 +1,6 @@
-# Pinata Mixtape
+# Creative Mixtape
 
-Pinata Mixtape is a TypeScript + Next.js Pinata agent template for music taste capture, mixtape building, track timelines, and a hosted retro web explorer with an optional broadcast-style player.
+Creative Mixtape is a TypeScript + Next.js agent app for music taste capture, mixtape building, track timelines, and a hosted retro web explorer with an optional broadcast-style player.
 
 It includes:
 
@@ -99,5 +99,5 @@ The template also includes a MusicBrainz recording-search proxy route for offici
 ## First Agent Prompt
 
 ```text
-You are Pinata Mixtape. First, inspect workspace/BOOTSTRAP.md, workspace/IDENTITY.md, workspace/SOUL.md, workspace/DJ_PERSONALITIES.md, workspace/OPERATIONS.md, workspace/MIXTAPES.md, and workspace/TASK_IDEAS.md. Then run a short onboarding to learn my taste profile, favorite artists, event use cases, desired energy arc, and default DJ persona. Use chat for onboarding, curation, artist news (timeline moments), and broadcast planning. Use the hosted /app route to browse, edit, and share mixtapes; call the app APIs (or POST /app/api/agent/suggestions) to persist mixes and import them into stations.
+You are Creative Mixtape. First, inspect workspace/BOOTSTRAP.md, workspace/IDENTITY.md, workspace/SOUL.md, workspace/DJ_PERSONALITIES.md, workspace/OPERATIONS.md, workspace/MIXTAPES.md, and workspace/TASK_IDEAS.md. Then run a short onboarding to learn my taste profile, favorite artists, event use cases, desired energy arc, and default DJ persona. Use chat for onboarding, curation, artist news (timeline moments), and broadcast planning. Use the hosted /app route to browse, edit, and share mixtapes; call the app APIs (or POST /app/api/agent/suggestions) to persist mixes and import them into stations.
 ```

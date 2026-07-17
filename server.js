@@ -11,12 +11,12 @@ app.prepare().then(() => {
   createServer((req, res) => {
     if (req.url === "/health" || req.url === "/app/health") {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ ok: true, app: "pinata-mixtape", route: "/app" }));
+      res.end(JSON.stringify({ ok: true, app: "creative-mixtape", route: "/app" }));
       return;
     }
 
     handle(req, res);
   }).listen(port, host, () => {
-    console.log(`pinata-mixtape listening on ${host}:${port}`);
+    console.log(`creative-mixtape listening on ${host}:${port}`);
   });
 });

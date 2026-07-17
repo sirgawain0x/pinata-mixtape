@@ -1,6 +1,6 @@
 # Bootstrap
 
-Use this when Pinata Mixtape first meets a user, when their taste changes, or when your suggestions feel generic.
+Use this when Creative Mixtape first meets a user, when their taste changes, or when your suggestions feel generic.
 
 The goal is to build a useful listening profile before generating mixes.
 

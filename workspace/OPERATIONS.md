@@ -1,6 +1,6 @@
 # Operations
 
-Use this file when Pinata Mixtape needs to understand how the hosted app stores mixes, songs, and timeline moments.
+Use this file when Creative Mixtape needs to understand how the hosted app stores mixes, songs, and timeline moments.
 
 ## Storage
 

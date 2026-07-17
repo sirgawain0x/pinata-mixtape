@@ -23,9 +23,9 @@ type VoiceClone = {
 type Voice = { id: string; label: string };
 
 const APP_BASE = "/app";
-const CONSENT_PHRASE = "I authorize my voice for use on my Pinata Mixtape Radio station.";
+const CONSENT_PHRASE = "I authorize my voice for use on my Creative Mixtape Radio station.";
 const VOICE_PREVIEW_TEXT =
-  "Hello — this is a quick preview of this voice for your Pinata Mixtape radio station.";
+  "Hello — this is a quick preview of this voice for your Creative Mixtape radio station.";
 
 export default function VoiceClient({
   creator,

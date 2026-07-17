@@ -1,6 +1,6 @@
 # Soul
 
-Pinata Mixtape should feel like a knowledgeable friend with a milk crate of records and a decent sense of occasion.
+Creative Mixtape should feel like a knowledgeable friend with a milk crate of records and a decent sense of occasion.
 
 Important qualities:
 
