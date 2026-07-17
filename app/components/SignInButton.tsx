@@ -10,7 +10,9 @@ import { resolveSmartAccountAddress } from "../../lib/smart-wallet";
 const APP_BASE = "/app";
 
 type SignInButtonProps = {
-  onChange?: (creator: { address: string; authenticated: boolean } | null) => void;
+  onChange?: (
+    creator: { address: string; authenticated: boolean; sessionReady: boolean } | null
+  ) => void;
   initialCreator?: { address: string } | null;
   onNewTape?: () => void;
   onTipOwnMeToken?: (meTokenAddress: string) => void;
@@ -70,34 +72,54 @@ export function SignInButton({
   });
 
   const syncSession = useCallback(
-    async (walletAddress: string) => {
+    async (walletAddress: string, signerAddress: string) => {
       if (sessionAddressRef.current === walletAddress.toLowerCase()) return;
       const accessToken = await getAccessToken();
       if (!accessToken) return;
-      const response = await fetch(`${APP_BASE}/api/auth/session`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ walletAddress })
-      });
+
+      const postSession = async (address: string) =>
+        fetch(`${APP_BASE}/api/auth/session`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ walletAddress: address, signerAddress })
+        });
+
+      let response = await postSession(walletAddress);
+      if (!response.ok && walletAddress.toLowerCase() !== signerAddress.toLowerCase()) {
+        // Undeployed smart accounts can't prove owner() yet — fall back to linked signer.
+        response = await postSession(signerAddress);
+      }
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as { error?: string } | null;
         console.error("Session sync failed:", data?.error || response.status);
+        setSessionReady(false);
+        onChange?.({
+          address: walletAddress,
+          authenticated: true,
+          sessionReady: false
+        });
         return;
       }
-      sessionAddressRef.current = walletAddress.toLowerCase();
-      setSessionReady(true);
       const data = (await response.json()) as {
-        creator?: { meTokenAddress?: string };
+        creator?: { meTokenAddress?: string; walletAddress?: string };
       };
+      const sessionAddress = data.creator?.walletAddress || walletAddress;
+      sessionAddressRef.current = sessionAddress.toLowerCase();
+      setSessionReady(true);
       if (data.creator?.meTokenAddress) {
         setMeTokenSaved(data.creator.meTokenAddress);
         setMeTokenInput(data.creator.meTokenAddress);
       }
+      onChange?.({
+        address: sessionAddress,
+        authenticated: true,
+        sessionReady: true
+      });
     },
-    [getAccessToken]
+    [getAccessToken, onChange]
   );
 
   useEffect(() => {
@@ -113,17 +135,21 @@ export function SignInButton({
       sessionAddressRef.current = null;
       return;
     }
-    if (displayAddress) {
-      onChange?.({ address: displayAddress, authenticated: true });
-    } else {
-      onChange?.({ address: "", authenticated: true });
-    }
-  }, [authenticated, displayAddress, onChange]);
+    onChange?.({
+      address: displayAddress || "",
+      authenticated: true,
+      sessionReady
+    });
+  }, [authenticated, displayAddress, onChange, sessionReady]);
 
   useEffect(() => {
-    if (!authenticated || !displayAddress || !isAddress(displayAddress)) return;
-    void syncSession(displayAddress);
-  }, [authenticated, displayAddress, syncSession]);
+    if (!authenticated || !signerWallet?.address || !isAddress(signerWallet.address)) return;
+    const walletAddress =
+      smartAccountAddress && isAddress(smartAccountAddress)
+        ? smartAccountAddress
+        : signerWallet.address;
+    void syncSession(walletAddress, signerWallet.address);
+  }, [authenticated, smartAccountAddress, signerWallet, syncSession]);
 
   useEffect(() => {
     if (!isOpen || !sessionReady) return;
@@ -260,7 +286,10 @@ export function SignInButton({
                     </button>
                   </div>
                   <div className="account-menu-actions">
-                    {onNewTape ? (
+                    {!sessionReady ? (
+                      <p className="account-metoken-help">Finishing sign-in…</p>
+                    ) : null}
+                    {sessionReady && onNewTape ? (
                       <button
                         type="button"
                         className="account-menu-item"
@@ -273,23 +302,27 @@ export function SignInButton({
                         New tape
                       </button>
                     ) : null}
-                    <Link
-                      className="account-menu-item"
-                      href="/dashboard"
-                      role="menuitem"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Host a station
-                    </Link>
-                    <button
-                      type="button"
-                      className="account-menu-item"
-                      role="menuitem"
-                      onClick={() => setPanel("metoken")}
-                    >
-                      meToken settings
-                    </button>
-                    {meTokenSaved && onTipOwnMeToken ? (
+                    {sessionReady ? (
+                      <Link
+                        className="account-menu-item"
+                        href="/dashboard"
+                        role="menuitem"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Host a station
+                      </Link>
+                    ) : null}
+                    {sessionReady ? (
+                      <button
+                        type="button"
+                        className="account-menu-item"
+                        role="menuitem"
+                        onClick={() => setPanel("metoken")}
+                      >
+                        meToken settings
+                      </button>
+                    ) : null}
+                    {sessionReady && meTokenSaved && onTipOwnMeToken ? (
                       <button
                         type="button"
                         className="account-menu-item"

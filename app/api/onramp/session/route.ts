@@ -1,6 +1,7 @@
 import { generateJwt } from "@coinbase/cdp-sdk/auth";
-import { isAddress, getAddress } from "viem";
-import { jsonError } from "../../../../lib/auth";
+import { getAddress, isAddress } from "viem";
+import { jsonError, requireCreator } from "../../../../lib/auth";
+import { chainId, isBaseSepolia } from "../../../../lib/chain";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -8,7 +9,19 @@ export const runtime = "nodejs";
 const REQUEST_HOST = "api.cdp.coinbase.com";
 const REQUEST_PATH = "/platform/v2/onramp/sessions";
 
+function destinationNetworkForChain(): string {
+  if (isBaseSepolia || chainId === 84532) return "base-sepolia";
+  return "base";
+}
+
 export async function POST(request: Request) {
+  let creator;
+  try {
+    creator = await requireCreator();
+  } catch {
+    return jsonError("Authentication required.", 401);
+  }
+
   const apiKeyId = process.env.CDP_API_KEY_ID;
   const apiKeySecret = process.env.CDP_API_KEY_SECRET;
   if (!apiKeyId || !apiKeySecret) {
@@ -20,6 +33,9 @@ export async function POST(request: Request) {
     typeof body?.destinationAddress === "string" ? body.destinationAddress.trim() : "";
   if (!isAddress(destinationAddress)) {
     return jsonError("destinationAddress must be a valid address.", 400);
+  }
+  if (getAddress(destinationAddress).toLowerCase() !== creator.walletAddress.toLowerCase()) {
+    return jsonError("destinationAddress must match the signed-in creator wallet.", 403);
   }
 
   const paymentAmount =
@@ -42,7 +58,7 @@ export async function POST(request: Request) {
 
     const payload: Record<string, string> = {
       purchaseCurrency: "USDC",
-      destinationNetwork: "base",
+      destinationNetwork: destinationNetworkForChain(),
       destinationAddress: getAddress(destinationAddress)
     };
     if (paymentAmount) {
@@ -76,7 +92,7 @@ export async function POST(request: Request) {
     const onrampUrl = data?.session?.onrampUrl;
     if (!onrampUrl) return jsonError("CDP did not return an onramp URL.", 502);
 
-    return Response.json({ onrampUrl });
+    return Response.json({ onrampUrl, network: destinationNetworkForChain() });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create onramp session.";
     return jsonError(message, 500);

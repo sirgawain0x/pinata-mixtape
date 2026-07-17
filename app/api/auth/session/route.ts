@@ -1,5 +1,4 @@
-import { PrivyClient } from "@privy-io/server-auth";
-import { isAddress, getAddress } from "viem";
+import { getAddress, isAddress } from "viem";
 import {
   clearSessionCookie,
   getSessionToken,
@@ -8,39 +7,62 @@ import {
   setSessionCookie
 } from "../../../../lib/auth";
 import { issueSessionStorage } from "../../../../lib/auth-storage";
+import {
+  assertWalletOwnedBySigner,
+  extractBearerToken,
+  getLinkedEthereumAddresses,
+  getPrivyClient,
+  verifyPrivyAccessToken
+} from "../../../../lib/privy-server";
 import { upsertCreatorByWallet } from "../../../../lib/stations";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function getPrivyClient(): PrivyClient | null {
-  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || process.env.PRIVY_APP_ID;
-  const appSecret = process.env.PRIVY_APP_SECRET;
-  if (!appId || !appSecret) return null;
-  return new PrivyClient(appId, appSecret);
-}
-
 export async function POST(request: Request) {
-  const privy = getPrivyClient();
-  if (!privy) {
+  if (!getPrivyClient()) {
     return jsonError("Privy server auth is not configured (PRIVY_APP_SECRET).", 500);
   }
 
-  const authHeader = request.headers.get("authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const token = extractBearerToken(request);
   if (!token) return jsonError("Missing Privy access token.", 401);
 
+  let user;
   try {
-    await privy.verifyAuthToken(token);
-  } catch {
-    return jsonError("Invalid Privy access token.", 401);
+    ({ user } = await verifyPrivyAccessToken(token));
+  } catch (error) {
+    const status = (error as Error & { status?: number }).status ?? 401;
+    return jsonError(
+      status === 500
+        ? (error as Error).message
+        : "Invalid Privy access token.",
+      status === 500 ? 500 : 401
+    );
   }
 
   const body = await request.json().catch(() => null);
   const walletAddress =
     typeof body?.walletAddress === "string" ? body.walletAddress.trim() : "";
+  const signerAddress =
+    typeof body?.signerAddress === "string" ? body.signerAddress.trim() : "";
+
   if (!isAddress(walletAddress)) {
     return jsonError("A valid walletAddress is required.", 400);
+  }
+  if (!isAddress(signerAddress)) {
+    return jsonError("A valid signerAddress is required.", 400);
+  }
+
+  const linked = getLinkedEthereumAddresses(user);
+  if (!linked.has(getAddress(signerAddress).toLowerCase())) {
+    return jsonError("signerAddress is not linked to this Privy user.", 403);
+  }
+
+  try {
+    await assertWalletOwnedBySigner(getAddress(walletAddress), getAddress(signerAddress));
+  } catch (error) {
+    const status = (error as Error & { status?: number }).status ?? 403;
+    return jsonError((error as Error).message || "Wallet ownership check failed.", status);
   }
 
   const creator = await upsertCreatorByWallet(getAddress(walletAddress));

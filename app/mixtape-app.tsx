@@ -770,7 +770,7 @@ export default function MixtapeApp({
                   setIsSignedIn(false);
                   return;
                 }
-                setIsSignedIn(true);
+                setIsSignedIn(Boolean(signedIn.sessionReady && signedIn.address));
                 if (!signedIn.address) return;
                 setCreator((prev) =>
                   prev?.walletAddress === signedIn.address

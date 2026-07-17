@@ -47,8 +47,19 @@ export async function sendSmartWalletCalls(
       ? { capabilities: { paymaster: { policyId: alchemyPolicyId } } }
       : {})
   });
-  if (typeof client.waitForCallsStatus === "function") {
-    await client.waitForCallsStatus({ id: result.id });
+
+  if (typeof client.waitForCallsStatus !== "function") {
+    throw new Error("Smart wallet client cannot confirm transaction status.");
   }
+
+  const status = await client.waitForCallsStatus({ id: result.id });
+  const outcome =
+    typeof status === "object" && status && "status" in status
+      ? String((status as { status?: string }).status)
+      : "";
+  if (outcome === "failure" || outcome === "reverted") {
+    throw new Error("Smart wallet transaction failed.");
+  }
+
   return { id: result.id };
 }
