@@ -40,7 +40,14 @@ export function SignInButton({
   const [copied, setCopied] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const sessionAddressRef = useRef<string | null>(null);
+
+  const closeDrawer = useCallback(() => {
+    setIsOpen(false);
+    setPanel("menu");
+  }, []);
 
   const signerWallet = useMemo(() => {
     const active = wallets.find((w) => w.type === "ethereum" && w.address);
@@ -170,13 +177,22 @@ export function SignInButton({
     if (!isOpen) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsOpen(false);
-        setPanel("menu");
+        closeDrawer();
+        triggerRef.current?.focus();
       }
     };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen]);
+    const focusTimer = window.setTimeout(() => {
+      panelRef.current?.querySelector<HTMLElement>("button, a, input")?.focus();
+    }, 0);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+      window.clearTimeout(focusTimer);
+    };
+  }, [isOpen, closeDrawer]);
 
   const handleLogout = async () => {
     await fetch(`${APP_BASE}/api/auth/session`, { method: "DELETE" }).catch(() => null);
@@ -248,6 +264,7 @@ export function SignInButton({
     return (
       <div className="account-menu" ref={menuRef}>
         <button
+          ref={triggerRef}
           className="btn-led account-menu-trigger"
           onClick={() => {
             setIsOpen((v) => !v);
@@ -256,21 +273,42 @@ export function SignInButton({
           disabled={isPending && !displayAddress}
           type="button"
           aria-expanded={isOpen}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
+          aria-controls="account-drawer"
         >
           {isPending && !displayAddress ? "Connecting…" : `My Account ${short}`}
         </button>
         {isOpen ? (
-          <>
+          <div className="account-drawer-root">
             <div
               className="account-menu-backdrop"
               aria-hidden="true"
-              onClick={() => {
-                setIsOpen(false);
-                setPanel("menu");
-              }}
+              onClick={closeDrawer}
             />
-            <div className="account-menu-panel" role="menu">
+            <div
+              id="account-drawer"
+              className="account-menu-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="account-drawer-title"
+              ref={panelRef}
+            >
+              <div className="account-drawer-top">
+                <h2 id="account-drawer-title" className="account-drawer-title">
+                  Account
+                </h2>
+                <button
+                  type="button"
+                  className="account-drawer-close"
+                  onClick={() => {
+                    closeDrawer();
+                    triggerRef.current?.focus();
+                  }}
+                  aria-label="Close account menu"
+                >
+                  ×
+                </button>
+              </div>
               {panel === "menu" ? (
                 <>
                   <div className="account-menu-header">
@@ -293,9 +331,8 @@ export function SignInButton({
                       <button
                         type="button"
                         className="account-menu-item"
-                        role="menuitem"
                         onClick={() => {
-                          setIsOpen(false);
+                          closeDrawer();
                           onNewTape();
                         }}
                       >
@@ -306,8 +343,7 @@ export function SignInButton({
                       <Link
                         className="account-menu-item"
                         href="/dashboard"
-                        role="menuitem"
-                        onClick={() => setIsOpen(false)}
+                        onClick={closeDrawer}
                       >
                         Host a station
                       </Link>
@@ -316,7 +352,6 @@ export function SignInButton({
                       <button
                         type="button"
                         className="account-menu-item"
-                        role="menuitem"
                         onClick={() => setPanel("metoken")}
                       >
                         meToken settings
@@ -326,9 +361,8 @@ export function SignInButton({
                       <button
                         type="button"
                         className="account-menu-item"
-                        role="menuitem"
                         onClick={() => {
-                          setIsOpen(false);
+                          closeDrawer();
                           onTipOwnMeToken(meTokenSaved);
                         }}
                       >
@@ -338,7 +372,6 @@ export function SignInButton({
                     <button
                       type="button"
                       className="account-menu-item account-menu-item-danger"
-                      role="menuitem"
                       onClick={() => void handleLogout()}
                     >
                       Log out
@@ -380,7 +413,7 @@ export function SignInButton({
                 </div>
               )}
             </div>
-          </>
+          </div>
         ) : null}
       </div>
     );
