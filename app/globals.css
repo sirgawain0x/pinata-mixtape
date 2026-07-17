@@ -1476,7 +1476,6 @@ h2 {
 .account-menu {
   position: relative;
   display: inline-block;
-  z-index: 50;
 }
 
 .account-menu-trigger {
@@ -1486,26 +1485,91 @@ h2 {
   text-overflow: ellipsis;
 }
 
-.account-menu-backdrop {
+.account-drawer-root {
   position: fixed;
   inset: 0;
-  z-index: 40;
-  background: transparent;
+  z-index: 70;
+}
+
+.account-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 4, 12, 0.72);
+  animation: account-drawer-fade 180ms ease;
 }
 
 .account-menu-panel {
   position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 50;
-  width: min(320px, calc(100vw - 24px));
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  width: min(88vw, 320px);
+  max-width: 100%;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0 16px 16px 0;
   background: linear-gradient(165deg, rgba(28, 22, 42, 0.98), rgba(14, 12, 22, 0.96));
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-  display: grid;
-  gap: 10px;
+  box-shadow: 18px 0 40px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  transform: translateX(0);
+  animation: account-drawer-slide 220ms ease;
+}
+
+.account-drawer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-drawer-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.account-drawer-close {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.account-drawer-close:hover,
+.account-drawer-close:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+
+@keyframes account-drawer-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes account-drawer-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 .account-menu-header {
@@ -1530,7 +1594,7 @@ h2 {
   gap: 8px;
   width: 100%;
   margin: 0;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid rgba(212, 175, 55, 0.35);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.25);
@@ -1539,12 +1603,14 @@ h2 {
   font-size: 0.82rem;
   text-align: left;
   cursor: pointer;
+  word-break: break-all;
 }
 
 .account-menu-address em {
   font-style: normal;
   color: var(--pink);
   font-size: 0.72rem;
+  flex-shrink: 0;
 }
 
 .account-menu-actions {
@@ -1555,7 +1621,8 @@ h2 {
 .account-menu-item {
   display: block;
   width: 100%;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  min-height: 44px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
@@ -1583,7 +1650,8 @@ h2 {
   background: transparent;
   color: var(--gold);
   font: inherit;
-  padding: 0;
+  padding: 8px 0;
+  min-height: 44px;
   cursor: pointer;
   text-align: left;
 }
@@ -1619,6 +1687,18 @@ h2 {
   margin: 0;
   font-size: 0.82rem;
   color: var(--gold);
+}
+
+@media (min-width: 641px) {
+  .account-menu-panel {
+    width: 340px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .account-menu-panel {
+    width: 360px;
+  }
 }
 
 .fund-usdc {
@@ -1745,16 +1825,6 @@ h2 {
 }
 
 @media (max-width: 640px) {
-  .account-menu-panel {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-    top: auto;
-    width: auto;
-    border-radius: 16px;
-  }
-
   .hero-actions {
     flex-wrap: wrap;
   }
