@@ -5,7 +5,7 @@ Creative Mixtape is a TypeScript + Next.js agent app for music taste capture, mi
 It includes:
 
 - `manifest.json` with Pinata template metadata and public `/` + `/app` routes on port `3000`
-- Marketing landing page at `/` (`landing/index.html`), served by `server.js`
+- Marketing landing page at `/` (`landing/index.html`), served by `server.js` on Pinata/PM2 and by `/app/api/marketing` (rewritten from `/`) on Vercel
 - PM2 runtime via `ecosystem.config.cjs`
 - TypeScript Next.js App Router UI mounted at `/app`
 - SQLite persistence in `workspace/data/mixtapes.db` for local dev and PM2 installs

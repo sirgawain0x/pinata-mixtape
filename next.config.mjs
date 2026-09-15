@@ -125,10 +125,27 @@ const allImgHosts = cspImgHosts();
 
 const nextConfig = {
   basePath: "/app",
+  // Vercel does not run server.js, so `/` would 404 under basePath `/app`.
+  // Rewrite the domain root to the marketing HTML route (same file Pinata serves).
+  async rewrites() {
+    return [
+      {
+        source: "/",
+        destination: "/app/api/marketing",
+        basePath: false
+      },
+      {
+        source: "/index.html",
+        destination: "/app/api/marketing",
+        basePath: false
+      }
+    ];
+  },
   async headers() {
     return [
       {
-        source: "/:path*",
+        // Keep wallet-app CSP on product routes; skip marketing HTML (needs CDNs).
+        source: "/((?!api/marketing$).*)",
         headers: [
           {
             key: "Content-Security-Policy",
