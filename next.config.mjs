@@ -123,20 +123,51 @@ const allScriptHosts = cspScriptHosts();
 const allStyleHosts = cspStyleHosts();
 const allImgHosts = cspImgHosts();
 
+/**
+ * Next.js forbids internal rewrites outside basePath (`/app`).
+ * Root `/` must use an absolute http(s) destination.
+ * @see https://nextjs.org/docs/messages/invalid-external-rewrite
+ */
+function absoluteOrigin() {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_MARKETING_ORIGIN;
+  if (fromEnv) {
+    try {
+      return new URL(fromEnv).origin;
+    } catch {
+      // fall through
+    }
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, "")}`;
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/^https?:\/\//, "")}`;
+  }
+  return "https://air.creativeplatform.xyz";
+}
+
+function marketingRewriteDestination() {
+  return `${absoluteOrigin()}/app/api/marketing`;
+}
+
 const nextConfig = {
   basePath: "/app",
   // Vercel does not run server.js, so `/` would 404 under basePath `/app`.
-  // Rewrite the domain root to the marketing HTML route (same file Pinata serves).
+  // Proxy the domain root to the marketing HTML route (same file Pinata serves).
   async rewrites() {
+    const destination = marketingRewriteDestination();
     return [
       {
         source: "/",
-        destination: "/app/api/marketing",
+        destination,
         basePath: false
       },
       {
         source: "/index.html",
-        destination: "/app/api/marketing",
+        destination,
         basePath: false
       }
     ];
