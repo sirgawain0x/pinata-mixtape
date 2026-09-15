@@ -81,6 +81,72 @@
       right: 1.25rem;
       bottom: 1.15rem;
     }
+    @media (max-width: 767px) {
+      .hero-photo-wrap {
+        min-height: 22rem;
+        transform: rotate(0deg);
+        box-shadow: 12px 12px 0 rgba(216,255,69,.85);
+        border-radius: 1.35rem;
+      }
+      .photo-label {
+        left: .85rem;
+        right: .85rem;
+        bottom: .85rem;
+      }
+    }
+    .apps-drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(8, 10, 14, .62);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s ease;
+    }
+    .apps-drawer-backdrop.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .apps-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 70;
+      display: flex;
+      height: 100%;
+      width: min(100%, 22rem);
+      flex-direction: column;
+      background: #141a24;
+      border-left: 1px solid rgba(246,241,232,.12);
+      box-shadow: -24px 0 60px rgba(0,0,0,.45);
+      transform: translateX(100%);
+      transition: transform .28s ease;
+    }
+    .apps-drawer.is-open {
+      transform: translateX(0);
+    }
+    .apps-link {
+      display: flex;
+      align-items: center;
+      gap: .9rem;
+      border-radius: 1rem;
+      border: 1px solid rgba(246,241,232,.1);
+      background: #1a202c;
+      padding: .9rem 1rem;
+      transition: border-color .2s ease, transform .2s ease, background .2s ease;
+    }
+    .apps-link:hover {
+      border-color: rgba(216,255,69,.55);
+      background: #222a36;
+      transform: translateY(-1px);
+    }
+    .apps-link.is-current {
+      border-color: rgba(216,255,69,.65);
+      background: #29331b;
+    }
+    body.apps-open {
+      overflow: hidden;
+    }
     .ticker {
       overflow: hidden;
       border-top: 1px solid rgba(246,241,232,.2);
@@ -88,14 +154,23 @@
       white-space: nowrap;
     }
     .ticker-track {
-      display: inline-flex;
+      display: flex;
+      width: max-content;
+      animation: drift 28s linear infinite;
+    }
+    .ticker-group {
+      display: flex;
+      flex-shrink: 0;
+      align-items: center;
       gap: 2.8rem;
-      min-width: max-content;
-      animation: drift 22s linear infinite;
+      padding-right: 2.8rem;
     }
     @keyframes drift {
       from { transform: translateX(0); }
       to { transform: translateX(-50%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ticker-track { animation: none; }
     }
     .equalizer span {
       display: inline-block;
@@ -144,13 +219,6 @@
       transition: transform .2s ease, brightness .2s ease, border-color .2s ease;
     }
     .icon-cta:hover { transform: translateY(-2px); }
-    @media (max-width: 767px) {
-      .hero-photo-wrap {
-        min-height: 23rem;
-        transform: rotate(0);
-        box-shadow: 9px 9px 0 rgba(216,255,69,.85);
-      }
-    }
   </style>
 </head>
 <body>
@@ -172,13 +240,24 @@
           <a class="nav-link focus-ring rounded-md" href="#passes">Passes</a>
         </div>
 
-        <a class="focus-ring hidden rounded-full bg-[#d8ff45] px-5 py-2.5 text-sm font-bold text-[#10141d] transition hover:brightness-110 md:inline-flex" href="/app">
-          Build a mixtape
-        </a>
-
-        <button id="menu-toggle" type="button" class="focus-ring grid h-10 w-10 place-items-center rounded-full border border-white/20 text-[#f6f1e8] md:hidden" aria-label="Open menu" aria-expanded="false">
-          <i data-lucide="menu" style="width:20px;height:20px"></i>
-        </button>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <button
+            id="apps-toggle"
+            type="button"
+            class="focus-ring grid h-10 w-10 place-items-center rounded-full border border-white/20 text-[#f6f1e8] transition hover:border-[#d8ff45] hover:text-[#d8ff45]"
+            aria-label="Browse Creative Platform apps"
+            aria-expanded="false"
+            aria-controls="apps-drawer"
+          >
+            <i data-lucide="layout-grid" style="width:18px;height:18px"></i>
+          </button>
+          <a class="focus-ring hidden rounded-full bg-[#d8ff45] px-4 py-2.5 text-sm font-bold text-[#10141d] transition hover:brightness-110 sm:px-5 md:inline-flex" href="/app">
+            Build a mixtape
+          </a>
+          <button id="menu-toggle" type="button" class="focus-ring grid h-10 w-10 place-items-center rounded-full border border-white/20 text-[#f6f1e8] md:hidden" aria-label="Open menu" aria-expanded="false">
+            <i data-lucide="menu" style="width:20px;height:20px"></i>
+          </button>
+        </div>
       </nav>
 
       <div id="mobile-menu" class="mx-auto mt-3 hidden max-w-7xl rounded-3xl border border-white/15 bg-[#181e29] p-5 md:hidden">
@@ -186,6 +265,9 @@
           <a class="nav-link focus-ring rounded-md text-[#f6f1e8]" href="#how-it-works">How it works</a>
           <a class="nav-link focus-ring rounded-md text-[#f6f1e8]" href="#radio">Radio</a>
           <a class="nav-link focus-ring rounded-md text-[#f6f1e8]" href="#passes">Passes</a>
+          <button type="button" class="apps-toggle-secondary focus-ring rounded-full border border-white/20 px-5 py-3 text-left font-bold text-[#f6f1e8]" aria-label="Browse Creative Platform apps">
+            Platform apps
+          </button>
           <a class="focus-ring rounded-full bg-[#d8ff45] px-5 py-3 text-center font-bold text-[#10141d]" href="/app">Build a mixtape</a>
         </div>
       </div>
@@ -215,7 +297,7 @@
             <p class="mt-5 text-sm text-[#a9b2b3]">Free for your first 10 mixtapes. No pressure, just play.</p>
           </div>
 
-          <div class="relative">
+          <div class="relative pb-8 md:pb-28">
             <div class="hero-photo-wrap">
               <img
                 loading="eager"
@@ -236,7 +318,7 @@
                 </div>
               </div>
             </div>
-            <div class="absolute -bottom-9 -left-4 hidden max-w-xs rounded-2xl bg-[#ff6347] p-5 text-[#10141d] shadow-lg md:block">
+            <div class="absolute left-0 top-full z-10 mt-4 hidden max-w-xs rounded-2xl bg-[#ff6347] p-5 text-[#10141d] shadow-lg md:block">
               <p class="text-xs font-bold uppercase tracking-[.14em]">Mixtape rule no. 1</p>
               <p class="display-font mt-2 text-lg font-bold leading-tight">Never send a playlist without a point of view.</p>
             </div>
@@ -246,8 +328,16 @@
 
       <section class="ticker w-full bg-[#d8ff45] py-4 text-[#10141d]" aria-label="Mixtape highlights">
         <div class="ticker-track text-sm font-bold uppercase tracking-[.16em]">
-          <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
-          <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+          <div class="ticker-group">
+            <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+            <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+            <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+          </div>
+          <div class="ticker-group" aria-hidden="true">
+            <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+            <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+            <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+          </div>
         </div>
       </section>
 
@@ -340,6 +430,19 @@
           <div class="mt-11 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#1a202c] p-7">
               <div class="flex items-start justify-between gap-4">
+                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Free / Pay as you go</h3>
+                <i data-lucide="gift" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">Free</p>
+              <p class="mt-3 leading-relaxed text-[#c9d0cf]">Create up to 10 mixtapes free. No membership required — just start and pay as you go when you need more room.</p>
+              <button type="button" data-plan="free" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
+                <span class="plan-label">Start free</span>
+                <span class="plan-selected hidden text-[#d8ff45]">Free selected</span>
+              </button>
+            </article>
+
+            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#1a202c] p-7">
+              <div class="flex items-start justify-between gap-4">
                 <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Pass</h3>
                 <i data-lucide="sparkles" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
               </div>
@@ -353,40 +456,14 @@
 
             <article class="plan-card featured flex min-h-[19rem] flex-col rounded-3xl bg-[#29331b] p-7">
               <div class="flex items-start justify-between gap-4">
-                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Plus Pass</h3>
-                <i data-lucide="zap" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
+                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Professional Pass</h3>
+                <i data-lucide="badge-dollar-sign" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
               </div>
-              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">$30 / month</p>
-              <p class="mt-3 leading-relaxed text-[#e1e5dc]">More space for your catalog and more ways to shape your listener community.</p>
-              <button type="button" data-plan="creative-plus" class="plan-select focus-ring mt-auto rounded-full bg-[#d8ff45] px-5 py-3 text-left font-bold text-[#10141d] transition hover:brightness-110">
-                <span class="plan-label">Choose Creative Plus</span>
-                <span class="plan-selected hidden">Creative Plus selected</span>
-              </button>
-            </article>
-
-            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#1a202c] p-7">
-              <div class="flex items-start justify-between gap-4">
-                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Investor Pass</h3>
-                <i data-lucide="badge-dollar-sign" class="text-[#ff6347]" style="width:21px;height:21px"></i>
-              </div>
-              <p class="mt-8 text-2xl font-bold text-[#ff917d]">$100 / month</p>
-              <p class="mt-3 leading-relaxed text-[#c9d0cf]">For ambitious curators building an audience with a serious point of view.</p>
-              <button type="button" data-plan="investor" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
-                <span class="plan-label">Choose Creative Investor</span>
-                <span class="plan-selected hidden text-[#d8ff45]">Creative Investor selected</span>
-              </button>
-            </article>
-
-            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#222a24] p-7">
-              <div class="flex items-start justify-between gap-4">
-                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Investor Plus Pass</h3>
-                <i data-lucide="tower-control" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
-              </div>
-              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">$120 / month</p>
-              <p class="mt-3 leading-relaxed text-[#c9d0cf]">A larger runway for influential curators preparing to become a true broadcast voice.</p>
-              <button type="button" data-plan="investor-plus" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
-                <span class="plan-label">Choose Investor Plus</span>
-                <span class="plan-selected hidden text-[#d8ff45]">Investor Plus selected</span>
+              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">$100 / month</p>
+              <p class="mt-3 leading-relaxed text-[#e1e5dc]">For ambitious curators building an audience with a serious point of view.</p>
+              <button type="button" data-plan="professional" class="plan-select focus-ring mt-auto rounded-full bg-[#d8ff45] px-5 py-3 text-left font-bold text-[#10141d] transition hover:brightness-110">
+                <span class="plan-label">Choose Creative Professional</span>
+                <span class="plan-selected hidden">Creative Professional selected</span>
               </button>
             </article>
 
@@ -402,19 +479,6 @@
                 <span class="plan-selected hidden text-[#d8ff45]">Brand selected</span>
               </button>
             </article>
-
-            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#322f1d] p-7">
-              <div class="flex items-start justify-between gap-4">
-                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Brand Pass Plus</h3>
-                <i data-lucide="crown" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
-              </div>
-              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">$1,100 / month</p>
-              <p class="mt-3 leading-relaxed text-[#e1e5dc]">The expanded pass for brands that want their own enduring signal on Mixtape.</p>
-              <button type="button" data-plan="brand-plus" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
-                <span class="plan-label">Choose Brand Plus</span>
-                <span class="plan-selected hidden text-[#d8ff45]">Brand Plus selected</span>
-              </button>
-            </article>
           </div>
 
           <p id="selection-message" class="mt-7 hidden rounded-xl border border-[#d8ff45]/40 bg-[#d8ff45]/10 px-4 py-3 text-sm font-semibold text-[#e8ff9a]" aria-live="polite">
@@ -425,16 +489,26 @@
 
       <section class="w-full px-5 pb-20 md:px-10 md:pb-28">
         <div class="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[#ff6347] px-7 py-12 text-[#10141d] md:px-12 md:py-16">
-          <div class="grid items-end gap-7 md:grid-cols-[1fr_auto]">
+          <div class="grid items-stretch gap-4 sm:items-end md:grid-cols-[1fr_auto]">
             <div>
               <p class="text-xs font-bold uppercase tracking-[.16em]">The world has enough playlists</p>
               <h2 class="display-font mt-3 max-w-3xl text-3xl font-semibold leading-[.96] tracking-[-.045em] md:text-5xl">
                 Make a mixtape that leaves a mark.
               </h2>
             </div>
-            <a class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-[#10141d] px-6 py-4 font-bold text-[#f6f1e8] transition hover:-translate-y-0.5" href="/app">
-              Build a mixtape
-            </a>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                class="apps-toggle-secondary focus-ring inline-flex items-center justify-center gap-2 rounded-full border border-[#10141d]/25 bg-transparent px-5 py-4 font-bold text-[#10141d] transition hover:-translate-y-0.5"
+                aria-label="Browse Creative Platform apps"
+              >
+                <i data-lucide="layout-grid" style="width:18px;height:18px"></i>
+                Platform apps
+              </button>
+              <a class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-[#10141d] px-6 py-4 font-bold text-[#f6f1e8] transition hover:-translate-y-0.5" href="/app">
+                Build a mixtape
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -442,7 +516,7 @@
 
     <footer class="w-full border-t border-white/15 px-5 py-8 md:px-10">
       <div class="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-[#aeb7b9] md:flex-row md:items-center md:justify-between">
-        <p>© 2026 Mixtape. Curated with intent.</p>
+        <p>© 2026 Creative Platform Inc. Mixtape. Curated with intent.</p>
         <div class="flex items-center gap-5">
           <a class="focus-ring font-semibold hover:text-[#d8ff45]" href="#how-it-works">How it works</a>
           <a class="focus-ring font-semibold hover:text-[#d8ff45]" href="#passes">Membership passes</a>
@@ -452,26 +526,153 @@
     </footer>
   </div>
 
+    <div id="apps-drawer-backdrop" class="apps-drawer-backdrop" hidden></div>
+    <aside id="apps-drawer" class="apps-drawer" role="dialog" aria-modal="true" aria-labelledby="apps-drawer-title" hidden>
+      <div class="flex items-center justify-between border-b border-white/10 px-5 py-4">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[.16em] text-[#d8ff45]">Creative Platform</p>
+          <h2 id="apps-drawer-title" class="display-font mt-1 text-xl font-bold text-[#f6f1e8]">Apps</h2>
+        </div>
+        <button id="apps-close" type="button" class="focus-ring grid h-10 w-10 place-items-center rounded-full border border-white/20 text-[#f6f1e8]" aria-label="Close apps">
+          <i data-lucide="x" style="width:18px;height:18px"></i>
+        </button>
+      </div>
+      <nav class="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-5" aria-label="Creative Platform apps">
+        <a class="apps-link" href="https://tv.creativeplatform.xyz" rel="noopener noreferrer" target="_blank">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#d8ff45]/15 text-[#d8ff45]">
+            <i data-lucide="tv" style="width:18px;height:18px"></i>
+          </span>
+          <span>
+            <span class="block font-bold text-[#f6f1e8]">Creative TV</span>
+            <span class="mt-0.5 block text-sm text-[#aeb7b9]">Watch, stream, and discover</span>
+          </span>
+        </a>
+        <a class="apps-link" href="https://finance.creativeplatform.xyz" rel="noopener noreferrer" target="_blank">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#ff6347]/15 text-[#ff917d]">
+            <i data-lucide="wallet" style="width:18px;height:18px"></i>
+          </span>
+          <span>
+            <span class="block font-bold text-[#f6f1e8]">Creative Finance</span>
+            <span class="mt-0.5 block text-sm text-[#aeb7b9]">Earnings, tokens, and payouts</span>
+          </span>
+        </a>
+        <a class="apps-link is-current" href="https://air.creativeplatform.xyz" aria-current="page">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#d8ff45]/15 text-[#d8ff45]">
+            <i data-lucide="disc-3" style="width:18px;height:18px"></i>
+          </span>
+          <span>
+            <span class="block font-bold text-[#f6f1e8]">Mixtape</span>
+            <span class="mt-0.5 block text-sm text-[#aeb7b9]">Curate and share mixes</span>
+          </span>
+        </a>
+        <a class="apps-link" href="https://create.creativeplatform.xyz" rel="noopener noreferrer" target="_blank">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#d8ff45]/15 text-[#d8ff45]">
+            <i data-lucide="paintbrush" style="width:18px;height:18px"></i>
+          </span>
+          <span>
+            <span class="block font-bold text-[#f6f1e8]">Creative Pixels</span>
+            <span class="mt-0.5 block text-sm text-[#aeb7b9]">Create visual art</span>
+          </span>
+        </a>
+        <a class="apps-link" href="https://beatme.creativeplatform.xyz" rel="noopener noreferrer" target="_blank">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#ff6347]/15 text-[#ff917d]">
+            <i data-lucide="music-2" style="width:18px;height:18px"></i>
+          </span>
+          <span>
+            <span class="block font-bold text-[#f6f1e8]">Beat Me</span>
+            <span class="mt-0.5 block text-sm text-[#aeb7b9]">Compete with your sound</span>
+          </span>
+        </a>
+        <a class="apps-link" href="https://books.creativeplatform.xyz" rel="noopener noreferrer" target="_blank">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#d8ff45]/15 text-[#d8ff45]">
+            <i data-lucide="book-open" style="width:18px;height:18px"></i>
+          </span>
+          <span>
+            <span class="block font-bold text-[#f6f1e8]">Creative Books</span>
+            <span class="mt-0.5 block text-sm text-[#aeb7b9]">Stories and longform</span>
+          </span>
+        </a>
+      </nav>
+      <div class="border-t border-white/10 px-5 py-4">
+        <a class="focus-ring text-sm font-semibold text-[#aeb7b9] hover:text-[#d8ff45]" href="https://creativeplatform.xyz" rel="noopener noreferrer" target="_blank">
+          creativeplatform.xyz
+        </a>
+      </div>
+    </aside>
+
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       if (window.lucide) lucide.createIcons();
 
       const menuButton = document.getElementById("menu-toggle");
       const mobileMenu = document.getElementById("mobile-menu");
+      const appsToggle = document.getElementById("apps-toggle");
+      const appsClose = document.getElementById("apps-close");
+      const appsDrawer = document.getElementById("apps-drawer");
+      const appsBackdrop = document.getElementById("apps-drawer-backdrop");
+      const appsSecondaryToggles = document.querySelectorAll(".apps-toggle-secondary");
+
+      function setMobileMenuOpen(isOpen) {
+        mobileMenu.classList.toggle("hidden", !isOpen);
+        menuButton.setAttribute("aria-expanded", String(isOpen));
+        menuButton.setAttribute("aria-label", isOpen ? "Close menu" : "Open menu");
+      }
+
+      function setAppsOpen(isOpen) {
+        document.body.classList.toggle("apps-open", isOpen);
+        appsToggle.setAttribute("aria-expanded", String(isOpen));
+
+        if (isOpen) {
+          setMobileMenuOpen(false);
+          appsDrawer.hidden = false;
+          appsBackdrop.hidden = false;
+          requestAnimationFrame(() => {
+            appsDrawer.classList.add("is-open");
+            appsBackdrop.classList.add("is-open");
+          });
+          appsClose.focus();
+          if (window.lucide) lucide.createIcons();
+          return;
+        }
+
+        appsDrawer.classList.remove("is-open");
+        appsBackdrop.classList.remove("is-open");
+        const finishClose = (event) => {
+          if (event && event.target !== appsDrawer) return;
+          appsDrawer.hidden = true;
+          appsBackdrop.hidden = true;
+          appsDrawer.removeEventListener("transitionend", finishClose);
+        };
+        appsDrawer.addEventListener("transitionend", finishClose);
+        appsToggle.focus();
+      }
 
       menuButton.addEventListener("click", () => {
-        const isOpen = !mobileMenu.classList.contains("hidden");
-        mobileMenu.classList.toggle("hidden", isOpen);
-        menuButton.setAttribute("aria-expanded", String(!isOpen));
-        menuButton.setAttribute("aria-label", isOpen ? "Open menu" : "Close menu");
+        setMobileMenuOpen(mobileMenu.classList.contains("hidden"));
       });
 
       document.querySelectorAll("#mobile-menu a").forEach((link) => {
-        link.addEventListener("click", () => {
-          mobileMenu.classList.add("hidden");
-          menuButton.setAttribute("aria-expanded", "false");
-          menuButton.setAttribute("aria-label", "Open menu");
+        link.addEventListener("click", () => setMobileMenuOpen(false));
+      });
+
+      appsToggle.addEventListener("click", () => {
+        setAppsOpen(appsDrawer.hidden);
+      });
+
+      appsSecondaryToggles.forEach((button) => {
+        button.addEventListener("click", () => {
+          setMobileMenuOpen(false);
+          setAppsOpen(true);
         });
+      });
+
+      appsClose.addEventListener("click", () => setAppsOpen(false));
+      appsBackdrop.addEventListener("click", () => setAppsOpen(false));
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !appsDrawer.hidden) {
+          setAppsOpen(false);
+        }
       });
 
       const selectionMessage = document.getElementById("selection-message");
