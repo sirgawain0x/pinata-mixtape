@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mixtape — Share what moves you</title>
+  <meta name="description" content="Mixtape is the home for music curators. Build a feeling, name the moment, and share your favorite songs.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #10141d;
+      --acid: #d8ff45;
+      --coral: #ff6347;
+      --paper: #f6f1e8;
+      --mist: #b9c2c7;
+      --vh: 1vh;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      width: 100%;
+      color: var(--paper);
+      font-family: "DM Sans", sans-serif;
+      overflow-x: hidden;
+      background: var(--ink);
+    }
+    .page-shell {
+      width: 100%;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 16% 11%, rgba(216,255,69,.13), transparent 22rem),
+        radial-gradient(circle at 92% 35%, rgba(255,99,71,.12), transparent 20rem),
+        #10141d;
+    }
+    .display-font { font-family: "Fraunces", serif; }
+    .noise {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .15;
+      background-image: radial-gradient(rgba(255,255,255,.8) .55px, transparent .65px);
+      background-size: 7px 7px;
+      mix-blend-mode: soft-light;
+      z-index: 30;
+    }
+    .nav-link {
+      color: rgba(246,241,232,.72);
+      transition: color .2s ease;
+    }
+    .nav-link:hover { color: var(--acid); }
+    .focus-ring:focus-visible {
+      outline: 3px solid var(--acid);
+      outline-offset: 4px;
+    }
+    .hero-photo-wrap {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      border-radius: 1.8rem;
+      min-height: 31rem;
+      transform: rotate(2deg);
+      box-shadow: 18px 18px 0 rgba(216,255,69,.85);
+    }
+    .hero-photo-wrap::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 45%, rgba(16,20,29,.78));
+      z-index: 1;
+    }
+    .photo-label {
+      position: absolute;
+      z-index: 2;
+      left: 1.25rem;
+      right: 1.25rem;
+      bottom: 1.15rem;
+    }
+    .ticker {
+      overflow: hidden;
+      border-top: 1px solid rgba(246,241,232,.2);
+      border-bottom: 1px solid rgba(246,241,232,.2);
+      white-space: nowrap;
+    }
+    .ticker-track {
+      display: inline-flex;
+      gap: 2.8rem;
+      min-width: max-content;
+      animation: drift 22s linear infinite;
+    }
+    @keyframes drift {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+    .equalizer span {
+      display: inline-block;
+      width: .23rem;
+      background: var(--acid);
+      border-radius: 999px;
+      animation: bounce 1.05s ease-in-out infinite alternate;
+    }
+    .equalizer span:nth-child(1) { height: .7rem; animation-delay: .05s; }
+    .equalizer span:nth-child(2) { height: 1.5rem; animation-delay: .2s; }
+    .equalizer span:nth-child(3) { height: .95rem; animation-delay: .38s; }
+    .equalizer span:nth-child(4) { height: 1.8rem; animation-delay: .1s; }
+    .equalizer span:nth-child(5) { height: .65rem; animation-delay: .29s; }
+    @keyframes bounce {
+      from { transform: scaleY(.45); opacity: .6; }
+      to { transform: scaleY(1); opacity: 1; }
+    }
+    .plan-card {
+      border: 1px solid rgba(246,241,232,.16);
+      transition: transform .22s ease, border-color .22s ease, background .22s ease;
+    }
+    .plan-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(216,255,69,.9);
+    }
+    .plan-card.featured {
+      border-color: var(--acid);
+      box-shadow: 8px 8px 0 rgba(216,255,69,.82);
+    }
+    .reveal {
+      animation: reveal .7s ease both;
+    }
+    .delay-1 { animation-delay: .12s; }
+    .delay-2 { animation-delay: .22s; }
+    .delay-3 { animation-delay: .34s; }
+    @keyframes reveal {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .icon-cta {
+      display: inline-grid;
+      place-items: center;
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 999px;
+      transition: transform .2s ease, brightness .2s ease, border-color .2s ease;
+    }
+    .icon-cta:hover { transform: translateY(-2px); }
+    @media (max-width: 767px) {
+      .hero-photo-wrap {
+        min-height: 23rem;
+        transform: rotate(0);
+        box-shadow: 9px 9px 0 rgba(216,255,69,.85);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="noise" aria-hidden="true"></div>
+
+    <header class="relative z-20 w-full px-5 pt-5 md:px-10 md:pt-8">
+      <nav class="mx-auto flex max-w-7xl items-center justify-between rounded-full border border-white/15 bg-[#10141d]/85 px-5 py-3 backdrop-blur-md md:px-6" aria-label="Primary navigation">
+        <a href="#top" class="focus-ring flex items-center gap-2 rounded-md">
+          <span class="grid h-8 w-8 place-items-center rounded-full bg-[#d8ff45] text-[#10141d]">
+            <i data-lucide="disc-3" style="width:17px;height:17px"></i>
+          </span>
+          <span class="font-bold tracking-tight text-[#f6f1e8]">Mixtape</span>
+        </a>
+
+        <div class="hidden items-center gap-7 text-sm font-semibold md:flex">
+          <a class="nav-link focus-ring rounded-md" href="#how-it-works">How it works</a>
+          <a class="nav-link focus-ring rounded-md" href="#radio">Radio</a>
+          <a class="nav-link focus-ring rounded-md" href="#passes">Passes</a>
+        </div>
+
+        <a class="focus-ring hidden rounded-full bg-[#d8ff45] px-5 py-2.5 text-sm font-bold text-[#10141d] transition hover:brightness-110 md:inline-flex" href="/app">
+          Build a mixtape
+        </a>
+
+        <button id="menu-toggle" type="button" class="focus-ring grid h-10 w-10 place-items-center rounded-full border border-white/20 text-[#f6f1e8] md:hidden" aria-label="Open menu" aria-expanded="false">
+          <i data-lucide="menu" style="width:20px;height:20px"></i>
+        </button>
+      </nav>
+
+      <div id="mobile-menu" class="mx-auto mt-3 hidden max-w-7xl rounded-3xl border border-white/15 bg-[#181e29] p-5 md:hidden">
+        <div class="flex flex-col gap-4 text-sm font-semibold">
+          <a class="nav-link focus-ring rounded-md text-[#f6f1e8]" href="#how-it-works">How it works</a>
+          <a class="nav-link focus-ring rounded-md text-[#f6f1e8]" href="#radio">Radio</a>
+          <a class="nav-link focus-ring rounded-md text-[#f6f1e8]" href="#passes">Passes</a>
+          <a class="focus-ring rounded-full bg-[#d8ff45] px-5 py-3 text-center font-bold text-[#10141d]" href="/app">Build a mixtape</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="w-full px-5 pb-16 pt-16 md:px-10 md:pb-24 md:pt-24">
+        <div class="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1.05fr_.95fr] lg:gap-16">
+          <div>
+            <p class="reveal inline-flex rounded-full border border-[#d8ff45]/50 bg-[#d8ff45]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[.18em] text-[#d8ff45]">
+              Your taste has a frequency
+            </p>
+            <h1 class="display-font reveal delay-1 mt-6 max-w-3xl text-4xl font-semibold leading-[.94] tracking-[-.055em] text-[#f6f1e8] sm:text-5xl md:text-6xl lg:text-[4.25rem]">
+              Put the songs you love in someone else's hands.
+            </h1>
+            <p class="reveal delay-2 mt-7 max-w-xl text-lg leading-relaxed text-[#c9d0cf] md:text-xl">
+              Mixtape is the home for music curators. Build a feeling, name the moment, and share your favorite songs with the people who get it.
+            </p>
+            <div class="reveal delay-3 mt-9 flex items-center gap-3">
+              <a class="icon-cta focus-ring bg-[#d8ff45] text-[#10141d] hover:brightness-110" href="/app" aria-label="Start a free mixtape">
+                <i data-lucide="arrow-up-right" style="width:22px;height:22px"></i>
+              </a>
+              <a class="icon-cta focus-ring border border-white/25 text-[#f6f1e8] hover:border-[#d8ff45] hover:text-[#d8ff45]" href="#how-it-works" aria-label="See how it works">
+                <i data-lucide="play" style="width:20px;height:20px"></i>
+              </a>
+            </div>
+            <p class="mt-5 text-sm text-[#a9b2b3]">Free for your first 10 mixtapes. No pressure, just play.</p>
+          </div>
+
+          <div class="relative">
+            <div class="hero-photo-wrap">
+              <img
+                loading="eager"
+                class="absolute inset-0 h-full w-full object-cover"
+                src="https://images.pexels.com/photos/35243839/pexels-photo-35243839.jpeg?auto=compress&cs=tinysrgb&w=1200"
+                alt="Man enjoying music in front of neon lights at night."
+              >
+              <div class="photo-label">
+                <div class="rounded-2xl border border-white/15 bg-[#10141d]/75 p-4 backdrop-blur-sm">
+                  <div class="mb-2 flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-[.16em] text-[#d8ff45]">Now spinning</span>
+                    <div class="equalizer flex h-5 items-end gap-1" aria-hidden="true">
+                      <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                  </div>
+                  <p class="font-bold text-[#f6f1e8]">Night Drive, Side A</p>
+                  <p class="mt-1 text-sm text-[#c9d0cf]">Curated by you, replayed by everyone.</p>
+                </div>
+              </div>
+            </div>
+            <div class="absolute -bottom-9 -left-4 hidden max-w-xs rounded-2xl bg-[#ff6347] p-5 text-[#10141d] shadow-lg md:block">
+              <p class="text-xs font-bold uppercase tracking-[.14em]">Mixtape rule no. 1</p>
+              <p class="display-font mt-2 text-lg font-bold leading-tight">Never send a playlist without a point of view.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ticker w-full bg-[#d8ff45] py-4 text-[#10141d]" aria-label="Mixtape highlights">
+        <div class="ticker-track text-sm font-bold uppercase tracking-[.16em]">
+          <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+          <span>Make it personal</span><span>✦</span><span>Pass it on</span><span>✦</span><span>Build your signal</span><span>✦</span>
+        </div>
+      </section>
+
+      <section id="how-it-works" class="w-full px-5 py-20 md:px-10 md:py-28">
+        <div class="mx-auto max-w-7xl">
+          <div class="grid gap-8 border-b border-white/15 pb-10 md:grid-cols-[1fr_.75fr] md:items-end">
+            <h2 class="display-font max-w-3xl text-3xl font-semibold leading-[.98] tracking-[-.04em] text-[#f6f1e8] md:text-5xl">
+              A mixtape is more than a queue.
+            </h2>
+            <p class="max-w-xl leading-relaxed text-[#b9c2c7]">
+              Build collections with a personality, share them with your people, and turn a growing audience into a platform of your own.
+            </p>
+          </div>
+          <div class="mt-8 grid gap-4 md:grid-cols-3">
+            <article class="rounded-3xl bg-[#181e29] p-7">
+              <div class="grid h-11 w-11 place-items-center rounded-full bg-[#d8ff45] text-[#10141d]">
+                <i data-lucide="list-music" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-9 text-xs font-bold uppercase tracking-[.15em] text-[#d8ff45]">01 / Build</p>
+              <h3 class="display-font mt-3 text-xl font-bold text-[#f6f1e8]">Curate the moment</h3>
+              <p class="mt-3 leading-relaxed text-[#ced3d0]">Make every playlist feel like a handwritten note: titles, sequences, and a sound that says something.</p>
+            </article>
+            <article class="rounded-3xl bg-[#222938] p-7">
+              <div class="grid h-11 w-11 place-items-center rounded-full bg-[#ff6347] text-[#10141d]">
+                <i data-lucide="send" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-9 text-xs font-bold uppercase tracking-[.15em] text-[#ff917d]">02 / Share</p>
+              <h3 class="display-font mt-3 text-xl font-bold text-[#f6f1e8]">Pass it around</h3>
+              <p class="mt-3 leading-relaxed text-[#ced3d0]">Send mixtapes to friends, followers, and future fans with one clean, shareable home for every mood.</p>
+            </article>
+            <article class="rounded-3xl bg-[#262b22] p-7">
+              <div class="grid h-11 w-11 place-items-center rounded-full bg-[#f6f1e8] text-[#10141d]">
+                <i data-lucide="radio-tower" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-9 text-xs font-bold uppercase tracking-[.15em] text-[#d8ff45]">03 / Grow</p>
+              <h3 class="display-font mt-3 text-xl font-bold text-[#f6f1e8]">Become the signal</h3>
+              <p class="mt-3 leading-relaxed text-[#ced3d0]">As your following grows, unlock creator tools made for the voices people come back to hear.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="radio" class="w-full px-5 pb-20 md:px-10 md:pb-28">
+        <div class="mx-auto grid max-w-7xl overflow-hidden rounded-[2rem] bg-[#252a36] lg:grid-cols-[.9fr_1.1fr]">
+          <div class="relative min-h-[21rem]">
+            <img
+              loading="lazy"
+              class="absolute inset-0 h-full w-full object-cover"
+              src="https://images.pexels.com/photos/38493054/pexels-photo-38493054.jpeg?auto=compress&cs=tinysrgb&w=1200"
+              alt="A professional podcast studio with microphones ready for recording."
+            >
+            <div class="absolute inset-0 bg-gradient-to-t from-[#10141d]/75 via-transparent to-transparent"></div>
+            <div class="absolute bottom-6 left-6 flex items-center gap-3 rounded-full border border-white/25 bg-[#10141d]/70 px-4 py-2 backdrop-blur">
+              <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-[#ff6347]"></span>
+              <span class="text-xs font-bold uppercase tracking-[.15em] text-[#f6f1e8]">Broadcast mode</span>
+            </div>
+          </div>
+          <div class="flex flex-col justify-center p-8 md:p-12">
+            <p class="text-xs font-bold uppercase tracking-[.16em] text-[#d8ff45]">For the curators who become culture</p>
+            <h2 class="display-font mt-4 max-w-2xl text-3xl font-semibold leading-[.98] tracking-[-.04em] text-[#f6f1e8] md:text-5xl">
+              When your audience grows, your station comes alive.
+            </h2>
+            <p class="mt-6 max-w-2xl leading-relaxed text-[#d2d6d3]">
+              Influential curators can broadcast their own always-on Mixtape radio station: program 24/7 streamable content, share exclusive audio and podcasts, run voice-clone commercials, and earn in their own token.
+            </p>
+            <div class="mt-8 grid gap-3 sm:grid-cols-2">
+              <div class="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-[#f6f1e8]">24/7 streamable programming</div>
+              <div class="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-[#f6f1e8]">Exclusive audio drops</div>
+              <div class="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-[#f6f1e8]">Podcasts &amp; mixtapes</div>
+              <div class="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-[#f6f1e8]">Earn in your own token</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="passes" class="w-full px-5 py-20 md:px-10 md:py-28">
+        <div class="mx-auto max-w-7xl">
+          <div class="flex flex-col justify-between gap-7 md:flex-row md:items-end">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[.16em] text-[#d8ff45]">Choose your pass</p>
+              <h2 class="display-font mt-3 max-w-2xl text-3xl font-semibold leading-[.98] tracking-[-.04em] text-[#f6f1e8] md:text-5xl">
+                Start free. Scale when your sound needs room.
+              </h2>
+            </div>
+            <p class="max-w-md leading-relaxed text-[#b9c2c7]">
+              Create up to 10 mixtapes free, then pay as you go or step into a membership pass built for your next chapter.
+            </p>
+          </div>
+
+          <div class="mt-11 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#1a202c] p-7">
+              <div class="flex items-start justify-between gap-4">
+                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Pass</h3>
+                <i data-lucide="sparkles" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">$10 / month</p>
+              <p class="mt-3 leading-relaxed text-[#c9d0cf]">A simple home for curators ready to make more and share more.</p>
+              <button type="button" data-plan="creative" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
+                <span class="plan-label">Choose Creative</span>
+                <span class="plan-selected hidden text-[#d8ff45]">Creative selected</span>
+              </button>
+            </article>
+
+            <article class="plan-card featured flex min-h-[19rem] flex-col rounded-3xl bg-[#29331b] p-7">
+              <div class="flex items-start justify-between gap-4">
+                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Plus Pass</h3>
+                <i data-lucide="zap" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">$30 / month</p>
+              <p class="mt-3 leading-relaxed text-[#e1e5dc]">More space for your catalog and more ways to shape your listener community.</p>
+              <button type="button" data-plan="creative-plus" class="plan-select focus-ring mt-auto rounded-full bg-[#d8ff45] px-5 py-3 text-left font-bold text-[#10141d] transition hover:brightness-110">
+                <span class="plan-label">Choose Creative Plus</span>
+                <span class="plan-selected hidden">Creative Plus selected</span>
+              </button>
+            </article>
+
+            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#1a202c] p-7">
+              <div class="flex items-start justify-between gap-4">
+                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Investor Pass</h3>
+                <i data-lucide="badge-dollar-sign" class="text-[#ff6347]" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-8 text-2xl font-bold text-[#ff917d]">$100 / month</p>
+              <p class="mt-3 leading-relaxed text-[#c9d0cf]">For ambitious curators building an audience with a serious point of view.</p>
+              <button type="button" data-plan="investor" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
+                <span class="plan-label">Choose Creative Investor</span>
+                <span class="plan-selected hidden text-[#d8ff45]">Creative Investor selected</span>
+              </button>
+            </article>
+
+            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#222a24] p-7">
+              <div class="flex items-start justify-between gap-4">
+                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Creative Investor Plus Pass</h3>
+                <i data-lucide="tower-control" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">$120 / month</p>
+              <p class="mt-3 leading-relaxed text-[#c9d0cf]">A larger runway for influential curators preparing to become a true broadcast voice.</p>
+              <button type="button" data-plan="investor-plus" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
+                <span class="plan-label">Choose Investor Plus</span>
+                <span class="plan-selected hidden text-[#d8ff45]">Investor Plus selected</span>
+              </button>
+            </article>
+
+            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#251f24] p-7">
+              <div class="flex items-start justify-between gap-4">
+                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Brand Pass</h3>
+                <i data-lucide="building-2" class="text-[#ff6347]" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-8 text-2xl font-bold text-[#ff917d]">$1,000 / month</p>
+              <p class="mt-3 leading-relaxed text-[#c9d0cf]">For brands that want to build a meaningful place in music culture.</p>
+              <button type="button" data-plan="brand" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
+                <span class="plan-label">Choose Brand</span>
+                <span class="plan-selected hidden text-[#d8ff45]">Brand selected</span>
+              </button>
+            </article>
+
+            <article class="plan-card flex min-h-[19rem] flex-col rounded-3xl bg-[#322f1d] p-7">
+              <div class="flex items-start justify-between gap-4">
+                <h3 class="display-font text-xl font-bold text-[#f6f1e8]">Brand Pass Plus</h3>
+                <i data-lucide="crown" class="text-[#d8ff45]" style="width:21px;height:21px"></i>
+              </div>
+              <p class="mt-8 text-2xl font-bold text-[#d8ff45]">$1,100 / month</p>
+              <p class="mt-3 leading-relaxed text-[#e1e5dc]">The expanded pass for brands that want their own enduring signal on Mixtape.</p>
+              <button type="button" data-plan="brand-plus" class="plan-select focus-ring mt-auto rounded-full border border-white/30 px-5 py-3 text-left font-bold text-[#f6f1e8] transition hover:border-[#d8ff45]">
+                <span class="plan-label">Choose Brand Plus</span>
+                <span class="plan-selected hidden text-[#d8ff45]">Brand Plus selected</span>
+              </button>
+            </article>
+          </div>
+
+          <p id="selection-message" class="mt-7 hidden rounded-xl border border-[#d8ff45]/40 bg-[#d8ff45]/10 px-4 py-3 text-sm font-semibold text-[#e8ff9a]" aria-live="polite">
+            Pass selected. Membership checkout is not available on this page — <a class="underline hover:text-white" href="/app">open the app</a> to start building.
+          </p>
+        </div>
+      </section>
+
+      <section class="w-full px-5 pb-20 md:px-10 md:pb-28">
+        <div class="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[#ff6347] px-7 py-12 text-[#10141d] md:px-12 md:py-16">
+          <div class="grid items-end gap-7 md:grid-cols-[1fr_auto]">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[.16em]">The world has enough playlists</p>
+              <h2 class="display-font mt-3 max-w-3xl text-3xl font-semibold leading-[.96] tracking-[-.045em] md:text-5xl">
+                Make a mixtape that leaves a mark.
+              </h2>
+            </div>
+            <a class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-[#10141d] px-6 py-4 font-bold text-[#f6f1e8] transition hover:-translate-y-0.5" href="/app">
+              Build a mixtape
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="w-full border-t border-white/15 px-5 py-8 md:px-10">
+      <div class="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-[#aeb7b9] md:flex-row md:items-center md:justify-between">
+        <p>© 2026 Mixtape. Curated with intent.</p>
+        <div class="flex items-center gap-5">
+          <a class="focus-ring font-semibold hover:text-[#d8ff45]" href="#how-it-works">How it works</a>
+          <a class="focus-ring font-semibold hover:text-[#d8ff45]" href="#passes">Membership passes</a>
+          <a class="focus-ring font-semibold hover:text-[#d8ff45]" href="/app">Open app</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.lucide) lucide.createIcons();
+
+      const menuButton = document.getElementById("menu-toggle");
+      const mobileMenu = document.getElementById("mobile-menu");
+
+      menuButton.addEventListener("click", () => {
+        const isOpen = !mobileMenu.classList.contains("hidden");
+        mobileMenu.classList.toggle("hidden", isOpen);
+        menuButton.setAttribute("aria-expanded", String(!isOpen));
+        menuButton.setAttribute("aria-label", isOpen ? "Open menu" : "Close menu");
+      });
+
+      document.querySelectorAll("#mobile-menu a").forEach((link) => {
+        link.addEventListener("click", () => {
+          mobileMenu.classList.add("hidden");
+          menuButton.setAttribute("aria-expanded", "false");
+          menuButton.setAttribute("aria-label", "Open menu");
+        });
+      });
+
+      const selectionMessage = document.getElementById("selection-message");
+
+      document.querySelectorAll(".plan-select").forEach((button) => {
+        button.addEventListener("click", () => {
+          const activeButton = document.querySelector(".plan-select.is-selected");
+          if (activeButton) {
+            activeButton.classList.remove("is-selected");
+            activeButton.querySelector(".plan-label").classList.remove("hidden");
+            activeButton.querySelector(".plan-selected").classList.add("hidden");
+          }
+
+          button.classList.add("is-selected");
+          button.querySelector(".plan-label").classList.add("hidden");
+          button.querySelector(".plan-selected").classList.remove("hidden");
+          selectionMessage.classList.remove("hidden");
+        });
+      });
+    });
+  </script>
+</body>
+</html>
