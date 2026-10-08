@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SongPlayerShell from "../../components/SongPlayerShell";
 import { buildCrateUrl, findTrackIndexInMix } from "../../../lib/mixtape-nav";
+import { appAbsoluteUrl } from "../../../lib/seo";
 import { ensureCreativeTvPlaybackForSong, getMix, getSong } from "../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!song) return { title: "Song not found" };
   return {
     title: `${song.title} · ${song.artist} · Creative Mixtape`,
-    description: `Listen to ${song.title} by ${song.artist} on the mixtape turntable.`
+    description: `Listen to ${song.title} by ${song.artist} on the mixtape turntable.`,
+    alternates: {
+      canonical: appAbsoluteUrl(`songs/${id}`)
+    }
   };
 }
 

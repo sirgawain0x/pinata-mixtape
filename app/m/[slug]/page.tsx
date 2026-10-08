@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getCurrentCreator } from "../../../lib/auth";
 import { canViewMix } from "../../../lib/mixtape-access";
 import { buildCrateUrl, buildSongUrl } from "../../../lib/mixtape-nav";
+import { appAbsoluteUrl } from "../../../lib/seo";
 import { getMixBySlug } from "../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   return {
     title: `${mix.title} · Mixtape`,
-    description: mix.description || mix.shareNote || `A curated mixtape with ${mix.tracks.length} tracks.`
+    description: mix.description || mix.shareNote || `A curated mixtape with ${mix.tracks.length} tracks.`,
+    alternates: {
+      canonical: appAbsoluteUrl(`m/${slug}`)
+    }
   };
 }
 

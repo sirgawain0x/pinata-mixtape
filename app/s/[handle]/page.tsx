@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
+import type { Metadata } from "next";
 import StationPlayer from "../../components/StationPlayer";
 import { StationSupportButton } from "../../components/StationSupportButton";
 import { getCurrentCreator } from "../../../lib/auth";
@@ -10,10 +11,26 @@ import {
   materializeSeedMixIfEmpty
 } from "../../../lib/stations";
 import { getSong } from "../../../lib/mixtapes";
+import { appAbsoluteUrl } from "../../../lib/seo";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = { params: Promise<{ handle: string }> };
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { handle } = await params;
+  const station = await getStationByHandle(handle);
+  if (!station || !station.isPublic) {
+    return { title: "Station not found" };
+  }
+  return {
+    title: `${station.name} · @${station.handle} · Mixtape Radio`,
+    description: station.tagline || `Listen to ${station.name} on Mixtape Radio.`,
+    alternates: {
+      canonical: appAbsoluteUrl(`s/${handle}`)
+    }
+  };
+}
 
 async function requestOrigin(): Promise<string> {
   const h = await headers();

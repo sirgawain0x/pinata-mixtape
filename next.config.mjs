@@ -146,11 +146,15 @@ function absoluteOrigin() {
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/^https?:\/\//, "")}`;
   }
-  return "https://air.creativeplatform.xyz";
+  return "https://mixtape.creativeplatform.xyz";
 }
 
 function marketingRewriteDestination() {
   return `${absoluteOrigin()}/app/api/marketing`;
+}
+
+function rootSeoRewrite(path) {
+  return `${absoluteOrigin()}/app${path}`;
 }
 
 const nextConfig = {
@@ -168,6 +172,16 @@ const nextConfig = {
       {
         source: "/index.html",
         destination,
+        basePath: false
+      },
+      {
+        source: "/robots.txt",
+        destination: rootSeoRewrite("/robots.txt"),
+        basePath: false
+      },
+      {
+        source: "/sitemap.xml",
+        destination: rootSeoRewrite("/sitemap.xml"),
         basePath: false
       }
     ];

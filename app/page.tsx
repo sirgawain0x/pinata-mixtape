@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
 import MixtapeApp from "./mixtape-app";
 import { getCurrentCreator } from "../lib/auth";
+import { appAbsoluteUrl } from "../lib/seo";
 import { listMixMoments, listMixes, listSongs, seedMixes, seedMixMoments } from "../lib/mixtapes";
 import { listStations } from "../lib/stations";
+
+export function generateMetadata(): Metadata {
+  return {
+    alternates: {
+      canonical: appAbsoluteUrl()
+    }
+  };
+}
 
 type HomePageProps = {
   searchParams?: Promise<{ mix?: string }>;
