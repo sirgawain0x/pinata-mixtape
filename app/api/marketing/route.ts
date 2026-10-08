@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { marketingLandingHtml } from "../../../lib/seo";
 
 /**
  * Serves the marketing landing HTML for Vercel.
@@ -9,7 +10,7 @@ import { join } from "node:path";
 const landingHtml = readFileSync(join(process.cwd(), "landing", "index.html"), "utf8");
 
 export function GET() {
-  return new Response(landingHtml, {
+  return new Response(marketingLandingHtml(landingHtml), {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "public, max-age=60"

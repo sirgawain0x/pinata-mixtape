@@ -5,13 +5,35 @@ import { fileURLToPath } from "node:url";
 import next from "next";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function marketingSiteOrigin() {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (fromEnv) {
+    try {
+      return new URL(fromEnv).origin;
+    } catch {
+      // fall through
+    }
+  }
+  return "https://mixtape.creativeplatform.xyz";
+}
+
+function marketingLandingHtml(rawHtml) {
+  const canonical = `${marketingSiteOrigin()}/`;
+  if (rawHtml.includes('rel="canonical"')) {
+    return rawHtml;
+  }
+  return rawHtml.replace("</head>", `  <link rel="canonical" href="${canonical}" />\n</head>`);
+}
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "0.0.0.0";
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev, hostname: host, port });
 const handle = app.getRequestHandler();
 
-const landingHtml = readFileSync(join(__dirname, "landing", "index.html"), "utf8");
+const landingHtml = marketingLandingHtml(
+  readFileSync(join(__dirname, "landing", "index.html"), "utf8")
+);
 
 function pathnameOf(url = "/") {
   try {
