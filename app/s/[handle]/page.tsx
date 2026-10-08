@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: `${station.name} · @${station.handle} · Mixtape Radio`,
     description: station.tagline || `Listen to ${station.name} on Mixtape Radio.`,
     alternates: {
-      canonical: appAbsoluteUrl(`s/${handle}`)
+      canonical: appAbsoluteUrl(`s/${station.handle}`)
     }
   };
 }

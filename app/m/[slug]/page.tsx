@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: `${mix.title} · Mixtape`,
     description: mix.description || mix.shareNote || `A curated mixtape with ${mix.tracks.length} tracks.`,
     alternates: {
-      canonical: appAbsoluteUrl(`m/${slug}`)
+      canonical: appAbsoluteUrl(`m/${mix.slug}`)
     }
   };
 }
