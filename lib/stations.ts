@@ -352,6 +352,27 @@ export async function getStationByHandle(handle: string): Promise<Station | null
   return row ? mapStation(row) : null;
 }
 
+export type StationSitemapEntry = {
+  handle: string;
+  updatedAt: string;
+};
+
+/** Public station handles for sitemap generation — minimal columns only. */
+export async function listPublicStationsForSitemap(): Promise<StationSitemapEntry[]> {
+  await dbReady();
+  const rows = await sqlAll<{ handle: string; updated_at: string }>(
+    `SELECT handle, updated_at
+       FROM stations
+      WHERE is_public = 1
+        AND TRIM(COALESCE(handle, '')) != ''
+      ORDER BY updated_at DESC, id DESC`
+  );
+  return rows.map((row) => ({
+    handle: row.handle.trim(),
+    updatedAt: row.updated_at
+  }));
+}
+
 export async function listStations(filter: { creatorId?: number; publicOnly?: boolean } = {}): Promise<Station[]> {
   await dbReady();
   const wheres: string[] = [];

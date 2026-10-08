@@ -695,6 +695,27 @@ function mixLimitClause(filter: MixListFilter): string {
   return ` LIMIT ${n}`;
 }
 
+export type MixSitemapEntry = {
+  slug: string;
+  updatedAt: string;
+};
+
+/** Public mix slugs for sitemap generation — no track hydration or legacy migration. */
+export async function listPublicMixesForSitemap(): Promise<MixSitemapEntry[]> {
+  await dbReady();
+  const rows = await sqlAll<{ slug: string; updated_at: string }>(
+    `SELECT slug, updated_at
+       FROM mixes
+      WHERE is_public = 1
+        AND TRIM(COALESCE(slug, '')) != ''
+      ORDER BY updated_at DESC, id DESC`
+  );
+  return rows.map((row) => ({
+    slug: row.slug.trim(),
+    updatedAt: row.updated_at
+  }));
+}
+
 export async function listMixes(query = "", filter: MixListFilter = {}): Promise<Mix[]> {
   await scheduleLegacyMixMigration();
   const search = query.trim();
