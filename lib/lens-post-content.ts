@@ -1,5 +1,27 @@
+import { socialPostText } from "./social-composer";
+
 /** Shared Lens text-post limit (UI + API). */
 export const LENS_POST_MAX_CHARACTERS = 2000;
+
+/** Final body published to Lens (trimmed draft plus optional playlist block). */
+export function lensFinalPostText(text: string, playlistUrl?: string | null): string {
+  return socialPostText(text, playlistUrl);
+}
+
+export function lensFinalPostLength(text: string, playlistUrl?: string | null): number {
+  return [...lensFinalPostText(text, playlistUrl)].length;
+}
+
+export function isLensFinalPostWithinLimit(text: string, playlistUrl?: string | null): boolean {
+  return lensFinalPostLength(text, playlistUrl) <= LENS_POST_MAX_CHARACTERS;
+}
+
+/** Reserve `\n\n` + playlist URL so the composed post stays within the Lens cap. */
+export function maxLensTextareaCharacters(playlistUrl?: string | null): number {
+  if (!playlistUrl) return LENS_POST_MAX_CHARACTERS;
+  const suffixReserve = 2 + [...playlistUrl].length;
+  return Math.max(0, LENS_POST_MAX_CHARACTERS - suffixReserve);
+}
 
 const POST_BODY_MAX_BYTES = 12_000;
 
