@@ -1,3 +1,4 @@
+import { isAiGatewayConfigured } from "../../../../lib/ai-gateway";
 import { getCurrentCreator } from "../../../../lib/auth";
 import { createPlaylistDraft, playlistConversationSchema } from "../../../../lib/playlist-agent";
 import { rateLimitHit } from "../../../../lib/rate-limit";
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   try { body = JSON.parse(raw); } catch { return Response.json({ error: "Invalid conversation." }, { status: 400 }); }
   const parsed = playlistConversationSchema.safeParse(body);
   if (!parsed.success) return Response.json({ error: "Send a conversation of up to 16 short messages." }, { status: 400 });
-  if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) {
+  if (!isAiGatewayConfigured()) {
     return Response.json({ error: "The assistant is unavailable right now. You can create your playlist with the form below." }, { status: 503 });
   }
   try {

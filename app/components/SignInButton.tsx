@@ -1,6 +1,6 @@
 "use client";
 
-import { useLinkAccount, useLogin, useLogout, usePrivy, useWallets } from "@privy-io/react-auth";
+import { useLinkAccount, useLogin, useLogout, useModalStatus, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { isAddress } from "viem";
@@ -29,6 +29,7 @@ export function SignInButton({
   const { ready, authenticated, user, getAccessToken } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
+  const { isOpen: privyModalOpen } = useModalStatus();
   const { linkPasskey, linkEmail, linkGoogle } = useLinkAccount({
     onSuccess: () => setPasskeyLinkStatus("Account updated."),
     onError: (error) => setPasskeyLinkStatus(error || "Could not update account.")
@@ -51,6 +52,14 @@ export function SignInButton({
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const sessionAddressRef = useRef<string | null>(null);
+  const drawerVisible = isOpen && !privyModalOpen;
+
+  useEffect(() => {
+    if (privyModalOpen && isOpen) {
+      setIsOpen(false);
+      setPanel("menu");
+    }
+  }, [privyModalOpen, isOpen]);
 
   useEffect(() => {
     if (ready) return;
@@ -202,7 +211,7 @@ export function SignInButton({
   }, [isOpen, sessionReady]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!drawerVisible) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         closeDrawer();
@@ -220,7 +229,7 @@ export function SignInButton({
       window.removeEventListener("keydown", onKey);
       window.clearTimeout(focusTimer);
     };
-  }, [isOpen, closeDrawer]);
+  }, [drawerVisible, closeDrawer]);
 
   const handleLogout = async () => {
     await fetch(`${APP_BASE}/api/auth/session`, { method: "DELETE" }).catch(() => null);
@@ -317,7 +326,7 @@ export function SignInButton({
             </>
           ) : "My Account"}
         </button>
-        {isOpen ? (
+        {drawerVisible ? (
           <div className="account-drawer-root">
             <div
               className="account-menu-backdrop"
@@ -328,7 +337,6 @@ export function SignInButton({
               id="account-drawer"
               className="account-menu-panel"
               role="dialog"
-              aria-modal="true"
               aria-labelledby="account-drawer-title"
               ref={panelRef}
             >
@@ -403,6 +411,7 @@ export function SignInButton({
                           className="account-menu-item"
                           onClick={() => {
                             setPasskeyLinkStatus("");
+                            closeDrawer();
                             linkPasskey({ name: "Mixtape" });
                           }}
                         >
@@ -419,6 +428,7 @@ export function SignInButton({
                               className="account-menu-item"
                               onClick={() => {
                                 setPasskeyLinkStatus("");
+                                closeDrawer();
                                 linkEmail();
                               }}
                             >
@@ -429,6 +439,7 @@ export function SignInButton({
                               className="account-menu-item"
                               onClick={() => {
                                 setPasskeyLinkStatus("");
+                                closeDrawer();
                                 linkGoogle();
                               }}
                             >

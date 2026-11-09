@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { isLensTransactionRequest } from "../lib/lens-mutation-result";
 import { assertFreeLensOperation } from "../lib/lens-operation";
 
 test("paid fallback is blocked before a wallet adapter can send it", () => {
@@ -11,9 +12,18 @@ test("paid fallback is blocked before a wallet adapter can send it", () => {
   assert.equal(walletCalled, false);
 });
 
-test("relay responses and sponsored signatures may proceed", () => {
-  assert.doesNotThrow(() => assertFreeLensOperation({ __typename: "PostResponse" }));
-  assert.doesNotThrow(() => assertFreeLensOperation({ __typename: "SponsoredTransactionRequest", raw: { value: "0", customData: { paymasterParams: { paymaster: "0xpaymaster" } } } }));
+test("sponsored transaction requests pass the gas guard", () => {
+  assert.doesNotThrow(() =>
+    assertFreeLensOperation({
+      __typename: "SponsoredTransactionRequest",
+      raw: { value: "0", customData: { paymasterParams: { paymaster: "0xpaymaster" } } },
+    })
+  );
+});
+
+test("PostResponse is not treated as a wallet transaction request", () => {
+  assert.equal(isLensTransactionRequest({ __typename: "PostResponse", hash: "0x" + "a".repeat(64) }), false);
+  assert.equal(isLensTransactionRequest(null), false);
 });
 
 test("sponsored requests cannot carry a payment or omit their paymaster", () => {
