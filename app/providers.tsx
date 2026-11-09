@@ -12,6 +12,7 @@ type Props = {
 export function Providers({ children }: Props) {
   const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "missing-privy-app-id";
 
+  // Use the default web configuration. A stale app client ID blocks Privy startup.
   return (
     <PrivyProvider
       appId={privyAppId}

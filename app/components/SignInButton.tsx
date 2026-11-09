@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { resolveSmartAccountAddress } from "../../lib/smart-wallet";
 
 const APP_BASE = "/app";
+const SIGN_IN_STARTUP_TIMEOUT_MS = 20_000;
 
 type SignInButtonProps = {
   onChange?: (
@@ -28,6 +29,7 @@ export function SignInButton({
   const { login } = useLogin();
   const { logout } = useLogout();
   const { wallets } = useWallets();
+  const [startupTimedOut, setStartupTimedOut] = useState(false);
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(
     initialCreator?.address ?? null
   );
@@ -43,6 +45,16 @@ export function SignInButton({
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const sessionAddressRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (ready) return;
+
+    const timeout = window.setTimeout(() => {
+      setStartupTimedOut(true);
+    }, SIGN_IN_STARTUP_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [ready]);
 
   const closeDrawer = useCallback(() => {
     setIsOpen(false);
@@ -249,8 +261,13 @@ export function SignInButton({
 
   if (!ready) {
     return (
-      <button className="btn-led" type="button" disabled>
-        Loading…
+      <button
+        className="btn-led"
+        type="button"
+        disabled={!startupTimedOut}
+        onClick={() => window.location.reload()}
+      >
+        {startupTimedOut ? "Retry sign-in" : "Loading…"}
       </button>
     );
   }
