@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { createWalletClient, custom, type WalletClient } from "viem";
+import { createWalletClient, custom } from "viem";
 import { lens } from "viem/chains";
 import { evmAddress, uri, txHash, postId, PostReactionType, type SessionClient } from "@lens-protocol/client";
 import { fetchAccountsAvailable, fetchPost, post, editPost, deletePost, addReaction, undoReaction, transactionStatus } from "@lens-protocol/client/actions";
@@ -23,7 +23,7 @@ export function useLensPublishing() {
   const [account, setAccount] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-  const [session, setSession] = useState<{ client: SessionClient; wallet: WalletClient; signer: string; account: string } | null>(null);
+  const [session, setSession] = useState<{ client: SessionClient; wallet: Awaited<ReturnType<typeof walletClient>>; signer: string; account: string } | null>(null);
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
   const [publishedId, setPublishedId] = useState("");
   const [pendingContent, setPendingContent] = useState("");
