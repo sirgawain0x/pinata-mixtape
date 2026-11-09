@@ -7,7 +7,7 @@ import { lens } from "viem/chains";
 import { evmAddress, uri, txHash, postId, PostReactionType, type SessionClient } from "@lens-protocol/client";
 import { fetchAccountsAvailable, fetchPost, post, editPost, deletePost, addReaction, undoReaction, transactionStatus } from "@lens-protocol/client/actions";
 import { signMessageWith } from "@lens-protocol/client/viem";
-import { asLensOperation } from "../../lib/lens-operation";
+import { completeDelegableLensMutation, completeLensReactionResult, isLensTransactionRequest } from "../../lib/lens-mutation-result";
 import { lensClient } from "../../lib/lens-client";
 import { MIXTAPE_LENS } from "../../lib/lens-config";
 import { submitLensOperation } from "../../lib/lens-submit-operation";
@@ -139,7 +139,9 @@ export function useLensPublishing() {
         if (!response.ok) throw new Error(metadata.error || "Could not prepare post metadata.");
         const result = await post(active.client, { contentUri: uri(metadata.contentUri), feed: evmAddress(MIXTAPE_LENS.feed) });
         if (result.isErr()) throw result.error;
-        hash = await submitLensOperation(result.value, active.wallet, connectedWalletFor(active.signer), lens.id);
+        hash = await completeDelegableLensMutation(result.value, () =>
+          submitLensOperation(result.value, active.wallet, connectedWalletFor(active.signer), lens.id)
+        );
         setPendingHash(hash);
         setPendingContent(content);
         try { sessionStorage.setItem("mixtape:pending-lens-post", JSON.stringify({ hash, content })); } catch { /* Optional recovery storage. */ }
@@ -181,11 +183,11 @@ export function useLensPublishing() {
       if (action === "hype" || action === "unhype") {
         const result = await (action === "hype" ? addReaction : undoReaction)(active.client, { post: postId(id), reaction: PostReactionType.Upvote });
         if (result.isErr()) throw result.error;
-        const reactionOp = asLensOperation(result.value);
-        if (reactionOp) {
-          await submitLensOperation(reactionOp, active.wallet, connectedWalletFor(active.signer), lens.id);
-        } else if (!result.value) {
-          throw new Error("Lens could not save your reaction.");
+        const reactionValue = result.value;
+        if (isLensTransactionRequest(reactionValue)) {
+          await submitLensOperation(reactionValue, active.wallet, connectedWalletFor(active.signer), lens.id);
+        } else {
+          completeLensReactionResult(reactionValue);
         }
       } else {
         let contentUri: string | undefined;
@@ -199,7 +201,9 @@ export function useLensPublishing() {
           ? await editPost(active.client, { post: postId(id), contentUri: uri(contentUri!) })
           : await deletePost(active.client, { post: postId(id) });
         if (result.isErr()) throw result.error;
-        const txHash = await submitLensOperation(result.value, active.wallet, connectedWalletFor(active.signer), lens.id);
+        const txHash = await completeDelegableLensMutation(result.value, () =>
+          submitLensOperation(result.value, active.wallet, connectedWalletFor(active.signer), lens.id)
+        );
         const change: PendingChange = { id, action, hash: txHash };
         setPendingChange(change);
         try { sessionStorage.setItem("mixtape:pending-lens-change", JSON.stringify(change)); } catch { /* Optional recovery storage. */ }

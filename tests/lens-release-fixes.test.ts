@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertFreeLensOperation, asLensOperation } from "../lib/lens-operation";
+import { completeLensReactionResult, isLensTransactionRequest } from "../lib/lens-mutation-result";
+import { assertFreeLensOperation } from "../lib/lens-operation";
 import {
   LENS_POST_MAX_CHARACTERS,
   lensPostBodyTooLarge,
@@ -24,9 +25,14 @@ test("oversized HTTP bodies are rejected before JSON parse", () => {
 });
 
 test("reaction operations reject paid Lens transactions before signing", () => {
-  const paid = asLensOperation({ __typename: "SelfFundedTransactionRequest" });
-  assert.ok(paid);
-  assert.throws(() => assertFreeLensOperation(paid!), /no payment was submitted/);
+  const paid = { __typename: "SelfFundedTransactionRequest" as const };
+  assert.ok(isLensTransactionRequest(paid));
+  assert.throws(() => assertFreeLensOperation(paid), /no payment was submitted/);
+});
+
+test("AddReactionResponse is not submitted to the wallet adapter", () => {
+  assert.equal(isLensTransactionRequest({ __typename: "AddReactionResponse", success: true }), false);
+  assert.doesNotThrow(() => completeLensReactionResult({ __typename: "UndoReactionResponse", success: true }));
 });
 
 test("lens account GET requires a Mixtape session", () => {
