@@ -1,5 +1,7 @@
+export type LensTieredOperation = { __typename: string; raw?: unknown };
+
 /** Reject operations that could spend the user's funds before invoking a wallet adapter. */
-export function assertFreeLensOperation(operation: { __typename: string; raw?: unknown }): void {
+export function assertFreeLensOperation(operation: LensTieredOperation): void {
   if (operation.__typename === "SelfFundedTransactionRequest") {
     throw new Error("Lens requested a paid transaction. Publishing stopped; no payment was submitted.");
   }

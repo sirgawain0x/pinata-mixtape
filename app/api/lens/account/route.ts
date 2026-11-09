@@ -1,12 +1,16 @@
 import { isAddress, verifyMessage } from "viem";
 import { evmAddress } from "@lens-protocol/client";
 import { fetchAccountsAvailable } from "@lens-protocol/client/actions";
-import { withCreator, jsonError } from "../../../../lib/auth";
+import { getCurrentCreator, withCreator, jsonError } from "../../../../lib/auth";
+import { requireSignedInForLensAccountLookup } from "../../../../lib/lens-account-access";
 import { sqlGet, sqlRun } from "../../../../lib/sql-bridge";
 import { lensClient } from "../../../../lib/lens-client";
 import { rateLimitHit } from "../../../../lib/rate-limit";
 
 export async function GET(request: Request) {
+  const viewer = await getCurrentCreator();
+  const authError = requireSignedInForLensAccountLookup(Boolean(viewer));
+  if (authError) return jsonError(authError.message, authError.status);
   const creatorId = Number(new URL(request.url).searchParams.get("creator"));
   if (!Number.isSafeInteger(creatorId) || creatorId < 1) return jsonError("Invalid creator.", 400);
   const row = await sqlGet<{ account: string }>("SELECT account FROM creator_lens_accounts WHERE creator_id = ?", [creatorId]);
