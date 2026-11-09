@@ -6,6 +6,7 @@ import { fetchPosts } from "@lens-protocol/client/actions";
 import { useLensPublishing } from "../hooks/useLensPublishing";
 import LensAccountPicker from "./LensAccountPicker";
 import DesignDialog from "./DesignDialog";
+import { LENS_POST_MAX_CHARACTERS } from "../../lib/lens-post-content";
 import { MIXTAPE_LENS } from "../../lib/lens-config";
 
 type FeedPost = { id: string; author: string; authorAddress: string; upvotes: number; hyped: boolean; content: string; timestamp: string };
@@ -25,7 +26,11 @@ export default function LensFeed({ refreshKey = 0, creatorId }: { refreshKey?: n
       try {
         let author: string | null = null;
         if (creatorId) {
-          const linked = await fetch(`/app/api/lens/account?creator=${creatorId}`);
+          const linked = await fetch(`/app/api/lens/account?creator=${creatorId}`, { credentials: "include" });
+          if (linked.status === 401) {
+            if (!cancelled) { setPosts([]); setStatus("Sign in to view this creator’s Lens posts."); }
+            return;
+          }
           if (!linked.ok) throw new Error("Could not load linked Lens account.");
           author = (await linked.json()).account;
           if (!author) { if (!cancelled) { setPosts([]); setStatus("No Lens account linked yet."); } return; }
@@ -68,7 +73,7 @@ export default function LensFeed({ refreshKey = 0, creatorId }: { refreshKey?: n
       </div>
     </article>)}</div>
     {editing ? <DesignDialog title="Edit your post" onClose={() => { if (!lens.busy) setEditing(null); }}>
-      <label className="mt-post-field">Your post<textarea data-dialog-autofocus rows={6} maxLength={4000} disabled={lens.busy} value={editText} onChange={(event) => setEditText(event.target.value)}/></label>
+      <label className="mt-post-field">Your post<textarea data-dialog-autofocus rows={6} maxLength={LENS_POST_MAX_CHARACTERS} disabled={lens.busy} value={editText} onChange={(event) => setEditText(event.target.value)}/></label>
       <button type="button" className="mt-primary" disabled={lens.busy || !editText.trim()} onClick={() => void act(editing, "edit")}>{lens.busy ? "Saving…" : "Save changes"}</button>
       {lens.status ? <p role="status" className="mt-note">{lens.status}</p> : null}
     </DesignDialog> : null}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Mix } from "../mixtape-app";
 import { publicPlaylistShareUrl, shareableOrigin, socialComposerUrl, socialPostText, type SocialPlatform } from "../../lib/social-composer";
+import { LENS_POST_MAX_CHARACTERS } from "../../lib/lens-post-content";
 import { useLensPublishing } from "../hooks/useLensPublishing";
 import LensAccountPicker from "./LensAccountPicker";
 import DesignDialog from "./DesignDialog";
@@ -47,7 +48,7 @@ export default function PostComposer({ mixes, initialMixId, onClose }: {
       </label>
     </fieldset>
     <label className="mt-post-field">Your post
-      <textarea disabled={lens.busy || Boolean(lens.pendingHash)} data-dialog-autofocus rows={5} maxLength={2000} placeholder="What’s on your rotation?" value={text}
+      <textarea disabled={lens.busy || Boolean(lens.pendingHash)} data-dialog-autofocus rows={5} maxLength={LENS_POST_MAX_CHARACTERS} placeholder="What’s on your rotation?" value={text}
         onChange={(event) => { setText(event.target.value); setOpened(null); setCopied(""); }}/>
     </label>
     <div className="mt-post-length"><span>{Array.from(text).length.toLocaleString()} characters</span><span>Final limits are checked on {destinationName}.</span></div>

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assertFreeLensOperation } from "../lib/lens-operation";
+import { assertFreeLensOperation, asLensOperation } from "../lib/lens-operation";
 
 test("paid fallback is blocked before a wallet adapter can send it", () => {
   let walletCalled = false;
@@ -14,6 +14,12 @@ test("paid fallback is blocked before a wallet adapter can send it", () => {
 test("relay responses and sponsored signatures may proceed", () => {
   assert.doesNotThrow(() => assertFreeLensOperation({ __typename: "PostResponse" }));
   assert.doesNotThrow(() => assertFreeLensOperation({ __typename: "SponsoredTransactionRequest", raw: { value: "0", customData: { paymasterParams: { paymaster: "0xpaymaster" } } } }));
+});
+
+test("asLensOperation only accepts tiered transaction shapes", () => {
+  assert.equal(asLensOperation(null), null);
+  assert.equal(asLensOperation(true), null);
+  assert.deepEqual(asLensOperation({ __typename: "PostResponse" }), { __typename: "PostResponse" });
 });
 
 test("sponsored requests cannot carry a payment or omit their paymaster", () => {

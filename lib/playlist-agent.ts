@@ -4,6 +4,7 @@ import { searchMusicBrainzRecordings, type MusicBrainzRecording } from "./musicb
 import { findRecordingListeningLink } from "./recording-discovery";
 import { buildYoutubeSearchUrl } from "./recording-links";
 import { parsePlaylistDetails } from "./playlist-details";
+import { resolveAiGatewayModel } from "./ai-gateway";
 import type { MixInput, TrackInput } from "./mixtapes";
 
 export const playlistConversationSchema = z.object({
@@ -26,7 +27,7 @@ export async function createPlaylistDraft(messages: z.infer<typeof playlistConve
   const recordings = new Map<string, MusicBrainzRecording>();
   let lookupCount = 0;
   const agent = new ToolLoopAgent({
-    model: process.env.AI_GATEWAY_MODEL || "google/gemini-3.8-flash",
+    model: resolveAiGatewayModel(),
     instructions: `You are Creative Mixtape's playlist assistant. Help the user create a playlist.
 Ask for the playlist name, creators, genre and an optional source URL. Ask one concise question at a time when essential details are missing. Creators and URLs may be left empty. You can suggest a name and genre if they ask you to curate.
 Use findRecordings to identify songs in MusicBrainz. Search at most six songs per response. Only include recordingIds returned by the tool IN THIS RESPONSE. Never invent artists, release dates, albums, IDs or playable URLs. Do not claim a URL was imported: you cannot read URLs. Ask which tracks to use when given only a URL.

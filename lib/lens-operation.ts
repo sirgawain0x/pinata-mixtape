@@ -1,5 +1,13 @@
+export type LensTieredOperation = { __typename: string; raw?: unknown };
+
+export function asLensOperation(value: unknown): LensTieredOperation | null {
+  if (!value || typeof value !== "object" || !("__typename" in value)) return null;
+  const typename = (value as { __typename: unknown }).__typename;
+  return typeof typename === "string" ? (value as LensTieredOperation) : null;
+}
+
 /** Reject operations that could spend the user's funds before invoking a wallet adapter. */
-export function assertFreeLensOperation(operation: { __typename: string; raw?: unknown }): void {
+export function assertFreeLensOperation(operation: LensTieredOperation): void {
   if (operation.__typename === "SelfFundedTransactionRequest") {
     throw new Error("Lens requested a paid transaction. Publishing stopped; no payment was submitted.");
   }
