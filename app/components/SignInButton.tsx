@@ -30,9 +30,17 @@ export function SignInButton({
   const { login } = useLogin();
   const { logout } = useLogout();
   const { isOpen: privyModalOpen } = useModalStatus();
+  const linkFeedbackPendingRef = useRef(false);
+  const [passkeyLinkStatus, setPasskeyLinkStatus] = useState("");
   const { linkPasskey, linkEmail, linkGoogle } = useLinkAccount({
-    onSuccess: () => setPasskeyLinkStatus("Account updated."),
-    onError: (error) => setPasskeyLinkStatus(error || "Could not update account.")
+    onSuccess: () => {
+      setPasskeyLinkStatus("Account updated.");
+      linkFeedbackPendingRef.current = true;
+    },
+    onError: (error) => {
+      setPasskeyLinkStatus(error || "Could not update account.");
+      linkFeedbackPendingRef.current = true;
+    }
   });
   const { wallets } = useWallets();
   const [startupTimedOut, setStartupTimedOut] = useState(false);
@@ -47,7 +55,6 @@ export function SignInButton({
   const [meTokenSaving, setMeTokenSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
-  const [passkeyLinkStatus, setPasskeyLinkStatus] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -60,6 +67,13 @@ export function SignInButton({
       setPanel("menu");
     }
   }, [privyModalOpen, isOpen]);
+
+  useEffect(() => {
+    if (privyModalOpen || !linkFeedbackPendingRef.current) return;
+    linkFeedbackPendingRef.current = false;
+    setIsOpen(true);
+    setPanel("menu");
+  }, [privyModalOpen]);
 
   useEffect(() => {
     if (ready) return;
@@ -326,6 +340,11 @@ export function SignInButton({
             </>
           ) : "My Account"}
         </button>
+        {passkeyLinkStatus && !drawerVisible ? (
+          <p className="account-metoken-status account-link-status" role="status">
+            {passkeyLinkStatus}
+          </p>
+        ) : null}
         {drawerVisible ? (
           <div className="account-drawer-root">
             <div
@@ -337,6 +356,7 @@ export function SignInButton({
               id="account-drawer"
               className="account-menu-panel"
               role="dialog"
+              aria-modal="true"
               aria-labelledby="account-drawer-title"
               ref={panelRef}
             >
