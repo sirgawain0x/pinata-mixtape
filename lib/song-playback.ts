@@ -32,19 +32,15 @@ export function inferAssistantTrackEmbed(listenUrl?: string, youtubeUrl?: string
 } {
   const listen = listenUrl?.trim() ?? "";
   const yt = youtubeUrl?.trim() ?? "";
+  const candidate = listen || yt;
   if (isYoutubeSearchUrl(listen) || isYoutubeSearchUrl(yt)) {
     return { embedSourceKind: "link_only", embedIframeUrl: "", youtubeUrl: yt || listen };
   }
-  const iframe = recordingEmbedUrl(listen) || recordingEmbedUrl(yt);
-  if (iframe) {
-    return { embedSourceKind: "iframe_allowed", embedIframeUrl: iframe, youtubeUrl: yt };
-  }
   const videoId = youtubeVideoId(listen) || youtubeVideoId(yt);
   if (videoId) {
-    const canonical = listen || yt;
-    return { embedSourceKind: "youtube", embedIframeUrl: "", youtubeUrl: canonical };
+    return { embedSourceKind: "youtube", embedIframeUrl: "", youtubeUrl: candidate };
   }
-  return { embedSourceKind: "link_only", embedIframeUrl: "", youtubeUrl: yt };
+  return { embedSourceKind: "link_only", embedIframeUrl: "", youtubeUrl: yt || listen };
 }
 
 export type ResolvedPlaybackSource = {
