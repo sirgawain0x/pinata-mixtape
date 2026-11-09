@@ -1,22 +1,50 @@
+import { inferAssistantTrackEmbed } from "./song-playback";
 import type { MixInput, TrackInput } from "./mixtapes";
 
-const REMOVAL_PATTERN = /\b(remove|drop|delete|take out|without|minus)\b/i;
+export type PlaylistTrackChange = "add" | "remove" | "replace";
 
-export function mergePlaylistRecordingIds(
-  previous: MixInput | null | undefined,
-  nextRecordingIds: string[],
-  lastUserMessage: string
-): string[] {
-  const prevIds = (previous?.tracks ?? [])
-    .map((track) => track.musicbrainzId?.trim())
-    .filter((id): id is string => Boolean(id));
-  const nextIds = [...new Set(nextRecordingIds.map((id) => id.trim()).filter(Boolean))];
-  if (!prevIds.length) return nextIds;
-  if (!nextIds.length && !REMOVAL_PATTERN.test(lastUserMessage)) return prevIds;
-  if (REMOVAL_PATTERN.test(lastUserMessage) || (nextIds.length > 0 && nextIds.length < prevIds.length)) {
-    return nextIds;
+function uniqueRecordingIds(ids: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of ids) {
+    const id = raw.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
   }
-  return [...new Set([...prevIds, ...nextIds])];
+  return out;
+}
+
+function previousRecordingIds(previous: MixInput | null | undefined): string[] {
+  return uniqueRecordingIds(
+    (previous?.tracks ?? []).map((track) => track.musicbrainzId ?? "").filter(Boolean)
+  );
+}
+
+export function applyPlaylistTrackChange(
+  previous: MixInput | null | undefined,
+  trackChange: PlaylistTrackChange,
+  recordingIds: string[],
+  removeRecordingIds: string[]
+): string[] {
+  const prevIds = previousRecordingIds(previous);
+  const nextIds = uniqueRecordingIds(recordingIds);
+  const removeIds = new Set(uniqueRecordingIds(removeRecordingIds));
+
+  if (!prevIds.length) return nextIds;
+
+  switch (trackChange) {
+    case "add":
+      return uniqueRecordingIds([...prevIds, ...nextIds]);
+    case "remove":
+      return prevIds.filter((id) => !removeIds.has(id));
+    case "replace":
+      return nextIds;
+    default: {
+      const _exhaustive: never = trackChange;
+      return _exhaustive;
+    }
+  }
 }
 
 function trackByRecordingId(tracks: TrackInput[]): Map<string, TrackInput> {
@@ -28,6 +56,18 @@ function trackByRecordingId(tracks: TrackInput[]): Map<string, TrackInput> {
   return map;
 }
 
+export function applyAssistantEmbedsToTracks(tracks: TrackInput[]): TrackInput[] {
+  return tracks.map((track) => {
+    const embed = inferAssistantTrackEmbed(track.listenUrl, track.youtubeUrl);
+    return {
+      ...track,
+      embedSourceKind: embed.embedSourceKind,
+      embedIframeUrl: embed.embedIframeUrl,
+      youtubeUrl: embed.youtubeUrl || track.youtubeUrl,
+    };
+  });
+}
+
 export function mergePlaylistDraft(
   previous: MixInput | null | undefined,
   next: MixInput,
@@ -36,10 +76,12 @@ export function mergePlaylistDraft(
   const previousTracks = previous?.tracks ?? [];
   const nextTracks = next.tracks ?? [];
   const byId = new Map([...trackByRecordingId(previousTracks), ...trackByRecordingId(nextTracks)]);
-  const tracks = recordingIds.flatMap((id) => {
-    const track = byId.get(id);
-    return track ? [track] : [];
-  });
+  const tracks = applyAssistantEmbedsToTracks(
+    recordingIds.flatMap((id) => {
+      const track = byId.get(id);
+      return track ? [track] : [];
+    })
+  );
   const nextCreators = next.creators?.map((name) => name.trim()).filter(Boolean) ?? [];
   const previousCreators = previous?.creators?.map((name) => name.trim()).filter(Boolean) ?? [];
   return {
