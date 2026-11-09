@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy, useLogin, useLogout, useWallets } from "@privy-io/react-auth";
+import { useLinkAccount, useLogin, useLogout, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { isAddress } from "viem";
@@ -28,6 +28,10 @@ export function SignInButton({
   const { ready, authenticated, user, getAccessToken } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
+  const { linkPasskey, linkEmail, linkGoogle } = useLinkAccount({
+    onSuccess: () => setPasskeyLinkStatus("Account updated."),
+    onError: (error) => setPasskeyLinkStatus(error || "Could not update account.")
+  });
   const { wallets } = useWallets();
   const [startupTimedOut, setStartupTimedOut] = useState(false);
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(
@@ -41,6 +45,7 @@ export function SignInButton({
   const [meTokenSaving, setMeTokenSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [passkeyLinkStatus, setPasskeyLinkStatus] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -60,6 +65,22 @@ export function SignInButton({
     setIsOpen(false);
     setPanel("menu");
   }, []);
+
+  const hasLinkedPasskey = useMemo(
+    () => user?.linkedAccounts?.some((account) => account.type === "passkey") ?? false,
+    [user?.linkedAccounts]
+  );
+
+  const hasRecoveryLogin = useMemo(
+    () =>
+      user?.linkedAccounts?.some(
+        (account) =>
+          account.type === "email" ||
+          account.type === "google_oauth" ||
+          account.type === "wallet"
+      ) ?? false,
+    [user?.linkedAccounts]
+  );
 
   const signerWallet = useMemo(() => {
     const active = wallets.find((w) => w.type === "ethereum" && w.address);
@@ -379,6 +400,51 @@ export function SignInButton({
                       >
                         meToken settings
                       </button>
+                    ) : null}
+                    {sessionReady ? (
+                      <>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          onClick={() => {
+                            setPasskeyLinkStatus("");
+                            linkPasskey({ name: "Mixtape" });
+                          }}
+                        >
+                          {hasLinkedPasskey ? "Add another passkey" : "Add a passkey"}
+                        </button>
+                        {!hasRecoveryLogin ? (
+                          <>
+                            <p className="account-metoken-help">
+                              Add email or Google so you can recover your account if you lose this
+                              device.
+                            </p>
+                            <button
+                              type="button"
+                              className="account-menu-item"
+                              onClick={() => {
+                                setPasskeyLinkStatus("");
+                                linkEmail();
+                              }}
+                            >
+                              Link email for recovery
+                            </button>
+                            <button
+                              type="button"
+                              className="account-menu-item"
+                              onClick={() => {
+                                setPasskeyLinkStatus("");
+                                linkGoogle();
+                              }}
+                            >
+                              Link Google for recovery
+                            </button>
+                          </>
+                        ) : null}
+                        {passkeyLinkStatus ? (
+                          <p className="account-metoken-status">{passkeyLinkStatus}</p>
+                        ) : null}
+                      </>
                     ) : null}
                     {sessionReady && meTokenSaved && onTipOwnMeToken ? (
                       <button
