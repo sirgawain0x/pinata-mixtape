@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Creator, Mix, Station } from "../mixtape-app";
 import type { Song } from "../../lib/mixtapes";
+import { isTrackHiddenFromPublicPlayback } from "../../lib/track-playback-policy";
 import SignInButton from "./SignInButton";
 import MixtapeEditor from "./MixtapeEditor";
 import DesignDialog from "./DesignDialog";
@@ -52,7 +53,7 @@ export default function MixtapeHome({ initialMixes, initialCreator, profileCreat
       const key = String(track.songId ?? `${track.title}-${track.artist}`);
       if (seen.has(key)) return false;
       seen.add(key);
-      return true;
+      return !isTrackHiddenFromPublicPlayback(track);
     });
   }, [mixes]);
 

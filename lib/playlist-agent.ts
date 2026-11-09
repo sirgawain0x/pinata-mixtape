@@ -2,6 +2,7 @@ import { ToolLoopAgent, Output, isStepCount, tool } from "ai";
 import { z } from "zod";
 import { searchMusicBrainzRecordings, type MusicBrainzRecording } from "./musicbrainz";
 import { findRecordingListeningLink } from "./recording-discovery";
+import { trackAlreadyHasYoutubeVideo } from "./youtube-data-lookup-core";
 import { buildYoutubeSearchUrl } from "./recording-links";
 import { parsePlaylistDetails } from "./playlist-details";
 import { resolveAiGatewayModel } from "./ai-gateway";
@@ -86,12 +87,32 @@ For add and replace, every ID in recordingIds must come from findRecordings in t
   });
   const linkDeadline = AbortSignal.timeout(5_000);
   const linkSignal = signal ? AbortSignal.any([signal, linkDeadline]) : linkDeadline;
+  const youtubeApiBudget = { remaining: 6 };
   for (const track of tracks) {
     if (linkSignal.aborted) break;
-    const listenUrl = await findRecordingListeningLink({
-      musicbrainzId: track.musicbrainzId, title: track.title ?? "", artist: track.artist ?? "", albumTitle: track.albumTitle
-    }, linkSignal).catch(() => undefined);
-    if (listenUrl) track.listenUrl = listenUrl;
+    const recording = recordings.get(track.musicbrainzId ?? "");
+    if (trackAlreadyHasYoutubeVideo(track.youtubeUrl, track.listenUrl)) {
+      const embedOnly = inferAssistantTrackEmbed(track.listenUrl, track.youtubeUrl);
+      track.embedSourceKind = embedOnly.embedSourceKind;
+      track.embedIframeUrl = embedOnly.embedIframeUrl;
+      track.youtubeUrl = embedOnly.youtubeUrl || track.youtubeUrl;
+      continue;
+    }
+    const listenUrl = await findRecordingListeningLink(
+      {
+        musicbrainzId: track.musicbrainzId,
+        title: track.title ?? "",
+        artist: track.artist ?? "",
+        albumTitle: track.albumTitle,
+        durationMs: recording?.length ?? null,
+      },
+      linkSignal,
+      { youtubeApiBudget }
+    ).catch(() => undefined);
+    if (listenUrl) {
+      track.listenUrl = listenUrl;
+      if (trackAlreadyHasYoutubeVideo(listenUrl)) track.youtubeUrl = listenUrl;
+    }
     const embed = inferAssistantTrackEmbed(track.listenUrl, track.youtubeUrl);
     track.embedSourceKind = embed.embedSourceKind;
     track.embedIframeUrl = embed.embedIframeUrl;

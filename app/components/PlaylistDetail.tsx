@@ -5,10 +5,10 @@ import { useRef, useState } from "react";
 import type { Mix } from "../mixtape-app";
 import { useMixPlayback } from "../hooks/useMixPlayback";
 import { resolvePlaybackSource } from "../../lib/song-playback";
-import { isYoutubeSearchUrl, streamingAppLinks } from "../../lib/recording-links";
+import { isYoutubeSearchUrl } from "../../lib/recording-links";
+import { isTrackHiddenFromPublicPlayback } from "../../lib/track-playback-policy";
 import CassettePlayer from "./CassettePlayer";
 import LivepeerSongBridge from "./LivepeerSongBridge";
-import StreamingAppLinks from "./StreamingAppLinks";
 import { PlaylistArt } from "./MixtapeIcons";
 
 export default function PlaylistDetail({ mix, trackIndex, canEdit, onEdit }: {
@@ -28,8 +28,6 @@ export default function PlaylistDetail({ mix, trackIndex, canEdit, onEdit }: {
   const playerRef = useRef<HTMLDivElement>(null);
   const active = playback.nowPlaying ?? mix.tracks[trackIndex] ?? mix.tracks[0];
   const outboundUrl = active ? resolvePlaybackSource(active).outboundUrl : undefined;
-  const appLinks = streamingAppLinks(active?.listenUrl, active?.embedIframeUrl);
-  const hasAppLinks = Boolean(appLinks.appleMusic || appLinks.spotify);
   const outboundLabel = isYoutubeSearchUrl(outboundUrl)
     ? "Search YouTube"
     : "Open listening link";
@@ -75,7 +73,7 @@ export default function PlaylistDetail({ mix, trackIndex, canEdit, onEdit }: {
             {playback.showYoutubeEmbed ? <div className="mt-video"><div id={`mt-youtube-${mix.id}`}/></div> : null}
             {playback.iframeUrl ? <iframe className="mt-embed" ref={playback.iframeRef} src={playback.iframeUrl}
               title={`${active?.title ?? mix.title} player`} allow="autoplay; encrypted-media; fullscreen" /> : null}
-            {playback.iframeUrl && outboundUrl && !hasAppLinks ? <a href={outboundUrl} target="_blank" rel="noopener noreferrer">Open in listening service ↗</a> : null}
+            {playback.iframeUrl && outboundUrl ? <a href={outboundUrl} target="_blank" rel="noopener noreferrer">Open in listening service ↗</a> : null}
             {playback.livepeerPlaybackId ? <div className="mt-video"><LivepeerSongBridge
               playbackId={playback.livepeerPlaybackId} isPlaying={playback.isPlaying}
               onPlayingChange={playback.setIsPlaying} showControls/></div> : null}
@@ -84,9 +82,8 @@ export default function PlaylistDetail({ mix, trackIndex, canEdit, onEdit }: {
         {!playback.currentSourceKind ? <div className="mt-empty mt-playback-fallback">
           <h3>{active?.title ?? "No tracks yet"}</h3>
           <p>{active ? active.artist : "Add a track to start listening."}</p>
-          {outboundUrl && !hasAppLinks ? <a href={outboundUrl} target="_blank" rel="noopener noreferrer">{outboundLabel} ↗</a> : null}
+          {outboundUrl ? <a href={outboundUrl} target="_blank" rel="noopener noreferrer">{outboundLabel} ↗</a> : null}
         </div> : null}
-        <StreamingAppLinks {...appLinks} inlinePlayerUrl={playback.iframeUrl}/>
         {playback.error ? <div role="alert" className="mt-error"><p>{playback.error.message}</p>
           {outboundUrl ? <a href={outboundUrl} target="_blank" rel="noopener noreferrer">{outboundLabel} ↗</a> : null}
           {playback.queuePosition < playback.playableQueue.length - 1 ? <button type="button" onClick={playback.skip}>Skip unavailable track</button> : null}
@@ -111,6 +108,7 @@ export default function PlaylistDetail({ mix, trackIndex, canEdit, onEdit }: {
     <div className="mt-section-heading"><h2>TRACKLIST</h2><span>{String(mix.tracks.length).padStart(2, "0")} tracks</span></div>
     <ol className="mt-tracklist">
       {mix.tracks.map((track, index) => {
+        if (!canEdit && isTrackHiddenFromPublicPlayback(track)) return null;
         const source = resolvePlaybackSource(track);
         const playable = source.kind !== "link_only";
         const selected = playback.currentTrackIndex === index;

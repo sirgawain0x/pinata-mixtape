@@ -3,8 +3,6 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import CassettePlayer from "./CassettePlayer";
-import StreamingAppLinks from "./StreamingAppLinks";
-import { streamingAppLinks } from "../../lib/recording-links";
 import { SongPlaybackMedia, useSongPlayback } from "../hooks/useSongPlayback";
 import { buildCrateUrl } from "../../lib/mixtape-nav";
 import type { SongPlaybackFields } from "../../lib/song-playback";
@@ -55,9 +53,6 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
 
   const controls = useSongPlayback({ song: playbackSong, embedOrigin });
   const isLinkOnly = controls.sourceKind === "link_only";
-  const appLinks = streamingAppLinks(song.listenUrl, song.embedIframeUrl);
-  const hasAppLinks = Boolean(appLinks.appleMusic || appLinks.spotify);
-
   const progressPct =
     controls.duration > 0 ? Math.min(100, (controls.progress / controls.duration) * 100) : 0;
 
@@ -88,10 +83,8 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
         onLivepeerPlaying={controls.onLivepeerPlaying}
         onLivepeerTime={controls.onLivepeerTime}
       />
-      <StreamingAppLinks {...appLinks} inlinePlayerUrl={controls.iframeUrl}/>
-
       <div className="song-player-controls">
-        {isLinkOnly && !hasAppLinks ? (
+        {isLinkOnly ? (
           <button className="button" disabled={!controls.outboundUrl} onClick={controls.openOutbound} type="button">
             Open listen link →
           </button>
@@ -107,7 +100,7 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
               {formatTime(controls.progress)} / {formatTime(controls.duration)}
             </span>
           </div>
-        ) : hasAppLinks ? null : (
+        ) : (
           <span className="muted">
             Source: {controls.sourceKind.replace("_", " ")}
             {controls.outboundUrl ? (
@@ -147,7 +140,7 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
             MusicBrainz
           </a>
         ) : null}
-        {song.listenUrl && !hasAppLinks ? (
+        {song.listenUrl ? (
           <a href={song.listenUrl} rel="noreferrer" target="_blank">
             Listen
           </a>
