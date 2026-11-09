@@ -14,7 +14,7 @@
     "pm2:stop": "pm2 delete creative-mixtape",
     "pm2:logs": "pm2 logs creative-mixtape --lines 100",
     "typecheck": "tsc --noEmit",
-    "test:mixtape": "tsx --test tests/playlist-metadata.test.ts tests/ai-gateway.test.ts",
+    "test:mixtape": "tsx --test tests/playlist-metadata.test.ts tests/ai-gateway.test.ts tests/playlist-draft-merge.test.ts tests/assistant-track-embed.test.ts",
     "test:social": "tsx --test tests/social-composer.test.ts",
     "test:lens": "tsx --test tests/lens-operation.test.ts tests/lens-release-fixes.test.ts tests/lens-mutation-result.test.ts"
   },

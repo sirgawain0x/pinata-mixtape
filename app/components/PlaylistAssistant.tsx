@@ -3,19 +3,23 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import type { Mix, Track } from "../mixtape-app";
 import type { MixInput } from "../../lib/mixtapes";
+import { inferAssistantTrackEmbed } from "../../lib/song-playback";
 import DesignDialog from "./DesignDialog";
 import { MixtapeIcon, MixtapeMark } from "./MixtapeIcons";
 
 type Message = { role: "user" | "assistant"; content: string };
 function editorDraft(input: MixInput): Partial<Mix> {
-  return { ...input, tracks: (input.tracks ?? []).map((track): Track => ({
-    title: track.title, artist: track.artist, releaseYear: track.releaseYear ?? "",
-    duration: track.duration ?? "", bpm: track.bpm ?? "", energy: track.energy ?? "", moodTags: track.moodTags ?? [], sceneTags: track.sceneTags ?? [],
-    notes: track.notes ?? "", musicbrainzId: track.musicbrainzId ?? "", musicbrainzUrl: track.musicbrainzUrl ?? "",
-    youtubeUrl: track.youtubeUrl ?? "", listenUrl: track.listenUrl ?? "", creativeTvUrl: track.creativeTvUrl ?? "",
-    embedSourceKind: track.embedSourceKind ?? "link_only", embedIframeUrl: track.embedIframeUrl ?? "",
-    albumTitle: track.albumTitle, releaseDate: track.releaseDate
-  })) };
+  return { ...input, tracks: (input.tracks ?? []).map((track): Track => {
+    const embed = inferAssistantTrackEmbed(track.listenUrl, track.youtubeUrl);
+    return {
+      title: track.title, artist: track.artist, releaseYear: track.releaseYear ?? "",
+      duration: track.duration ?? "", bpm: track.bpm ?? "", energy: track.energy ?? "", moodTags: track.moodTags ?? [], sceneTags: track.sceneTags ?? [],
+      notes: track.notes ?? "", musicbrainzId: track.musicbrainzId ?? "", musicbrainzUrl: track.musicbrainzUrl ?? "",
+      youtubeUrl: embed.youtubeUrl || track.youtubeUrl || "", listenUrl: track.listenUrl ?? "", creativeTvUrl: track.creativeTvUrl ?? "",
+      embedSourceKind: track.embedSourceKind ?? embed.embedSourceKind, embedIframeUrl: track.embedIframeUrl ?? embed.embedIframeUrl,
+      albumTitle: track.albumTitle, releaseDate: track.releaseDate,
+    };
+  }) };
 }
 
 export default function PlaylistAssistant({ signedIn, onClose, onForm, onReview }: {
@@ -34,10 +38,16 @@ export default function PlaylistAssistant({ signedIn, onClose, onForm, onReview 
     event.preventDefault();
     if (!prompt.trim() || busy) return;
     const next: Message[] = [...messages, { role: "user", content: prompt.trim() }];
-    setMessages(next); setPrompt(""); setBusy(true); setError(""); setDraft(null);
+    setMessages(next); setPrompt(""); setBusy(true); setError("");
     const controller = new AbortController(); abortRef.current = controller;
+    const previousDraft = draft;
     try {
-      const response = await fetch("/app/api/agent/create-playlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next.slice(-15) }), signal: controller.signal });
+      const response = await fetch("/app/api/agent/create-playlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: next.slice(-15), previousDraft }),
+        signal: controller.signal,
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not reach the assistant.");
       setMessages([...next, { role: "assistant", content: data.reply }]); setDraft(data.draft);
