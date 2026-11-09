@@ -17,7 +17,7 @@
     "test:mixtape": "tsx --test tests/playlist-metadata.test.ts",
     "test:social": "tsx --test tests/social-composer.test.ts",
     "test:lens": "tsx --test tests/lens-operation.test.ts",
-    "test:auth": "tsx --test tests/privy-config.test.ts tests/privy-session.test.ts"
+    "test:auth": "tsx --test tests/privy-config.test.ts tests/privy-session.test.ts tests/privy-recovery-login.test.ts"
   },
   "dependencies": {
     "@account-kit/core": "^4.88.1",

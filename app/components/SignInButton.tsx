@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { isAddress } from "viem";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { hasPrivyRecoveryLogin } from "../../lib/privy-recovery-login";
 import { resolveSmartAccountAddress } from "../../lib/smart-wallet";
 
 const APP_BASE = "/app";
@@ -72,13 +73,7 @@ export function SignInButton({
   );
 
   const hasRecoveryLogin = useMemo(
-    () =>
-      user?.linkedAccounts?.some(
-        (account) =>
-          account.type === "email" ||
-          account.type === "google_oauth" ||
-          account.type === "wallet"
-      ) ?? false,
+    () => hasPrivyRecoveryLogin(user?.linkedAccounts),
     [user?.linkedAccounts]
   );
 
