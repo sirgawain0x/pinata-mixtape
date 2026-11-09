@@ -39,6 +39,8 @@ export type Track = {
   title: string;
   artist: string;
   releaseYear: string;
+  releaseDate?: string;
+  albumTitle?: string;
   duration: string;
   bpm: string;
   energy: string;
@@ -55,6 +57,9 @@ export type Track = {
 };
 
 export type Mix = {
+  creators: string[];
+  genre: string;
+  sourceUrl: string;
   id: number;
   title: string;
   description: string;
@@ -91,6 +96,7 @@ export type Song = Track & {
 };
 
 export type Station = {
+  creatorId?: number;
   id: number;
   handle: string;
   name: string;
@@ -102,6 +108,8 @@ export type Creator = {
   walletAddress: string;
   displayName: string;
   meTokenAddress?: string;
+  avatarUrl?: string;
+  bio?: string;
 };
 
 type MixtapeAppProps = {

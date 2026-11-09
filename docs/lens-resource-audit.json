@@ -1,0 +1,202 @@
+{
+  "observedOn": "2026-11-06",
+  "network": "Lens mainnet",
+  "source": "https://api.lens.xyz/graphql",
+  "apps": [
+    {
+      "address": "0x782d7568fA0Fe02245dc9b2D2861C759a08c070D",
+      "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+      "graphAddress": "0x13E08f3da87E69243a18F383Da4D0ffC94cb3136",
+      "defaultFeedAddress": "0x7C83aBa8Ff2e4a50882BB4890D30C04c655FfF73",
+      "namespaceAddress": null,
+      "sponsorshipAddress": null,
+      "verificationEnabled": false,
+      "metadata": {
+        "name": "Chones",
+        "url": "https://chones.xyz/"
+      }
+    },
+    {
+      "address": "0x6210854CbDA1c5aDa470b9911b590C4F20EDcf23",
+      "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+      "graphAddress": "0x51f4905F86402Bcfa015b445f73E3dEfF995a279",
+      "defaultFeedAddress": "0x9FE052e8ebE534AdE89e817FcbDD56C59d1DA5A2",
+      "namespaceAddress": null,
+      "sponsorshipAddress": null,
+      "verificationEnabled": false,
+      "metadata": {
+        "name": "Song Cup",
+        "url": "https://tv.creativeplatform.xyz/songchain/song-cup"
+      }
+    },
+    {
+      "address": "0x3412C2509EeF4f9A133E6D3638B9B3c06fc30111",
+      "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+      "graphAddress": "0x2B36706E8E352a273c34D108A5854A55cb2302A6",
+      "defaultFeedAddress": "0x3c336f772167d789d8f781a7002c33451120D74D",
+      "namespaceAddress": "0x1E643F889D6eD970bADBD231C34F2C7C7105987A",
+      "sponsorshipAddress": null,
+      "verificationEnabled": false,
+      "metadata": {
+        "name": "Creative TV",
+        "url": "https://tv.creativeplatform.xyz/"
+      }
+    },
+    {
+      "address": "0x22C33eaC41E01FA1Fc508Ae4b4b435475B58837E",
+      "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+      "graphAddress": "0x433025d9718302E7B2e1853D712d96F00764513F",
+      "defaultFeedAddress": "0xa9761B3b2e94ea5601e72F140cf650b5f4a1aC8e",
+      "namespaceAddress": "0x1aA55B9042f08f45825dC4b651B64c9F98Af4615",
+      "sponsorshipAddress": null,
+      "verificationEnabled": false,
+      "metadata": {
+        "name": "Creative TV LIVE",
+        "url": "https://tv.creativeplatform.xyz/"
+      }
+    }
+  ],
+  "resources": {
+    "tvFeeds": {
+      "items": [
+        {
+          "feed": "0x3c336f772167d789d8f781a7002c33451120D74D",
+          "timestamp": "2026-06-03T03:40:57+00:00"
+        },
+        {
+          "feed": "0xcB5E109FFC0E15565082d78E68dDDf2573703580",
+          "timestamp": "2026-01-27T16:58:53+00:00"
+        }
+      ],
+      "pageInfo": {
+        "next": null
+      }
+    },
+    "liveFeeds": {
+      "items": [
+        {
+          "feed": "0xa9761B3b2e94ea5601e72F140cf650b5f4a1aC8e",
+          "timestamp": "2026-06-04T22:59:19+00:00"
+        },
+        {
+          "feed": "0xcB5E109FFC0E15565082d78E68dDDf2573703580",
+          "timestamp": "2026-01-27T16:58:31+00:00"
+        }
+      ],
+      "pageInfo": {
+        "next": null
+      }
+    },
+    "tvGroups": {
+      "items": []
+    },
+    "liveGroups": {
+      "items": []
+    }
+  },
+  "sponsorships": [
+    {
+      "address": "0xD4E2e65e8F439657C66f43a1EB2D17803e161508",
+      "isPaused": false,
+      "allowsLensAccess": true,
+      "metadata": {
+        "name": "Sponsor"
+      },
+      "limits": {
+        "global": null,
+        "user": {
+          "limit": 3,
+          "window": "DAY"
+        }
+      }
+    }
+  ],
+  "ownedFeedInventory": {
+    "feeds": {
+      "items": [
+        {
+          "address": "0x912b4094d966744bFf3F968963A89163760C3153",
+          "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+          "metadata": {
+            "name": "Chones",
+            "description": "The Official Chones Club"
+          }
+        },
+        {
+          "address": "0x7C83aBa8Ff2e4a50882BB4890D30C04c655FfF73",
+          "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+          "metadata": {
+            "name": "Chones",
+            "description": "Official feed for Chones."
+          }
+        },
+        {
+          "address": "0x5D15E5b8848A2BaFB0B968dC4CB6725551F1addb",
+          "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+          "metadata": null
+        },
+        {
+          "address": "0x9FE052e8ebE534AdE89e817FcbDD56C59d1DA5A2",
+          "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+          "metadata": {
+            "name": "Song Cup",
+            "description": "This is the official sONg Cup feed by sONgCHAIN."
+          }
+        },
+        {
+          "address": "0xa9761B3b2e94ea5601e72F140cf650b5f4a1aC8e",
+          "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+          "metadata": {
+            "name": "Creative TV LIVE",
+            "description": "The official feed for Creative TV LIVE \ud83d\udcf9"
+          }
+        },
+        {
+          "address": "0x3c336f772167d789d8f781a7002c33451120D74D",
+          "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+          "metadata": null
+        },
+        {
+          "address": "0x3A0c08Dc03173C8Cf1498c331c31f28cd28f4993",
+          "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+          "metadata": null
+        }
+      ],
+      "pageInfo": {
+        "next": null
+      }
+    },
+    "sharedFeed": {
+      "address": "0xcB5E109FFC0E15565082d78E68dDDf2573703580",
+      "metadata": null
+    }
+  },
+  "mixtapeApp": {
+    "app": {
+      "address": "0x91c841aF98acEA56c2b63C46Cd7E8F0E000FBaee",
+      "graphAddress": "0x2B36706E8E352a273c34D108A5854A55cb2302A6",
+      "sponsorshipAddress": null,
+      "defaultFeedAddress": "0x3A0c08Dc03173C8Cf1498c331c31f28cd28f4993",
+      "namespaceAddress": "0x1E643F889D6eD970bADBD231C34F2C7C7105987A",
+      "verificationEnabled": false,
+      "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+      "metadata": {
+        "name": "Mixtape",
+        "url": "https://mixtape.creativeplatform.xyz/"
+      }
+    },
+    "appFeeds": {
+      "items": [
+        {
+          "feed": "0x3A0c08Dc03173C8Cf1498c331c31f28cd28f4993"
+        },
+        {
+          "feed": "0xcB5E109FFC0E15565082d78E68dDDf2573703580"
+        }
+      ],
+      "pageInfo": {
+        "next": null
+      }
+    }
+  }
+}

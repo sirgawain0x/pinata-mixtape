@@ -48,6 +48,7 @@ type Options = {
   mixId: number | null;
   ytElementId: string | null;
   initialTrackIndex?: number;
+  fallbackToFirstPlayable?: boolean;
   enabled?: boolean;
   onTrackPlaying?: (trackIndex: number) => void;
   onLastTrackEnded?: () => void;
@@ -62,6 +63,7 @@ export function useMixPlayback({
   mixId,
   ytElementId,
   initialTrackIndex = 0,
+  fallbackToFirstPlayable = true,
   enabled = true,
   onTrackPlaying,
   onLastTrackEnded
@@ -80,11 +82,15 @@ export function useMixPlayback({
 
   const playableQueue = useMemo(() => queue.filter((item) => item.playable), [queue]);
 
-  const [queuePosition, setQueuePosition] = useState(0);
+  const [queuePosition, setQueuePosition] = useState(() => {
+    const position = playableQueue.findIndex((item) => item.trackIndex === initialTrackIndex);
+    return position < 0 && fallbackToFirstPlayable ? 0 : position;
+  });
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [error, setError] = useState<MixPlaybackError | null>(null);
 
+  const pendingAutoplayRef = useRef(false);
   const ytPlayerRef = useRef<MixYtPlayer | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -101,6 +107,7 @@ export function useMixPlayback({
   const currentSourceKind: PlaybackSourceKind | null = currentSource?.kind ?? null;
 
   const resetPlayback = useCallback(() => {
+    pendingAutoplayRef.current = false;
     setQueuePosition(0);
     setIsPlaying(false);
     setPlayerReady(false);
@@ -129,10 +136,15 @@ export function useMixPlayback({
 
     lastSeekRef.current = { mixId, trackIndex: initialTrackIndex };
     const playableIndex = playableQueue.findIndex((item) => item.trackIndex === initialTrackIndex);
-    if (playableIndex >= 0) setQueuePosition(playableIndex);
-  }, [enabled, initialTrackIndex, mixId, playableQueue]);
+    if (playableIndex >= 0 || !fallbackToFirstPlayable) setQueuePosition(playableIndex);
+  }, [enabled, fallbackToFirstPlayable, initialTrackIndex, mixId, playableQueue]);
 
   const advanceQueue = useCallback(() => {
+    if (queuePosition >= playableQueue.length - 1) {
+      pendingAutoplayRef.current = false;
+      setIsPlaying(false);
+      return;
+    }
     setError(null);
     setIsPlaying(false);
     setPlayerReady(false);
@@ -142,12 +154,11 @@ export function useMixPlayback({
       audioRef.current.pause();
       audioRef.current = null;
     }
-    setQueuePosition((current) => {
-      if (playableQueue.length === 0) return 0;
-      if (current >= playableQueue.length - 1) return current;
-      return current + 1;
-    });
-  }, [playableQueue.length]);
+    if (queuePosition < playableQueue.length - 1) {
+      pendingAutoplayRef.current = true;
+      setQueuePosition(queuePosition + 1);
+    }
+  }, [playableQueue.length, queuePosition]);
 
   const skip = useCallback(() => {
     advanceQueue();
@@ -171,10 +182,14 @@ export function useMixPlayback({
 
     const setup = () => {
       if (cancelled || !window.YT?.Player) return;
-      ytPlayerRef.current?.destroy();
-      ytPlayerRef.current = new window.YT.Player(ytElementId, {
+      const shell = document.getElementById(ytElementId);
+      if (!shell) return;
+      // YouTube replaces its target with an iframe. Keep the React-owned shell intact.
+      const target = document.createElement("div");
+      shell.replaceChildren(target);
+      ytPlayerRef.current = new window.YT.Player(target, {
         videoId,
-        playerVars: { rel: 0, modestbranding: 1 },
+        playerVars: { rel: 0, playsinline: 1, origin: window.location.origin },
         events: {
           onReady: () => {
             if (!cancelled) {
@@ -194,7 +209,7 @@ export function useMixPlayback({
             setIsPlaying(false);
           },
           onStateChange: (event: { data: number }) => {
-            if (!window.YT) return;
+            if (cancelled || !window.YT) return;
             if (event.data === window.YT.PlayerState.PLAYING) {
               setIsPlaying(true);
               setError(null);
@@ -307,13 +322,6 @@ export function useMixPlayback({
     }
   }, [currentItem, currentSource, enabled]);
 
-  const postIframeCommand = useCallback((command: "playVideo" | "pauseVideo") => {
-    iframeRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: "command", func: command, args: [] }),
-      "*"
-    );
-  }, []);
-
   const play = useCallback(() => {
     setError(null);
     if (!currentItem || !currentSource) return;
@@ -352,20 +360,20 @@ export function useMixPlayback({
       return;
     }
 
-    if (currentSource.kind === "iframe") {
-      postIframeCommand("playVideo");
-      setIsPlaying(true);
-      notifyTrackPlaying(currentItem.trackIndex);
-      return;
-    }
-
     if (currentSource.kind === "livepeer") {
       setIsPlaying(true);
       notifyTrackPlaying(currentItem.trackIndex);
     }
-  }, [currentItem, currentSource, notifyTrackPlaying, postIframeCommand]);
+  }, [currentItem, currentSource, notifyTrackPlaying]);
+
+  useEffect(() => {
+    if (!playerReady || !pendingAutoplayRef.current) return;
+    pendingAutoplayRef.current = false;
+    play();
+  }, [playerReady, play]);
 
   const pause = useCallback(() => {
+    pendingAutoplayRef.current = false;
     if (currentSource?.kind === "youtube") {
       ytPlayerRef.current?.pauseVideo?.();
       return;
@@ -374,20 +382,26 @@ export function useMixPlayback({
       audioRef.current?.pause();
       return;
     }
-    if (currentSource?.kind === "iframe") {
-      postIframeCommand("pauseVideo");
-      setIsPlaying(false);
-      return;
-    }
     if (currentSource?.kind === "livepeer") {
       setIsPlaying(false);
     }
-  }, [currentSource, postIframeCommand]);
+  }, [currentSource]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) pause();
     else play();
   }, [isPlaying, pause, play]);
+
+  const playTrack = useCallback((trackIndex: number) => {
+    const position = playableQueue.findIndex((item) => item.trackIndex === trackIndex);
+    if (position < 0) return;
+    if (position === queuePosition) { play(); return; }
+    pause();
+    setIsPlaying(false);
+    setPlayerReady(false);
+    pendingAutoplayRef.current = true;
+    setQueuePosition(position);
+  }, [pause, play, playableQueue, queuePosition]);
 
   const nowPlaying = currentItem?.track ?? null;
   const canPlay = playableQueue.length > 0;
@@ -417,6 +431,7 @@ export function useMixPlayback({
     play,
     pause,
     togglePlay,
+    playTrack,
     skip,
     setQueuePosition,
     youtubeVideoIdForCurrent: currentSource?.youtubeVideoId ?? youtubeVideoId(currentItem?.track.youtubeUrl ?? "")

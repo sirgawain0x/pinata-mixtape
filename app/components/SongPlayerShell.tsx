@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import RecordPlayerCanvas from "./record-player/RecordPlayerCanvas";
+import CassettePlayer from "./CassettePlayer";
+import StreamingAppLinks from "./StreamingAppLinks";
+import { streamingAppLinks } from "../../lib/recording-links";
 import { SongPlaybackMedia, useSongPlayback } from "../hooks/useSongPlayback";
 import { buildCrateUrl } from "../../lib/mixtape-nav";
 import type { SongPlaybackFields } from "../../lib/song-playback";
@@ -36,6 +38,8 @@ function formatTime(seconds: number): string {
 export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Props) {
   const playbackSong = useMemo(
     () => ({
+      title: song.title,
+      artist: song.artist,
       audioCid: song.audioCid,
       audioUrl: song.audioUrl,
       isCurated: song.isCurated,
@@ -51,6 +55,8 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
 
   const controls = useSongPlayback({ song: playbackSong, embedOrigin });
   const isLinkOnly = controls.sourceKind === "link_only";
+  const appLinks = streamingAppLinks(song.listenUrl, song.embedIframeUrl);
+  const hasAppLinks = Boolean(appLinks.appleMusic || appLinks.spotify);
 
   const progressPct =
     controls.duration > 0 ? Math.min(100, (controls.progress / controls.duration) * 100) : 0;
@@ -69,24 +75,27 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
         </p>
       )}
 
-      <RecordPlayerCanvas
+      {controls.sourceKind === "pinata" ? <CassettePlayer
         artist={song.artist}
         isPlaying={controls.isPlaying}
-        onTogglePlay={controls.togglePlay}
+        canPlay={controls.playerReady}
+        onToggle={controls.togglePlay}
         title={song.title}
-      />
+      /> : null}
       <SongPlaybackMedia
         controls={controls}
+        showVideo
         onLivepeerPlaying={controls.onLivepeerPlaying}
         onLivepeerTime={controls.onLivepeerTime}
       />
+      <StreamingAppLinks {...appLinks} inlinePlayerUrl={controls.iframeUrl}/>
 
       <div className="song-player-controls">
-        {isLinkOnly ? (
+        {isLinkOnly && !hasAppLinks ? (
           <button className="button" disabled={!controls.outboundUrl} onClick={controls.openOutbound} type="button">
             Open listen link →
           </button>
-        ) : (
+        ) : isLinkOnly || ["pinata", "iframe"].includes(controls.sourceKind) ? null : (
           <button className="button" disabled={!controls.playerReady} onClick={controls.togglePlay} type="button">
             {!controls.playerReady ? "Loading…" : controls.isPlaying ? "Pause" : "Play"}
           </button>
@@ -98,7 +107,7 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
               {formatTime(controls.progress)} / {formatTime(controls.duration)}
             </span>
           </div>
-        ) : (
+        ) : hasAppLinks ? null : (
           <span className="muted">
             Source: {controls.sourceKind.replace("_", " ")}
             {controls.outboundUrl ? (
@@ -116,7 +125,7 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
 
       {isLinkOnly ? (
         <p className="muted song-link-only-note">
-          Add a direct YouTube URL on the mixtape to play this track in-app.
+          Find this recording on your listening service.
         </p>
       ) : null}
 
@@ -138,7 +147,7 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
             MusicBrainz
           </a>
         ) : null}
-        {song.listenUrl ? (
+        {song.listenUrl && !hasAppLinks ? (
           <a href={song.listenUrl} rel="noreferrer" target="_blank">
             Listen
           </a>

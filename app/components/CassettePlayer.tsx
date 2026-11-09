@@ -37,6 +37,7 @@ export default function CassettePlayer({
         <span className="cassette-label-band cassette-label-band-b" />
         <span className="cassette-label-band cassette-label-band-c" />
       </div>
+      <div className="cassette-display"><strong>{title}</strong>{artist ? <span>{artist}</span> : null}</div>
       <div className="cassette-window">
         <span className="cassette-reel cassette-reel-left" />
         <span className="cassette-tape" />

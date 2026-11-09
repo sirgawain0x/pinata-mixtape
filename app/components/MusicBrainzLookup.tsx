@@ -7,6 +7,7 @@ export type MbRecording = {
   title: string;
   artistCredit: string;
   firstReleaseDate: string;
+  releaseTitles?: string[];
   url: string;
 };
 
@@ -67,12 +68,14 @@ export default function MusicBrainzLookup({ onSelect }: Props) {
       <div className="editor-grid">
         <input
           onChange={(event) => setMbTitle(event.target.value)}
+          aria-label="Track title for MusicBrainz lookup"
           placeholder="Track title"
           type="text"
           value={mbTitle}
         />
         <input
           onChange={(event) => setMbArtist(event.target.value)}
+          aria-label="Artist for MusicBrainz lookup"
           placeholder="Artist"
           type="text"
           value={mbArtist}

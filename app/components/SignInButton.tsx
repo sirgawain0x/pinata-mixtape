@@ -292,8 +292,14 @@ export function SignInButton({
           aria-expanded={isOpen}
           aria-haspopup="dialog"
           aria-controls="account-drawer"
+          aria-label={displayAddress ? `My Account ${short}` : "My Account"}
         >
-          {isPending && !displayAddress ? "Connecting…" : `My Account ${short}`}
+          {isPending && !displayAddress ? "Connecting…" : displayAddress ? (
+            <>
+              <span className="account-trigger-label">My Account&nbsp;</span>
+              <span>{short}</span>
+            </>
+          ) : "My Account"}
         </button>
         {isOpen ? (
           <div className="account-drawer-root">

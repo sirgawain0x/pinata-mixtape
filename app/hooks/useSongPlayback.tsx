@@ -127,12 +127,15 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
 
     const setup = () => {
       if (cancelled || !window.YT?.Player) return;
-      ytPlayerRef.current?.destroy();
-      ytPlayerRef.current = new window.YT!.Player(ytContainerId, {
-        height: "0",
-        width: "0",
+      const shell = document.getElementById(ytContainerId);
+      if (!shell) return;
+      const target = document.createElement("div");
+      shell.replaceChildren(target);
+      ytPlayerRef.current = new window.YT.Player(target, {
+        height: "100%",
+        width: "100%",
         videoId: source.youtubeVideoId,
-        playerVars: { autoplay: 0, controls: 0, modestbranding: 1 },
+        playerVars: { autoplay: 0, playsinline: 1, origin: window.location.origin },
         events: {
           onReady: () => {
             if (!cancelled) setPlayerReady(true);
@@ -233,14 +236,6 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
       else player.playVideo();
       return;
     }
-    if (source.kind === "iframe" && iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: "command", func: isPlaying ? "pauseVideo" : "playVideo", args: [] }),
-        "*"
-      );
-      setIsPlaying((prev) => !prev);
-      return;
-    }
     if (source.kind === "livepeer") {
       setIsPlaying((prev) => !prev);
     }
@@ -286,10 +281,12 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
 
 export function SongPlaybackMedia({
   controls,
+  showVideo = false,
   onLivepeerTime,
   onLivepeerPlaying
 }: {
   controls: SongPlaybackControls;
+  showVideo?: boolean;
   embedOrigin?: string;
   onLivepeerTime?: (current: number, duration: number) => void;
   onLivepeerPlaying?: (playing: boolean) => void;
@@ -303,13 +300,14 @@ export function SongPlaybackMedia({
         onPlayingChange={onLivepeerPlaying}
         onTimeUpdate={onLivepeerTime}
         playbackId={livepeerPlaybackId}
+        showControls={showVideo}
       />
     );
   }
 
   if (sourceKind === "youtube" && youtubeContainerId) {
     return (
-      <div className="song-yt-shell" aria-hidden="true">
+      <div className={showVideo ? "song-video-shell" : "song-yt-shell"} aria-hidden={showVideo ? undefined : true}>
         <div id={youtubeContainerId} />
       </div>
     );
@@ -319,7 +317,7 @@ export function SongPlaybackMedia({
     return (
       <iframe
         allow="autoplay; encrypted-media"
-        className="song-iframe-embed"
+        className={showVideo ? "song-provider-embed" : "song-iframe-embed"}
         ref={controls.iframeRef}
         src={iframeUrl}
         title="Embedded playback"

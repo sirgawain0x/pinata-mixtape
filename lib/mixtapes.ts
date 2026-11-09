@@ -1,3 +1,6 @@
+import { preferredRecordingLink, recordingEmbedUrl } from "./recording-links";
+import { youtubeVideoId } from "./youtube";
+import { parsePlaylistDetails } from "./playlist-details";
 import { parseAllowedEmbedUrl, resolveEmbedSourceKind, type EmbedSourceKind } from "./embed-sources";
 import { isCreativeTvConfigured, parseCreativeTvUrl, resolvePlaybackByAssetId } from "./creative-tv";
 import { searchMusicBrainzRecordings } from "./musicbrainz";
@@ -20,6 +23,8 @@ export type TrackInput = {
   title: string;
   artist: string;
   releaseYear?: string;
+  releaseDate?: string;
+  albumTitle?: string;
   duration?: string;
   bpm?: string;
   energy?: string;
@@ -80,6 +85,9 @@ export type MixTrack = Track & { songId: number };
 
 export type MixInput = {
   title: string;
+  creators?: string[];
+  genre?: string;
+  sourceUrl?: string;
   description?: string;
   vibe?: string;
   useCase?: string;
@@ -98,6 +106,9 @@ export type MixInput = {
 export type SongInput = TrackInput;
 
 export type Mix = {
+  creators: string[];
+  genre: string;
+  sourceUrl: string;
   id: number;
   title: string;
   description: string;
@@ -148,6 +159,9 @@ export type MixMoment = {
 };
 
 type MixRow = {
+  creators?: string;
+  genre?: string;
+  source_url?: string;
   id: number;
   title: string;
   description: string | null;
@@ -173,6 +187,8 @@ type SongRow = {
   artist: string;
   musicbrainz_id: string | null;
   release_year: string | null;
+  release_date?: string | null;
+  album_title?: string | null;
   duration: string | null;
   bpm: string | null;
   energy: string | null;
@@ -234,12 +250,6 @@ function buildMusicBrainzSearchUrl(title: string, artist: string): string {
   return `https://musicbrainz.org/search?query=${encodeURIComponent(query)}&type=recording&method=indexed`;
 }
 
-function buildYoutubeSearchUrl(title: string, artist: string): string {
-  const query = [title, artist].filter(Boolean).join(" ");
-  if (!query) return "";
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-}
-
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 
 export function slugifyMixTitle(title: string): string {
@@ -280,18 +290,19 @@ function normalizeTrack(input: TrackInput): Track {
   const youtubeUrl = input.youtubeUrl?.trim() || "";
   const creativeTvRaw = input.creativeTvUrl?.trim() || "";
   const parsedCreativeTv = parseCreativeTvUrl(creativeTvRaw);
-  const listenUrl =
-    input.listenUrl?.trim() || parsedCreativeTv?.discoverUrl || buildYoutubeSearchUrl(title, artist);
+  const listenUrl = preferredRecordingLink(title, artist,
+    input.listenUrl, youtubeUrl, parsedCreativeTv?.discoverUrl, input.embedIframeUrl);
   const embedIframeRaw = input.embedIframeUrl?.trim() || "";
+  const detectedKind = recordingEmbedUrl(listenUrl) ? "iframe_allowed" : youtubeVideoId(listenUrl) ? "youtube" : undefined;
   const embedSourceKind = resolveEmbedSourceKind(
-    input.embedSourceKind,
+    input.embedSourceKind ?? (parsedCreativeTv ? "creativetv" : detectedKind),
     youtubeUrl,
     embedIframeRaw,
     creativeTvRaw
   );
   let embedIframeUrl = "";
   if (embedSourceKind === "iframe_allowed") {
-    const parsed = parseAllowedEmbedUrl(embedIframeRaw || youtubeUrl || listenUrl);
+    const parsed = parseAllowedEmbedUrl(embedIframeRaw || recordingEmbedUrl(listenUrl) || youtubeUrl || listenUrl);
     if (!parsed) {
       throw new Error("Iframe embed URL must use an allowed music host (Spotify, SoundCloud, Bandcamp, Apple Music, YouTube).");
     }
@@ -314,6 +325,8 @@ function normalizeTrack(input: TrackInput): Track {
     title,
     artist,
     releaseYear: input.releaseYear?.trim() || "",
+    releaseDate: input.releaseDate?.trim() || "",
+    albumTitle: input.albumTitle?.trim() || "",
     duration: input.duration?.trim() || "",
     bpm: input.bpm?.trim() || "",
     energy: input.energy?.trim() || "",
@@ -369,6 +382,8 @@ function mapSong(row: SongRow): Track {
     title,
     artist,
     releaseYear: row.release_year ?? "",
+    releaseDate: row.release_date ?? "",
+    albumTitle: row.album_title ?? "",
     duration: row.duration ?? "",
     bpm: row.bpm ?? "",
     energy: row.energy ?? "",
@@ -378,7 +393,8 @@ function mapSong(row: SongRow): Track {
     musicbrainzId: row.musicbrainz_id ?? "",
     musicbrainzUrl: row.musicbrainz_url?.trim() || buildMusicBrainzSearchUrl(title, artist),
     youtubeUrl: row.youtube_url ?? "",
-    listenUrl: row.listen_url?.trim() || buildYoutubeSearchUrl(title, artist),
+    listenUrl: preferredRecordingLink(title, artist, row.listen_url ?? undefined,
+      row.youtube_url ?? undefined, row.creative_tv_url ?? undefined, row.embed_iframe_url ?? undefined),
     embedSourceKind,
     embedIframeUrl: row.embed_iframe_url?.trim() ?? "",
     creativeTvUrl: row.creative_tv_url?.trim() ?? "",
@@ -435,6 +451,9 @@ async function listTracksForMix(mixId: number): Promise<MixTrack[]> {
 
 async function mapMix(row: MixRow): Promise<Mix> {
   return {
+    creators: parseList(row.creators ?? "[]"),
+    genre: row.genre ?? "",
+    sourceUrl: row.source_url ?? "",
     id: row.id,
     title: row.title,
     description: row.description ?? "",
@@ -474,15 +493,17 @@ function mapMixMoment(row: MixMomentRow): MixMoment {
 
 
 const UPSERT_SONG_SQL = `INSERT INTO songs (
-    fingerprint, title, artist, musicbrainz_id, release_year, duration, bpm, energy, mood_tags, scene_tags, notes, musicbrainz_url, youtube_url, listen_url, embed_source_kind, embed_iframe_url, creative_tv_url, creative_tv_post_id
+    fingerprint, title, artist, musicbrainz_id, release_year, release_date, album_title, duration, bpm, energy, mood_tags, scene_tags, notes, musicbrainz_url, youtube_url, listen_url, embed_source_kind, embed_iframe_url, creative_tv_url, creative_tv_post_id
   ) VALUES (
-    @fingerprint, @title, @artist, @musicbrainzId, @releaseYear, @duration, @bpm, @energy, @moodTags, @sceneTags, @notes, @musicbrainzUrl, @youtubeUrl, @listenUrl, @embedSourceKind, @embedIframeUrl, @creativeTvUrl, @creativeTvPostId
+    @fingerprint, @title, @artist, @musicbrainzId, @releaseYear, @releaseDate, @albumTitle, @duration, @bpm, @energy, @moodTags, @sceneTags, @notes, @musicbrainzUrl, @youtubeUrl, @listenUrl, @embedSourceKind, @embedIframeUrl, @creativeTvUrl, @creativeTvPostId
   )
   ON CONFLICT(fingerprint) DO UPDATE SET
     title = excluded.title,
     artist = excluded.artist,
     musicbrainz_id = COALESCE(excluded.musicbrainz_id, songs.musicbrainz_id),
     release_year = excluded.release_year,
+    release_date = COALESCE(NULLIF(excluded.release_date, ''), songs.release_date),
+    album_title = COALESCE(NULLIF(excluded.album_title, ''), songs.album_title),
     duration = excluded.duration,
     bpm = excluded.bpm,
     energy = excluded.energy,
@@ -508,6 +529,8 @@ function upsertSongParams(track: Track): Record<string, unknown> {
     artist: track.artist,
     musicbrainzId: track.musicbrainzId,
     releaseYear: track.releaseYear,
+    releaseDate: track.releaseDate ?? "",
+    albumTitle: track.albumTitle ?? "",
     duration: track.duration,
     bpm: track.bpm,
     energy: track.energy,
@@ -747,6 +770,9 @@ export async function listMixes(query = "", filter: MixListFilter = {}): Promise
           OR mixes.cover_theme LIKE @like
           OR mixes.share_note LIKE @like
           OR mixes.tags LIKE @like
+          OR mixes.creators LIKE @like
+          OR mixes.genre LIKE @like
+          OR mixes.source_url LIKE @like
           OR songs.title LIKE @like
           OR songs.artist LIKE @like
           OR songs.energy LIKE @like
@@ -769,44 +795,31 @@ export async function getMixBySlug(slug: string): Promise<Mix | null> {
   return row ? await mapMix(row) : null;
 }
 
-export async function listSongs(query = "", limit = 12): Promise<Song[]> {
+export async function listSongs(query = "", limit = 12, visibility?: MixListFilter): Promise<Song[]> {
   await scheduleLegacyMixMigration();
   const search = query.trim();
-  const baseQuery = `
-    SELECT
-      songs.*,
-      COUNT(DISTINCT mix_songs.mix_id) AS mix_count,
-      COALESCE(json_group_array(DISTINCT mix_songs.mix_id), '[]') AS mix_ids
-    FROM songs
-    LEFT JOIN mix_songs ON mix_songs.song_id = songs.id
-  `;
-
-  if (!search) {
-    const rows = await sqlAll<SongListRow>(
-      `${baseQuery}
-         GROUP BY songs.id
-         ORDER BY songs.updated_at DESC, songs.id DESC
-         LIMIT ?`,
-      [Math.min(Math.max(limit, 1), 50)]
-    );
-    return rows.map(mapLibrarySong);
-  }
-
-  const like = `%${search}%`;
+  const vis = visibility ? mixVisibilityClause(visibility) : { sql: "1=1", params: {} };
   const rows = await sqlAll<SongListRow>(
-    `${baseQuery}
-       WHERE songs.title LIKE @like
+    `SELECT songs.*,
+        COUNT(DISTINCT mix_songs.mix_id) AS mix_count,
+        COALESCE(json_group_array(DISTINCT mix_songs.mix_id), '[]') AS mix_ids
+       FROM songs
+       LEFT JOIN mix_songs ON mix_songs.song_id = songs.id
+       ${visibility ? "LEFT JOIN mixes ON mixes.id = mix_songs.mix_id" : ""}
+       WHERE (${vis.sql}) AND (
+          @queryEmpty = 1
+          OR songs.title LIKE @like
           OR songs.artist LIKE @like
           OR songs.energy LIKE @like
           OR songs.notes LIKE @like
           OR songs.mood_tags LIKE @like
           OR songs.scene_tags LIKE @like
+       )
        GROUP BY songs.id
        ORDER BY songs.updated_at DESC, songs.id DESC
        LIMIT @limit`,
-    { like, limit: Math.min(Math.max(limit, 1), 50) }
+    { ...vis.params, queryEmpty: search ? 0 : 1, like: `%${search}%`, limit: Math.min(Math.max(limit, 1), 50) }
   );
-
   return rows.map(mapLibrarySong);
 }
 
@@ -843,6 +856,8 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
     title: input.title?.trim() || current.title,
     artist: input.artist?.trim() || current.artist,
     releaseYear: input.releaseYear?.trim() ?? current.releaseYear,
+    releaseDate: input.releaseDate?.trim() ?? current.releaseDate,
+    albumTitle: input.albumTitle?.trim() ?? current.albumTitle,
     duration: input.duration?.trim() ?? current.duration,
     bpm: input.bpm?.trim() ?? current.bpm,
     energy: input.energy?.trim() ?? current.energy,
@@ -864,6 +879,8 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
          artist = @artist,
          musicbrainz_id = @musicbrainzId,
          release_year = @releaseYear,
+         release_date = @releaseDate,
+         album_title = @albumTitle,
          duration = @duration,
          bpm = @bpm,
          energy = @energy,
@@ -885,6 +902,8 @@ export async function updateSong(id: number, input: Partial<SongInput>): Promise
       artist: next.artist,
       musicbrainzId: next.musicbrainzId,
       releaseYear: next.releaseYear,
+      releaseDate: next.releaseDate ?? "",
+      albumTitle: next.albumTitle ?? "",
       duration: next.duration,
       bpm: next.bpm,
       energy: next.energy,
@@ -1068,6 +1087,7 @@ export async function createMix(input: MixInput): Promise<Mix> {
   const title = input.title.trim();
   if (!title) throw new Error("Title is required.");
 
+  const details = parsePlaylistDetails(input);
   const tracks = (input.tracks ?? []).map(normalizeTrack);
   const slug = input.slug?.trim()
     ? slugifyMixTitle(input.slug)
@@ -1078,13 +1098,16 @@ export async function createMix(input: MixInput): Promise<Mix> {
   const result = await sqlRun(
     `INSERT INTO mixes (
         title, description, vibe, use_case, duration, dj_persona, cover_theme, share_note, tags, tracks,
-        is_public, slug, published_at, creator_id
+        is_public, slug, published_at, creator_id, creators, genre, source_url
       ) VALUES (
         @title, @description, @vibe, @useCase, @duration, @djPersona, @coverTheme, @shareNote, @tags, '[]',
-        @isPublic, @slug, @publishedAt, @creatorId
+        @isPublic, @slug, @publishedAt, @creatorId, @creators, @genre, @sourceUrl
       )`,
     {
       title,
+      creators: JSON.stringify(details.creators ?? []),
+      genre: details.genre ?? "",
+      sourceUrl: details.sourceUrl ?? "",
       description: input.description?.trim() || "",
       vibe: input.vibe?.trim() || "",
       useCase: input.useCase?.trim() || "",
@@ -1133,7 +1156,11 @@ export async function updateMix(id: number, input: Partial<MixInput>): Promise<M
     publishedAt = null;
   }
 
+  const details = parsePlaylistDetails(input);
   const next = {
+    creators: JSON.stringify(details.creators ?? current.creators),
+    genre: details.genre ?? current.genre,
+    sourceUrl: details.sourceUrl ?? current.sourceUrl,
     title: input.title?.trim() || current.title,
     description: input.description?.trim() ?? current.description,
     vibe: input.vibe?.trim() ?? current.vibe,
@@ -1152,7 +1179,10 @@ export async function updateMix(id: number, input: Partial<MixInput>): Promise<M
 
   await sqlRun(
     `UPDATE mixes
-     SET title = @title,
+     SET creators = @creators,
+         genre = @genre,
+         source_url = @sourceUrl,
+         title = @title,
          description = @description,
          vibe = @vibe,
          use_case = @useCase,
@@ -1292,6 +1322,7 @@ export async function seedMixes(): Promise<Mix[]> {
         sceneTags: ["sunset", "arrival"],
         notes: "Sets an immediate social tone without peaking too early.",
         musicbrainzUrl: "https://musicbrainz.org/search?query=Music+Sounds+Better+With+You+Stardust&type=recording&method=indexed",
+        youtubeUrl: "https://www.youtube.com/watch?v=FQlAEiCb8m0",
         listenUrl: "https://www.youtube.com/results?search_query=Music+Sounds+Better+With+You+Stardust"
       },
       {
@@ -1305,6 +1336,7 @@ export async function seedMixes(): Promise<Mix[]> {
         sceneTags: ["reset", "breather"],
         notes: "A left turn that gives the mix shape instead of flat tempo loyalty.",
         musicbrainzUrl: "https://musicbrainz.org/search?query=Teardrop+Massive+Attack&type=recording&method=indexed",
+        youtubeUrl: "https://www.youtube.com/watch?v=u7K72X4eo_s",
         listenUrl: "https://www.youtube.com/results?search_query=Teardrop+Massive+Attack"
       },
       {
@@ -1318,6 +1350,7 @@ export async function seedMixes(): Promise<Mix[]> {
         sceneTags: ["crowd-open", "singalong"],
         notes: "This is where the room stops leaning and starts moving.",
         musicbrainzUrl: "https://musicbrainz.org/search?query=Praise+You+Fatboy+Slim&type=recording&method=indexed",
+        youtubeUrl: "https://www.youtube.com/watch?v=ruAi4VBoBSM",
         listenUrl: "https://www.youtube.com/results?search_query=Praise+You+Fatboy+Slim"
       }
     ]

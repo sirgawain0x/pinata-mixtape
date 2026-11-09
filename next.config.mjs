@@ -43,6 +43,9 @@ const defaultAuthConnectHosts = [
   "wss://*.walletconnect.org",
   "https://relay.walletconnect.org",
   "https://explorer-api.walletconnect.com",
+  "https://echo.walletconnect.com",
+  "https://metamask-sdk.api.cx.metamask.io",
+  "wss://metamask-sdk.api.cx.metamask.io",
   "https://hcaptcha.com",
   "https://*.hcaptcha.com",
   "https://newassets.hcaptcha.com"
@@ -50,6 +53,8 @@ const defaultAuthConnectHosts = [
 
 /** Hosts allowed to execute scripts via script-src. Keep minimal to avoid XSS bypasses. */
 const defaultScriptHosts = [
+  "https://www.youtube.com",
+  "https://s.ytimg.com",
   "https://auth.turnkey.com",
   "https://accounts.google.com",
   "https://auth.privy.io",
@@ -97,6 +102,8 @@ function cspConnectHosts() {
     [
       "https://livepeercdn.com",
       "https://livepeer.studio",
+      "https://api.lens.xyz",
+      "https://rpc.lens.xyz",
       "https://*.livepeercdn.com",
       ...defaultAuthConnectHosts
     ],
@@ -122,6 +129,12 @@ const allConnectHosts = cspConnectHosts();
 const allScriptHosts = cspScriptHosts();
 const allStyleHosts = cspStyleHosts();
 const allImgHosts = cspImgHosts();
+const allMediaHosts = mergeCspHosts([
+  "https://livepeercdn.com",
+  "https://*.livepeercdn.com",
+  "https://gateway.pinata.cloud",
+  ...(process.env.NEXT_PUBLIC_PINATA_GATEWAY ? [new URL(process.env.NEXT_PUBLIC_PINATA_GATEWAY).origin] : [])
+], "MIXTAPE_CSP_MEDIA_HOSTS");
 
 /**
  * Next.js forbids internal rewrites outside basePath (`/app`).
@@ -201,7 +214,7 @@ const nextConfig = {
               `img-src 'self' blob: data: ${allImgHosts.join(" ")}`,
               `font-src 'self'`,
               `frame-src 'self' ${allFrameHosts.join(" ")}`,
-              "media-src 'self' blob: https://livepeercdn.com https://*.livepeercdn.com",
+              `media-src 'self' blob: ${allMediaHosts.join(" ")}`,
               `connect-src 'self' ${allConnectHosts.join(" ")}`
             ].join("; ")
           }

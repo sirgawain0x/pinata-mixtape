@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.env*
+workspace
+**/.DS_Store
+01-typesafe-schema.md
+02-api-spec.md
+03-artist-bio-component.md
+tests
