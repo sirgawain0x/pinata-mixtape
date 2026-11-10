@@ -39,7 +39,7 @@ export function applyPlaylistTrackChange(
     case "remove":
       return prevIds.filter((id) => !removeIds.has(id));
     case "replace":
-      return nextIds;
+      return uniqueRecordingIds([...nextIds, ...prevIds]).filter((id) => !removeIds.has(id));
     default: {
       const _exhaustive: never = trackChange;
       return _exhaustive;

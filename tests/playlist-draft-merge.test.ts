@@ -40,13 +40,16 @@ test("remove-one drops only the requested recording", () => {
   assert.deepEqual(merged, ["mb-1", "mb-3"]);
 });
 
-test("replace uses only the new recording list", () => {
+test("replace preserves omitted tracks and removes only explicit IDs", () => {
   const previous = {
     title: "Sunset",
     tracks: [track("mb-1", "One"), track("mb-2", "Two")],
   };
   const merged = applyPlaylistTrackChange(previous, "replace", ["mb-9", "mb-8"], []);
-  assert.deepEqual(merged, ["mb-9", "mb-8"]);
+  assert.deepEqual(merged, ["mb-9", "mb-8", "mb-1", "mb-2"]);
+  const reordered = applyPlaylistTrackChange(previous, "replace", ["mb-2", "mb-9"], ["mb-1"]);
+  assert.deepEqual(reordered, ["mb-2", "mb-9"]);
+  assert.deepEqual(applyPlaylistTrackChange(previous, "replace", [], []), ["mb-1", "mb-2"]);
 });
 
 test("mergePlaylistDraft recomputes embed fields and ignores client iframe values", () => {

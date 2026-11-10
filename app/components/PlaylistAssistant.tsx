@@ -50,7 +50,8 @@ export default function PlaylistAssistant({ signedIn, onClose, onForm, onReview 
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not reach the assistant.");
-      setMessages([...next, { role: "assistant", content: data.reply }]); setDraft(data.draft);
+      setMessages([...next, { role: "assistant", content: data.reply }]);
+      if (data.draft) setDraft(data.draft);
     } catch (error) {
       if (!controller.signal.aborted) { setError((error as Error).message); setMessages(messages); setPrompt(next[next.length - 1].content); }
     } finally { if (!controller.signal.aborted) setBusy(false); }
