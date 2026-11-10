@@ -40,7 +40,7 @@ test("filterPublicPlaybackTracks removes legacy-only rows", () => {
 });
 
 test("keeps a non-legacy iframe when a track also has a legacy listening link", () => {
-  assert.equal(trackUsesOnlyLegacyStreamingSources({
+  assert.equal(isTrackHiddenFromPublicPlayback({
     listenUrl: "https://open.spotify.com/track/abc",
     embedSourceKind: "iframe_allowed",
     embedIframeUrl: "https://bandcamp.com/EmbeddedPlayer/track=123/",
