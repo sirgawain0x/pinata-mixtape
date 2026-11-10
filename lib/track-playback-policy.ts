@@ -36,7 +36,8 @@ export function trackHasInAppPlayableSource(track: SongPlaybackFields): boolean 
   if (Boolean(track.isCurated) && (track.audioCid?.trim() || track.audioUrl?.trim())) return true;
   if (track.livepeerPlaybackId?.trim()) return true;
   const source = resolvePlaybackSource(track);
-  return source.kind === "pinata" || source.kind === "livepeer" || source.kind === "youtube";
+  return source.kind === "pinata" || source.kind === "livepeer" || source.kind === "youtube" ||
+    (source.kind === "iframe" && Boolean(source.iframeUrl) && !isLegacyStreamingUrl(source.iframeUrl));
 }
 
 export function trackUsesOnlyLegacyStreamingSources(track: SongPlaybackFields): boolean {

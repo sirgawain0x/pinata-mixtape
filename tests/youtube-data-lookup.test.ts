@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, mock } from "node:test";
+import { findRecordingListeningLink } from "../lib/recording-discovery";
 import {
   buildYoutubeDataSearchQuery,
   findYoutubeVideoForRecording,
@@ -56,17 +57,23 @@ test("findYoutubeVideoForRecording falls back without an API key", async () => {
 test("findYoutubeVideoForRecording parses a mocked search response", async () => {
   const previous = process.env.YOUTUBE_API_KEY;
   process.env.YOUTUBE_API_KEY = "test-key";
-  mock.method(globalThis, "fetch", async () =>
-    Response.json({
-      items: [
-        {
-          id: { videoId: "dQw4w9WgXcQ" },
-          snippet: { title: "Artist — Song", channelTitle: "Artist" },
-          contentDetails: { duration: "PT3M33S" },
-        },
-      ],
-    })
-  );
+  const fetchMock = mock.method(globalThis, "fetch", async (input: URL | string) => {
+    const url = new URL(input);
+    if (url.pathname.endsWith("/videos")) {
+      assert.equal(url.searchParams.get("part"), "contentDetails");
+      return Response.json({
+        items: [{ id: "dQw4w9WgXcQ", contentDetails: { duration: "PT3M33S" } }],
+      });
+    }
+    assert.equal(url.searchParams.get("part"), "snippet");
+    const alternate = url.searchParams.get("q") === "Artist Other Song";
+    return Response.json({
+      items: [{
+        id: { videoId: alternate ? "abcdEFGhijk" : "dQw4w9WgXcQ" },
+        snippet: { title: alternate ? "Artist — Other Song" : "Artist — Song", channelTitle: "Artist" },
+      }],
+    });
+  });
   try {
     const result = await findYoutubeVideoForRecording({
       musicbrainzId: "mb-test-1",
@@ -78,8 +85,33 @@ test("findYoutubeVideoForRecording parses a mocked search response", async () =>
     if (result.kind === "video") {
       assert.match(result.watchUrl, /watch\?v=dQw4w9WgXcQ/);
     }
+    assert.equal(fetchMock.mock.callCount(), 2);
+    const alternate = await findYoutubeVideoForRecording({
+      musicbrainzId: "mb-test-1",
+      title: "Other Song",
+      artist: "Artist",
+      durationMs: 213_000,
+    });
+    assert.equal(alternate.kind === "video" ? alternate.videoId : null, "abcdEFGhijk");
+    assert.equal(fetchMock.mock.callCount(), 4);
   } finally {
     mock.restoreAll();
+    if (previous) process.env.YOUTUBE_API_KEY = previous;
+    else delete process.env.YOUTUBE_API_KEY;
+  }
+});
+
+test("public recording lookups cannot spend YouTube API quota", async (t) => {
+  const previous = process.env.YOUTUBE_API_KEY;
+  process.env.YOUTUBE_API_KEY = "test-key";
+  const fetchMock = t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("Public link lookup must not call YouTube");
+  });
+  try {
+    const result = await findRecordingListeningLink({ title: "Song", artist: "Artist" });
+    assert.match(result ?? "", /search_query=/);
+    assert.equal(fetchMock.mock.callCount(), 0);
+  } finally {
     if (previous) process.env.YOUTUBE_API_KEY = previous;
     else delete process.env.YOUTUBE_API_KEY;
   }

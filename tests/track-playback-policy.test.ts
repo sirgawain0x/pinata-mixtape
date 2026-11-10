@@ -38,3 +38,11 @@ test("filterPublicPlaybackTracks removes legacy-only rows", () => {
   ];
   assert.equal(filterPublicPlaybackTracks(tracks).length, 1);
 });
+
+test("keeps a non-legacy iframe when a track also has a legacy listening link", () => {
+  assert.equal(trackUsesOnlyLegacyStreamingSources({
+    listenUrl: "https://open.spotify.com/track/abc",
+    embedSourceKind: "iframe_allowed",
+    embedIframeUrl: "https://bandcamp.com/EmbeddedPlayer/track=123/",
+  }), false);
+});

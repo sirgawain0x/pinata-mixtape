@@ -3,6 +3,7 @@ import { buildYoutubeSearchUrl } from "./recording-links";
 import { youtubeVideoId } from "./youtube";
 
 const YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search";
+const YOUTUBE_VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos";
 const LOOKUP_TIMEOUT_MS = 4_000;
 const MAX_CACHE_ENTRIES = 500;
 const MAX_RESULTS = 3;
@@ -27,13 +28,13 @@ type YoutubeApiItem = {
 const cache = new Map<string, string>();
 const cacheOrder: string[] = [];
 
-function rememberCache(musicbrainzId: string, watchUrl: string) {
-  if (cache.has(musicbrainzId)) {
-    cache.set(musicbrainzId, watchUrl);
+function rememberCache(cacheKey: string, watchUrl: string) {
+  if (cache.has(cacheKey)) {
+    cache.set(cacheKey, watchUrl);
     return;
   }
-  cache.set(musicbrainzId, watchUrl);
-  cacheOrder.push(musicbrainzId);
+  cache.set(cacheKey, watchUrl);
+  cacheOrder.push(cacheKey);
   while (cacheOrder.length > MAX_CACHE_ENTRIES) {
     const oldest = cacheOrder.shift();
     if (oldest) cache.delete(oldest);
@@ -139,22 +140,18 @@ export async function findYoutubeVideoForRecording(
 ): Promise<YoutubeLookupResult> {
   const fallbackSearch = buildYoutubeSearchUrl(input.title, input.artist);
 
-  const musicbrainzId = input.musicbrainzId?.trim();
-  if (musicbrainzId && cache.has(musicbrainzId)) {
-    const cached = cache.get(musicbrainzId)!;
-    const videoId = youtubeVideoId(cached);
-    if (videoId) return { kind: "video", watchUrl: cached, videoId };
-  }
-
-  const apiKey = readYoutubeApiKey();
-  if (!apiKey) return { kind: "search_fallback", searchUrl: fallbackSearch };
-
   const query = buildYoutubeDataSearchQuery(input.title, input.artist);
-  if (!query) return { kind: "search_fallback", searchUrl: fallbackSearch };
+  const apiKey = readYoutubeApiKey();
+  if (!query || !apiKey) return { kind: "search_fallback", searchUrl: fallbackSearch };
+
+  const cacheKey = JSON.stringify([input.musicbrainzId?.trim(), input.title.trim(), input.artist.trim(), input.durationMs ?? null]);
+  const cached = cache.get(cacheKey);
+  const cachedVideoId = cached && youtubeVideoId(cached);
+  if (cached && cachedVideoId) return { kind: "video", watchUrl: cached, videoId: cachedVideoId };
 
   const url = new URL(YOUTUBE_SEARCH_URL);
   url.search = new URLSearchParams({
-    part: "snippet,contentDetails",
+    part: "snippet",
     type: "video",
     videoEmbeddable: "true",
     maxResults: String(MAX_RESULTS),
@@ -164,27 +161,36 @@ export async function findYoutubeVideoForRecording(
 
   try {
     const timeout = AbortSignal.timeout(LOOKUP_TIMEOUT_MS);
-    const response = await fetchWithTimeout(
-      url,
-      { signal: signal ? AbortSignal.any([signal, timeout]) : timeout },
-      LOOKUP_TIMEOUT_MS
-    );
-    const body = await response.json().catch(() => null);
-    if (!response.ok) {
-      const reason = (body as { error?: { errors?: { reason?: string }[] } })?.error?.errors?.[0]?.reason;
-      if (reason === "quotaExceeded" || reason === "dailyLimitExceeded") {
-        return { kind: "search_fallback", searchUrl: fallbackSearch };
-      }
-      return { kind: "search_fallback", searchUrl: fallbackSearch };
-    }
+    const lookupSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const response = await fetchWithTimeout(url, { signal: lookupSignal }, LOOKUP_TIMEOUT_MS);
+    if (!response.ok) return { kind: "search_fallback", searchUrl: fallbackSearch };
 
-    const items = parseYoutubeSearchResponse(body);
-    const best = pickBestYoutubeSearchItem(items, input.artist, input.title, input.durationMs ?? null);
+    const items = parseYoutubeSearchResponse(await response.json());
+    const videoIds = items.flatMap((item) => {
+      const id = item.id?.videoId;
+      return id && youtubeVideoId(`https://youtu.be/${id}`) ? [id] : [];
+    });
+    if (input.durationMs && videoIds.length) {
+      const detailsUrl = new URL(YOUTUBE_VIDEOS_URL);
+      detailsUrl.search = new URLSearchParams({
+        part: "contentDetails",
+        id: videoIds.join(","),
+        key: apiKey,
+      }).toString();
+      const details = await fetchWithTimeout(detailsUrl, { signal: lookupSignal }, LOOKUP_TIMEOUT_MS)
+        .then((result) => result.ok ? result.json() : null)
+        .catch(() => null) as { items?: { id: string; contentDetails?: YoutubeApiItem["contentDetails"] }[] } | null;
+      const byId = new Map(details?.items?.map((item) => [item.id, item.contentDetails]));
+      for (const item of items) {
+        if (item.id?.videoId) item.contentDetails = byId.get(item.id.videoId);
+      }
+    }
+    const best = pickBestYoutubeSearchItem(items, input.artist, input.title, input.durationMs);
     const videoId = best?.id?.videoId;
     if (!videoId) return { kind: "search_fallback", searchUrl: fallbackSearch };
 
     const watchUrl = watchUrlForVideoId(videoId);
-    if (musicbrainzId) rememberCache(musicbrainzId, watchUrl);
+    rememberCache(cacheKey, watchUrl);
     return { kind: "video", watchUrl, videoId };
   } catch {
     return { kind: "search_fallback", searchUrl: fallbackSearch };

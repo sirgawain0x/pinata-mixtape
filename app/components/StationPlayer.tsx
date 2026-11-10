@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { trackUsesOnlyLegacyStreamingSources } from "../../lib/track-playback-policy";
 import { youtubeEmbedUrl, youtubeVideoId } from "../../lib/youtube";
 
 type Segment = {
@@ -373,8 +372,8 @@ function audioPlayableUrl(segment: Segment): string {
 
 function segmentIsPlayable(segment: Segment): boolean {
   if (segment.kind === "music") {
-    if (segment.song && trackUsesOnlyLegacyStreamingSources(segment.song)) return false;
     if (segment.song?.youtubeUrl && youtubeVideoId(segment.song.youtubeUrl)) return true;
+    if (segment.song?.embedSourceKind === "iframe_allowed" && segment.song.embedIframeUrl) return true;
     if (segment.audioUrl) return true;
     return false;
   }

@@ -27,11 +27,11 @@ export async function findRecordingListeningLink(
   }
 
   const budget = options?.youtubeApiBudget;
-  if (budget && budget.remaining <= 0) {
+  if (!budget || budget.remaining <= 0) {
     return buildYoutubeSearchUrl(recording.title, recording.artist);
   }
 
-  if (budget) budget.remaining -= 1;
+  budget.remaining -= 1;
 
   const result = await findYoutubeVideoForRecording(
     {
