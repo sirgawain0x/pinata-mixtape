@@ -11,6 +11,9 @@ import {
   materializeSeedMixIfEmpty
 } from "../../../lib/stations";
 import { getSong } from "../../../lib/mixtapes";
+import { isLegacyStreamingUrl, trackUsesOnlyLegacyStreamingSources } from "../../../lib/track-playback-policy";
+import { resolvePlaybackSource } from "../../../lib/song-playback";
+import { youtubeVideoId } from "../../../lib/youtube";
 import { appAbsoluteUrl } from "../../../lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -96,9 +99,14 @@ export default async function StationListenPage({ params }: PageProps) {
   await materializeSeedMixIfEmpty(station.id);
   const stationCreator = await getCreator(station.creatorId);
   const rawSegments = await listStationSegments(station.id);
-  const segments = await Promise.all(
+  const segments = (await Promise.all(
     rawSegments.map(async (segment) => {
       const song = segment.songId ? await getSong(segment.songId) : null;
+      const playback = song ? resolvePlaybackSource(song) : undefined;
+      const audioUrl = segment.audioUrl || (playback?.kind === "pinata" ? playback.audioUrl : "") || "";
+      if (segment.kind === "music" && song && !audioUrl && trackUsesOnlyLegacyStreamingSources(song)) {
+        return null;
+      }
       return {
         id: segment.id,
         position: segment.position,
@@ -106,20 +114,20 @@ export default async function StationListenPage({ params }: PageProps) {
         title: segment.title,
         body: segment.body,
         audioCid: segment.audioCid,
-        audioUrl: segment.audioUrl,
+        audioUrl,
         durationSeconds: segment.durationSeconds,
         song: song
           ? {
               title: song.title,
               artist: song.artist,
-              youtubeUrl: song.youtubeUrl,
+              youtubeUrl: youtubeVideoId(song.youtubeUrl) ? song.youtubeUrl : youtubeVideoId(song.listenUrl) ? song.listenUrl : "",
               embedSourceKind: song.embedSourceKind,
-              embedIframeUrl: song.embedIframeUrl
+              embedIframeUrl: isLegacyStreamingUrl(song.embedIframeUrl) ? "" : song.embedIframeUrl
             }
           : null
       };
     })
-  );
+  )).filter((segment) => segment !== null);
 
   return (
     <main className="shell">

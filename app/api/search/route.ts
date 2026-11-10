@@ -9,11 +9,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const q = url.searchParams.get("q") ?? "";
   const creator = await getCurrentCreator();
+  const [mixes, songs] = await Promise.all([
+    listMixes(q, { publicOnly: !creator, viewerCreatorId: creator?.id ?? null }),
+    listSongs(q, 10, { publicOnly: !creator, viewerCreatorId: creator?.id ?? null })
+  ]);
   return Response.json({
-    mixes: await listMixes(q, {
-      publicOnly: !creator,
-      viewerCreatorId: creator?.id ?? null
-    }),
-    songs: await listSongs(q, 10)
+    mixes,
+    songs
   });
 }

@@ -4,6 +4,61 @@
 import type { Client } from "@libsql/client";
 import type { SqliteDb } from "./db";
 
+// Replace known search placeholders with verified recording links.
+const RECORDING_LINK_BACKFILL = `
+  UPDATE songs
+  SET youtube_url = CASE
+    WHEN title = 'Music Sounds Better With You' AND artist = 'Stardust'
+      THEN 'https://www.youtube.com/watch?v=FQlAEiCb8m0'
+    WHEN title = 'Teardrop' AND artist = 'Massive Attack'
+      THEN 'https://www.youtube.com/watch?v=u7K72X4eo_s'
+    WHEN title = 'Praise You' AND artist = 'Fatboy Slim'
+      THEN 'https://www.youtube.com/watch?v=ruAi4VBoBSM'
+  END
+  WHERE COALESCE(TRIM(youtube_url), '') = ''
+    AND COALESCE(embed_source_kind, 'youtube') = 'youtube'
+    AND COALESCE(TRIM(audio_cid), '') = ''
+    AND COALESCE(TRIM(audio_url), '') = ''
+    AND COALESCE(TRIM(livepeer_playback_id), '') = ''
+    AND listen_url IN (
+      'https://www.youtube.com/results?search_query=Music+Sounds+Better+With+You+Stardust',
+      'https://www.youtube.com/results?search_query=Teardrop+Massive+Attack',
+      'https://www.youtube.com/results?search_query=Praise+You+Fatboy+Slim'
+    )
+    AND ((title = 'Music Sounds Better With You' AND artist = 'Stardust')
+      OR (title = 'Teardrop' AND artist = 'Massive Attack')
+      OR (title = 'Praise You' AND artist = 'Fatboy Slim'))
+    AND EXISTS (
+      SELECT 1 FROM mix_songs
+      JOIN mixes ON mixes.id = mix_songs.mix_id
+      WHERE mix_songs.song_id = songs.id
+        AND mixes.title = 'Neon Rooftop Warm-Up'
+        AND mixes.creator_id IS NULL
+    );
+
+  UPDATE songs
+  SET listen_url = CASE title
+    WHEN 'Try' THEN 'https://soundcloud.com/mickeyshiloh/try-prod-by-g2'
+    WHEN 'Chemical, Chemical' THEN 'https://www.youtube.com/watch?v=yKfpOu0YoKY'
+    WHEN 'Crank Dat' THEN 'https://www.youtube.com/watch?v=u_35RPTEhfQ'
+  END
+  WHERE (
+    (title = 'Try' AND artist = 'Mickey Shiloh'
+      AND listen_url = 'https://www.youtube.com/results?search_query=Try%20Mickey%20Shiloh')
+    OR (title = 'Chemical, Chemical' AND artist = 'Pretty Girls Make Graves'
+      AND listen_url = 'https://www.youtube.com/results?search_query=Chemical%2C%20Chemical%20Pretty%20Girls%20Make%20Graves')
+    OR (title = 'Crank Dat' AND artist = 'Key! ft. Redd Smash'
+      AND listen_url = 'https://www.youtube.com/results?search_query=Crank%20Dat%20Key!%20ft.%20Redd%20Smash')
+  )
+    AND COALESCE(embed_source_kind, 'youtube') = 'youtube'
+    AND COALESCE(TRIM(youtube_url), '') = ''
+    AND COALESCE(TRIM(embed_iframe_url), '') = ''
+    AND COALESCE(TRIM(creative_tv_url), '') = ''
+    AND COALESCE(TRIM(audio_url), '') = ''
+    AND COALESCE(TRIM(audio_cid), '') = ''
+    AND COALESCE(TRIM(livepeer_playback_id), '') = '';
+`;
+
 export const MIX_SCHEMA_DDL = `
   CREATE TABLE IF NOT EXISTS mixes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,6 +128,19 @@ export const MIX_SCHEMA_DDL = `
 `;
 
 export const STATION_SCHEMA_DDL = `
+  CREATE TABLE IF NOT EXISTS creator_lens_challenges (
+    creator_id INTEGER PRIMARY KEY,
+    message TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    FOREIGN KEY(creator_id) REFERENCES creators(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS creator_lens_accounts (
+    creator_id INTEGER PRIMARY KEY,
+    account TEXT NOT NULL,
+    FOREIGN KEY(creator_id) REFERENCES creators(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS creators (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     wallet_address TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -205,6 +273,22 @@ export function bootstrapSqlite(database: SqliteDb): void {
   database.exec(MIX_SCHEMA_DDL);
   database.exec(STATION_SCHEMA_DDL);
 
+  const mixColumns = database.prepare("PRAGMA table_info(mixes)").all() as { name: string }[];
+  for (const [name, definition] of [
+    ["creators", "TEXT NOT NULL DEFAULT '[]'"],
+    ["genre", "TEXT NOT NULL DEFAULT ''"],
+    ["source_url", "TEXT NOT NULL DEFAULT ''"]
+  ]) {
+    if (!mixColumns.some((column) => column.name === name)) {
+      try {
+        database.exec(`ALTER TABLE mixes ADD COLUMN ${name} ${definition}`);
+      } catch (error) {
+        const columns = database.prepare("PRAGMA table_info(mixes)").all() as { name: string }[];
+        if (!columns.some((column) => column.name === name)) throw error;
+      }
+    }
+  }
+
   try {
     database.exec(`ALTER TABLE songs ADD COLUMN musicbrainz_id TEXT`);
   } catch {
@@ -259,6 +343,8 @@ export function bootstrapSqlite(database: SqliteDb): void {
   }
 
   const songExtraColumns = [
+    `ALTER TABLE songs ADD COLUMN release_date TEXT`,
+    `ALTER TABLE songs ADD COLUMN album_title TEXT`,
     `ALTER TABLE songs ADD COLUMN audio_cid TEXT`,
     `ALTER TABLE songs ADD COLUMN audio_url TEXT`,
     `ALTER TABLE songs ADD COLUMN duration_seconds INTEGER`,
@@ -274,6 +360,8 @@ export function bootstrapSqlite(database: SqliteDb): void {
       // exists
     }
   }
+
+  database.exec(RECORDING_LINK_BACKFILL);
 
   database.exec(
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_mixes_slug_unique ON mixes(slug COLLATE NOCASE) WHERE slug IS NOT NULL AND TRIM(slug) <> ''`
@@ -303,6 +391,22 @@ export async function bootstrapLibsql(client: Client): Promise<void> {
       /* column exists */
     }
   };
+  const mixColumns = await client.execute("PRAGMA table_info(mixes)");
+  for (const [name, definition] of [
+    ["creators", "TEXT NOT NULL DEFAULT '[]'"],
+    ["genre", "TEXT NOT NULL DEFAULT ''"],
+    ["source_url", "TEXT NOT NULL DEFAULT ''"]
+  ]) {
+    if (!mixColumns.rows.some((column) => column.name === name)) {
+      try {
+        await client.execute(`ALTER TABLE mixes ADD COLUMN ${name} ${definition}`);
+      } catch (error) {
+        const columns = await client.execute("PRAGMA table_info(mixes)");
+        if (!columns.rows.some((column) => column.name === name)) throw error;
+      }
+    }
+  }
+
   await tryAlter(`ALTER TABLE songs ADD COLUMN musicbrainz_id TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN youtube_url TEXT`);
   await tryAlter(`ALTER TABLE mix_moments ADD COLUMN segment_id INTEGER`);
@@ -314,6 +418,8 @@ export async function bootstrapLibsql(client: Client): Promise<void> {
   await tryAlter(`ALTER TABLE creators ADD COLUMN metoken_address TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN embed_source_kind TEXT NOT NULL DEFAULT 'youtube'`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN embed_iframe_url TEXT`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN release_date TEXT`);
+  await tryAlter(`ALTER TABLE songs ADD COLUMN album_title TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN audio_cid TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN audio_url TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN duration_seconds INTEGER`);
@@ -321,6 +427,7 @@ export async function bootstrapLibsql(client: Client): Promise<void> {
   await tryAlter(`ALTER TABLE songs ADD COLUMN creative_tv_url TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN creative_tv_post_id TEXT`);
   await tryAlter(`ALTER TABLE songs ADD COLUMN livepeer_playback_id TEXT`);
+  await client.executeMultiple(RECORDING_LINK_BACKFILL);
 
   try {
     await client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mixes_slug_unique ON mixes(slug COLLATE NOCASE) WHERE slug IS NOT NULL AND TRIM(slug) <> ''`);

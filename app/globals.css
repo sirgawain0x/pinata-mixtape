@@ -31,14 +31,14 @@ body {
   font-family: "Trebuchet MS", "Gill Sans", sans-serif;
 }
 
-button:not([class*="privy"]):not([data-testid*="privy"]),
-input:not([class*="privy"]):not([data-testid*="privy"]),
-a:not([class*="privy"]):not([data-testid*="privy"]) {
+button:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)),
+input:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)),
+a:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)) {
   font: inherit;
 }
 
-button:not([class*="privy"]):not([data-testid*="privy"]),
-a:not([class*="privy"]):not([data-testid*="privy"]) {
+button:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)),
+a:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)) {
   min-height: 42px;
   border: 1px solid var(--text);
   background: linear-gradient(180deg, rgba(248, 232, 200, 0.14), rgba(248, 232, 200, 0.02));
@@ -52,19 +52,19 @@ a:not([class*="privy"]):not([data-testid*="privy"]) {
   transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 
-button:not([class*="privy"]):not([data-testid*="privy"]):hover,
-a:not([class*="privy"]):not([data-testid*="privy"]):hover {
+button:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)):hover,
+a:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)):hover {
   transform: translateY(-1px);
   border-color: var(--mint);
 }
 
-button:not([class*="privy"]):not([data-testid*="privy"]):disabled {
+button:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)):disabled {
   opacity: 0.6;
   cursor: wait;
   transform: none;
 }
 
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([class*="privy"]):not([data-testid*="privy"]) {
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)) {
   width: 100%;
   border: 1px solid var(--line);
   background: rgba(20, 15, 32, 0.88);
@@ -72,8 +72,8 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([class*=
   padding: 11px 12px;
 }
 
-input[type="checkbox"]:not([class*="privy"]):not([data-testid*="privy"]),
-input[type="radio"]:not([class*="privy"]):not([data-testid*="privy"]) {
+input[type="checkbox"]:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)),
+input[type="radio"]:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)) {
   width: 1rem;
   height: 1rem;
   margin: 0;
@@ -82,7 +82,7 @@ input[type="radio"]:not([class*="privy"]):not([data-testid*="privy"]) {
   flex-shrink: 0;
 }
 
-input[type="file"]:not([class*="privy"]):not([data-testid*="privy"]) {
+input[type="file"]:not([class*="privy"]):not([data-testid*="privy"]):not(:where(#privy-dialog, #privy-dialog *)) {
   width: auto;
   max-width: 100%;
   padding: 8px 0;
@@ -2277,8 +2277,8 @@ h4 {
 }
 
 /* ---- Tactile brushed-metal controls ------------------------------------- */
-button,
-a.button,
+button:not(:where(#privy-dialog, #privy-dialog *)),
+a:not(:where(#privy-dialog, #privy-dialog *)).button,
 .signin > button,
 .tape-meta > button,
 .search > button,
@@ -2304,16 +2304,16 @@ a.button,
   transition: transform 100ms ease, border-color 120ms ease, box-shadow 100ms ease, color 120ms ease;
 }
 
-button:hover,
-a:hover {
+button:not(:where(#privy-dialog, #privy-dialog *)):hover,
+a:not(:where(#privy-dialog, #privy-dialog *)):hover {
   transform: none;
   border-color: #141518;
   border-bottom-color: var(--led-amber);
   color: #fff;
 }
 
-button:active,
-a:active {
+button:not(:where(#privy-dialog, #privy-dialog *)):active,
+a:not(:where(#privy-dialog, #privy-dialog *)):active {
   transform: translateY(2px);
   border-bottom-width: 1px;
   box-shadow:
@@ -2330,7 +2330,7 @@ a:active {
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55);
 }
 
-button:disabled {
+button:not(:where(#privy-dialog, #privy-dialog *)):disabled {
   opacity: 0.5;
 }
 
@@ -2345,9 +2345,9 @@ button:disabled {
 }
 
 /* ---- Recessed inputs ----------------------------------------------------- */
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-textarea,
-select,
+input:not(:where(#privy-dialog, #privy-dialog *)):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea:not(:where(#privy-dialog, #privy-dialog *)),
+select:not(:where(#privy-dialog, #privy-dialog *)),
 .composer-form input[type="text"],
 .composer-form input[type="url"],
 .composer-form textarea,
@@ -2360,15 +2360,15 @@ select,
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7);
 }
 
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-textarea:focus,
-select:focus {
+input:not(:where(#privy-dialog, #privy-dialog *)):not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+textarea:not(:where(#privy-dialog, #privy-dialog *)):focus,
+select:not(:where(#privy-dialog, #privy-dialog *)):focus {
   border-color: var(--led-amber);
   outline: none;
 }
 
-input[type="checkbox"],
-input[type="radio"] {
+input:not(:where(#privy-dialog, #privy-dialog *))[type="checkbox"],
+input:not(:where(#privy-dialog, #privy-dialog *))[type="radio"] {
   accent-color: var(--led-amber);
 }
 
@@ -2674,6 +2674,51 @@ input[type="radio"] {
   position: absolute;
   visibility: hidden;
   width: 0;
+}
+
+.song-provider-embed {
+  display: block;
+  width: 100%;
+  height: 200px;
+  border: 0;
+  border-radius: 12px;
+}
+
+.streaming-app-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.streaming-app-links svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.streaming-app-links a {
+  gap: 7px;
+}
+
+.song-video-shell,
+.song-livepeer-visible {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #15151c;
+}
+
+.song-video-shell > div,
+.song-video-shell iframe,
+.song-livepeer-visible video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .song-mix-list {
@@ -3136,7 +3181,7 @@ input[type="radio"] {
 }
 
 .mix-card,
-a.mix-card {
+a:not(:where(#privy-dialog, #privy-dialog *)).mix-card {
   display: grid;
   gap: 4px;
   text-decoration: none;
@@ -3145,7 +3190,7 @@ a.mix-card {
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55);
 }
 
-a.mix-card:hover {
+a:not(:where(#privy-dialog, #privy-dialog *)).mix-card:hover {
   border: none;
 }
 
@@ -3346,3 +3391,6 @@ a.mix-card:hover {
   background: var(--led-green);
   color: var(--led-green);
 }
+
+/* Match the supported light Privy theme without inheriting the legacy dark controls. */
+#privy-dialog { color-scheme: light; }

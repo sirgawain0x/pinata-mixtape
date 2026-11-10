@@ -19,8 +19,8 @@ export default function TrackPreview({ track, label = "Preview", compact = false
       <div className={compact ? "track-preview track-preview-compact" : "track-preview"}>
         <p className="muted track-preview-warning">
           {source.outboundUrl
-            ? "Link only — add a direct YouTube URL for in-app preview."
-            : "No playback source — add a YouTube or embed URL."}
+            ? "Open the listening link to find this recording."
+            : "Add a title and artist to find this recording."}
         </p>
         {source.outboundUrl ? (
           <a className="button secondary-button" href={source.outboundUrl} rel="noreferrer" target="_blank">
@@ -33,7 +33,7 @@ export default function TrackPreview({ track, label = "Preview", compact = false
 
   return (
     <div className={compact ? "track-preview track-preview-compact" : "track-preview"}>
-      <div className="track-preview-controls">
+      {source.kind !== "iframe" ? <div className="track-preview-controls">
         <button
           className="secondary-button"
           disabled={!controls.playerReady}
@@ -43,10 +43,11 @@ export default function TrackPreview({ track, label = "Preview", compact = false
           {!controls.playerReady ? "Loading…" : controls.isPlaying ? "Pause preview" : `${label}`}
         </button>
         <span className="muted">Source: {controls.sourceKind.replace("_", " ")}</span>
-      </div>
+      </div> : null}
       {controls.error ? <p className="signin-error">{controls.error}</p> : null}
       <SongPlaybackMedia
         controls={controls}
+        showVideo={source.kind === "iframe"}
         onLivepeerPlaying={controls.onLivepeerPlaying}
         onLivepeerTime={controls.onLivepeerTime}
       />

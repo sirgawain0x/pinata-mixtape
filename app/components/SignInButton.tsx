@@ -1,10 +1,11 @@
 "use client";
 
-import { usePrivy, useLogin, useLogout, useWallets } from "@privy-io/react-auth";
+import { useLinkAccount, useLogin, useLogout, useModalStatus, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { isAddress } from "viem";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { hasPrivyRecoveryLogin } from "../../lib/privy-recovery-login";
 import { resolveSmartAccountAddress } from "../../lib/smart-wallet";
 
 const APP_BASE = "/app";
@@ -28,6 +29,19 @@ export function SignInButton({
   const { ready, authenticated, user, getAccessToken } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
+  const { isOpen: privyModalOpen } = useModalStatus();
+  const linkFeedbackPendingRef = useRef(false);
+  const [passkeyLinkStatus, setPasskeyLinkStatus] = useState("");
+  const { linkPasskey, linkEmail, linkGoogle } = useLinkAccount({
+    onSuccess: () => {
+      setPasskeyLinkStatus("Account updated.");
+      linkFeedbackPendingRef.current = true;
+    },
+    onError: (error) => {
+      setPasskeyLinkStatus(error || "Could not update account.");
+      linkFeedbackPendingRef.current = true;
+    }
+  });
   const { wallets } = useWallets();
   const [startupTimedOut, setStartupTimedOut] = useState(false);
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(
@@ -45,6 +59,21 @@ export function SignInButton({
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const sessionAddressRef = useRef<string | null>(null);
+  const drawerVisible = isOpen && !privyModalOpen;
+
+  useEffect(() => {
+    if (privyModalOpen && isOpen) {
+      setIsOpen(false);
+      setPanel("menu");
+    }
+  }, [privyModalOpen, isOpen]);
+
+  useEffect(() => {
+    if (privyModalOpen || !linkFeedbackPendingRef.current) return;
+    linkFeedbackPendingRef.current = false;
+    setIsOpen(true);
+    setPanel("menu");
+  }, [privyModalOpen]);
 
   useEffect(() => {
     if (ready) return;
@@ -60,6 +89,16 @@ export function SignInButton({
     setIsOpen(false);
     setPanel("menu");
   }, []);
+
+  const hasLinkedPasskey = useMemo(
+    () => user?.linkedAccounts?.some((account) => account.type === "passkey") ?? false,
+    [user?.linkedAccounts]
+  );
+
+  const hasRecoveryLogin = useMemo(
+    () => hasPrivyRecoveryLogin(user?.linkedAccounts),
+    [user?.linkedAccounts]
+  );
 
   const signerWallet = useMemo(() => {
     const active = wallets.find((w) => w.type === "ethereum" && w.address);
@@ -186,7 +225,7 @@ export function SignInButton({
   }, [isOpen, sessionReady]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!drawerVisible) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         closeDrawer();
@@ -204,7 +243,7 @@ export function SignInButton({
       window.removeEventListener("keydown", onKey);
       window.clearTimeout(focusTimer);
     };
-  }, [isOpen, closeDrawer]);
+  }, [drawerVisible, closeDrawer]);
 
   const handleLogout = async () => {
     await fetch(`${APP_BASE}/api/auth/session`, { method: "DELETE" }).catch(() => null);
@@ -292,10 +331,21 @@ export function SignInButton({
           aria-expanded={isOpen}
           aria-haspopup="dialog"
           aria-controls="account-drawer"
+          aria-label={displayAddress ? `My Account ${short}` : "My Account"}
         >
-          {isPending && !displayAddress ? "Connecting…" : `My Account ${short}`}
+          {isPending && !displayAddress ? "Connecting…" : displayAddress ? (
+            <>
+              <span className="account-trigger-label">My Account&nbsp;</span>
+              <span>{short}</span>
+            </>
+          ) : "My Account"}
         </button>
-        {isOpen ? (
+        {passkeyLinkStatus && !drawerVisible ? (
+          <p className="account-metoken-status account-link-status" role="status">
+            {passkeyLinkStatus}
+          </p>
+        ) : null}
+        {drawerVisible ? (
           <div className="account-drawer-root">
             <div
               className="account-menu-backdrop"
@@ -373,6 +423,54 @@ export function SignInButton({
                       >
                         meToken settings
                       </button>
+                    ) : null}
+                    {sessionReady ? (
+                      <>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          onClick={() => {
+                            setPasskeyLinkStatus("");
+                            closeDrawer();
+                            linkPasskey({ name: "Mixtape" });
+                          }}
+                        >
+                          {hasLinkedPasskey ? "Add another passkey" : "Add a passkey"}
+                        </button>
+                        {!hasRecoveryLogin ? (
+                          <>
+                            <p className="account-metoken-help">
+                              Add email or Google so you can recover your account if you lose this
+                              device.
+                            </p>
+                            <button
+                              type="button"
+                              className="account-menu-item"
+                              onClick={() => {
+                                setPasskeyLinkStatus("");
+                                closeDrawer();
+                                linkEmail();
+                              }}
+                            >
+                              Link email for recovery
+                            </button>
+                            <button
+                              type="button"
+                              className="account-menu-item"
+                              onClick={() => {
+                                setPasskeyLinkStatus("");
+                                closeDrawer();
+                                linkGoogle();
+                              }}
+                            >
+                              Link Google for recovery
+                            </button>
+                          </>
+                        ) : null}
+                        {passkeyLinkStatus ? (
+                          <p className="account-metoken-status">{passkeyLinkStatus}</p>
+                        ) : null}
+                      </>
                     ) : null}
                     {sessionReady && meTokenSaved && onTipOwnMeToken ? (
                       <button

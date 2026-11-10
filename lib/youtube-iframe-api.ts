@@ -4,7 +4,7 @@ declare global {
   interface Window {
     onYouTubeIframeAPIReady?: () => void;
     YT?: {
-      Player: new (elementId: string, options: unknown) => unknown;
+      Player: new (element: string | HTMLElement, options: unknown) => unknown;
       PlayerState: {
         UNSTARTED: number;
         ENDED: number;

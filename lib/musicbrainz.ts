@@ -1,3 +1,6 @@
+import { publicRecordingUrl } from "./recording-links";
+import { youtubeVideoId } from "./youtube";
+
 type MusicBrainzRecordingSearchOptions = {
   title?: string;
   artist?: string;
@@ -39,6 +42,27 @@ type MusicBrainzSearchResponse = {
 const MUSICBRAINZ_BASE = "https://musicbrainz.org/ws/2/recording";
 const USER_AGENT = "PinataMixtape/0.1.0 ( https://github.com/raid-guild )";
 
+export async function findMusicBrainzRecordingLink(id: string, signal?: AbortSignal): Promise<string | undefined> {
+  if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) return;
+  signal?.throwIfAborted();
+  await respectRateLimit();
+  signal?.throwIfAborted();
+  const timeout = AbortSignal.timeout(3_000);
+  const response = await fetch(`${MUSICBRAINZ_BASE}/${id}?inc=url-rels&fmt=json`, {
+    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    next: { revalidate: 86_400 }
+  });
+  if (!response.ok) return;
+  const data = await response.json() as { relations?: { url?: { resource?: string } }[] };
+  for (const relation of data.relations ?? []) {
+    const url = publicRecordingUrl(relation.url?.resource);
+    if (!url) continue;
+    const videoId = youtubeVideoId(url.href);
+    if (videoId) return url.href;
+  }
+}
+
 let lastMusicBrainzRequestAt = 0;
 
 function sleep(ms: number): Promise<void> {
@@ -47,14 +71,9 @@ function sleep(ms: number): Promise<void> {
 
 async function respectRateLimit(): Promise<void> {
   const now = Date.now();
-  const elapsed = now - lastMusicBrainzRequestAt;
-  const minGapMs = 1100;
-
-  if (elapsed < minGapMs) {
-    await sleep(minGapMs - elapsed);
-  }
-
-  lastMusicBrainzRequestAt = Date.now();
+  const scheduledAt = Math.max(now, lastMusicBrainzRequestAt + 1100);
+  lastMusicBrainzRequestAt = scheduledAt;
+  if (scheduledAt > now) await sleep(scheduledAt - now);
 }
 
 function quotedTerm(value: string): string {
@@ -121,6 +140,7 @@ export async function searchMusicBrainzRecordings(
       "User-Agent": USER_AGENT,
       Accept: "application/json"
     },
+    signal: AbortSignal.timeout(12_000),
     cache: "no-store"
   });
 

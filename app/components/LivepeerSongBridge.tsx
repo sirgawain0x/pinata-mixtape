@@ -7,11 +7,12 @@ import { useEffect, useRef } from "react";
 type Props = {
   playbackId: string;
   isPlaying: boolean;
+  showControls?: boolean;
   onTimeUpdate?: (current: number, duration: number) => void;
   onPlayingChange?: (playing: boolean) => void;
 };
 
-export default function LivepeerSongBridge({ playbackId, isPlaying, onTimeUpdate, onPlayingChange }: Props) {
+export default function LivepeerSongBridge({ playbackId, isPlaying, showControls = false, onTimeUpdate, onPlayingChange }: Props) {
   const shellRef = useRef<HTMLDivElement>(null);
   const hlsSrc = `https://livepeercdn.com/hls/${playbackId}/index.m3u8` as `${string}m3u8`;
   const livepeerSrc = { type: "hls", src: hlsSrc } as Src;
@@ -46,10 +47,10 @@ export default function LivepeerSongBridge({ playbackId, isPlaying, onTimeUpdate
   }, [onPlayingChange, onTimeUpdate, playbackId]);
 
   return (
-    <div className="song-livepeer-shell" ref={shellRef}>
+    <div className={showControls ? "song-livepeer-visible" : "song-livepeer-shell"} ref={shellRef}>
       <Root src={[livepeerSrc]}>
         <Container>
-          <Video />
+          <Video controls={showControls} playsInline />
         </Container>
       </Root>
     </div>

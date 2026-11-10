@@ -1,3 +1,4 @@
+import { findRecordingListeningLink } from "../../../../lib/recording-discovery";
 import { searchMusicBrainzRecordings } from "../../../../lib/musicbrainz";
 import { clientLimiterKey, rateLimitHit } from "../../../../lib/rate-limit";
 
@@ -11,14 +12,24 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
+  const recordingId = url.searchParams.get("recordingId");
+  if (recordingId || url.searchParams.get("findLink") === "1") {
+    const listenUrl = await findRecordingListeningLink({
+      musicbrainzId: recordingId ?? undefined,
+      title: (url.searchParams.get("title") ?? "").slice(0, 160),
+      artist: (url.searchParams.get("artist") ?? "").slice(0, 120),
+      albumTitle: (url.searchParams.get("album") ?? "").slice(0, 160)
+    }, request.signal).catch(() => undefined);
+    return Response.json({ listenUrl: listenUrl ?? null });
+  }
   const title = url.searchParams.get("title") ?? "";
   const artist = url.searchParams.get("artist") ?? "";
   const query = url.searchParams.get("query") ?? "";
   const limit = Number(url.searchParams.get("limit") ?? 5);
 
-  if (!query.trim() && !title.trim()) {
+  if (!query.trim() && !title.trim() && !artist.trim()) {
     return Response.json(
-      { error: "Provide `query` or at least `title` for MusicBrainz lookup." },
+      { error: "Provide a query, title, or artist for MusicBrainz lookup." },
       { status: 400 }
     );
   }

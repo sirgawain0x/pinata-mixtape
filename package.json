@@ -13,7 +13,11 @@
     "pm2:reload": "pm2 reload ecosystem.config.cjs --update-env",
     "pm2:stop": "pm2 delete creative-mixtape",
     "pm2:logs": "pm2 logs creative-mixtape --lines 100",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:mixtape": "tsx --test tests/playlist-metadata.test.ts tests/ai-gateway.test.ts tests/playlist-draft-merge.test.ts tests/assistant-track-embed.test.ts tests/youtube-data-lookup.test.ts tests/track-playback-policy.test.ts",
+    "test:social": "tsx --test tests/social-composer.test.ts",
+    "test:lens": "tsx --test tests/lens-operation.test.ts tests/lens-release-fixes.test.ts tests/lens-mutation-result.test.ts",
+    "test:auth": "tsx --test tests/privy-config.test.ts tests/privy-session.test.ts tests/privy-recovery-login.test.ts"
   },
   "dependencies": {
     "@account-kit/core": "^4.88.1",
@@ -22,6 +26,9 @@
     "@alchemy/wallet-apis": "^5.0.6",
     "@coinbase/cdp-sdk": "^1.56.0",
     "@farcaster/miniapp-sdk": "^0.3.0",
+    "@lens-protocol/client": "0.0.0-canary-20250820102520",
+    "@lens-protocol/env": "0.0.0-canary-20250820102520",
+    "@lens-protocol/metadata": "^2.1.0",
     "@libsql/client": "^0.15.15",
     "@livepeer/react": "^4.3.6",
     "@privy-io/alchemy-migration": "^0.0.5",
@@ -31,6 +38,7 @@
     "@react-three/fiber": "^9.6.1",
     "@tanstack/react-query": "^5.100.4",
     "@wagmi/core": "^3.5.5",
+    "ai": "^7.0.164",
     "better-sqlite3": "^12.4.1",
     "kokoro-js": "^1.2.1",
     "next": "16.4.1",
@@ -38,9 +46,15 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "rss-parser": "^3.13.0",
+    "server-only": "^0.0.1",
     "three": "^0.184.0",
     "viem": "^2.54.0",
-    "wagmi": "^2.19.5"
+    "wagmi": "^2.19.5",
+    "zod": "^4.6.7"
+  },
+  "overrides": {
+    "@lens-protocol/client": "0.0.0-canary-20250820102520",
+    "@lens-protocol/env": "0.0.0-canary-20250820102520"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
@@ -49,6 +63,7 @@
     "@types/react-dom": "^19.1.2",
     "@types/three": "^0.184.1",
     "pino-pretty": "^13.1.3",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.3"
   }
 }

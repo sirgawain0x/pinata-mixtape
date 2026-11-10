@@ -1,4 +1,12 @@
+import type { EmbedSourceKind } from "./embed-sources";
 import { youtubeVideoId } from "./youtube";
+import {
+  isYoutubeSearchUrl,
+  preferredRecordingLink,
+  publicRecordingUrl,
+  recordingEmbedUrl,
+  streamingAppLinks,
+} from "./recording-links";
 
 export type PlaybackSourceKind = "pinata" | "livepeer" | "youtube" | "iframe" | "link_only";
 
@@ -12,7 +20,28 @@ export type SongPlaybackFields = {
   embedIframeUrl?: string;
   creativeTvUrl?: string;
   listenUrl?: string;
+  title?: string;
+  artist?: string;
 };
+
+/** Infer embed fields for assistant-generated tracks from resolved listen URLs. */
+export function inferAssistantTrackEmbed(listenUrl?: string, youtubeUrl?: string): {
+  embedSourceKind: EmbedSourceKind;
+  embedIframeUrl: string;
+  youtubeUrl: string;
+} {
+  const listen = listenUrl?.trim() ?? "";
+  const yt = youtubeUrl?.trim() ?? "";
+  const candidate = listen || yt;
+  if (isYoutubeSearchUrl(listen) || isYoutubeSearchUrl(yt)) {
+    return { embedSourceKind: "link_only", embedIframeUrl: "", youtubeUrl: yt || listen };
+  }
+  const videoId = youtubeVideoId(listen) || youtubeVideoId(yt);
+  if (videoId) {
+    return { embedSourceKind: "youtube", embedIframeUrl: "", youtubeUrl: candidate };
+  }
+  return { embedSourceKind: "link_only", embedIframeUrl: "", youtubeUrl: yt || listen };
+}
 
 export type ResolvedPlaybackSource = {
   kind: PlaybackSourceKind;
@@ -27,43 +56,47 @@ export function resolvePlaybackSource(song: SongPlaybackFields): ResolvedPlaybac
   const audioCid = song.audioCid?.trim() ?? "";
   const audioUrl = song.audioUrl?.trim() ?? "";
   const isCurated = Boolean(song.isCurated);
+  const outboundUrl = preferredRecordingLink(song.title ?? "", song.artist ?? "",
+    song.listenUrl, song.youtubeUrl, song.creativeTvUrl, song.embedIframeUrl) || undefined;
 
   if (isCurated && (audioCid || audioUrl)) {
-    return { kind: "pinata", audioUrl: audioUrl || undefined };
+    return { kind: "pinata", audioUrl: audioUrl || `https://gateway.pinata.cloud/ipfs/${encodeURIComponent(audioCid)}`, outboundUrl };
+  }
+
+  const youtubeUrl = publicRecordingUrl(song.youtubeUrl)?.toString() ?? "";
+  const explicitVideoId = youtubeVideoId(youtubeUrl);
+  if (song.embedSourceKind === "youtube" && explicitVideoId) {
+    return { kind: "youtube", youtubeVideoId: explicitVideoId, outboundUrl };
   }
 
   const livepeerPlaybackId = song.livepeerPlaybackId?.trim() ?? "";
   if (livepeerPlaybackId) {
-    return { kind: "livepeer", livepeerPlaybackId };
+    return { kind: "livepeer", livepeerPlaybackId, outboundUrl };
   }
 
   const embedKind = song.embedSourceKind ?? "youtube";
-  const youtubeUrl = song.youtubeUrl?.trim() ?? "";
-  const videoId = youtubeVideoId(youtubeUrl);
+  const listenUrl = publicRecordingUrl(song.listenUrl)?.toString() ?? "";
+  const videoId = explicitVideoId || youtubeVideoId(listenUrl);
 
   if (embedKind === "youtube" && videoId) {
-    return { kind: "youtube", youtubeVideoId: videoId };
+    return { kind: "youtube", youtubeVideoId: videoId, outboundUrl };
   }
 
-  const iframeUrl = song.embedIframeUrl?.trim() ?? "";
+  const iframeUrl = recordingEmbedUrl(song.embedIframeUrl) || publicRecordingUrl(song.embedIframeUrl)?.toString();
   if (embedKind === "iframe_allowed" && iframeUrl) {
-    return { kind: "iframe", iframeUrl };
+    const { appleMusic, spotify } = streamingAppLinks(song.listenUrl, song.embedIframeUrl);
+    if (appleMusic && spotify && streamingAppLinks(iframeUrl).spotify) {
+      return { kind: "iframe", iframeUrl: recordingEmbedUrl(appleMusic), outboundUrl };
+    }
+    return { kind: "iframe", iframeUrl, outboundUrl };
   }
 
-  if (embedKind === "creativetv" && song.creativeTvUrl?.trim()) {
-    return { kind: "link_only", outboundUrl: song.creativeTvUrl.trim() };
+  if (embedKind === "youtube") {
+    const providerEmbed = recordingEmbedUrl(listenUrl) || recordingEmbedUrl(youtubeUrl);
+    if (providerEmbed) return { kind: "iframe", iframeUrl: providerEmbed, outboundUrl };
   }
 
-  const listenUrl = song.listenUrl?.trim() ?? "";
-  if (listenUrl) {
-    return { kind: "link_only", outboundUrl: listenUrl };
-  }
-
-  if (song.creativeTvUrl?.trim()) {
-    return { kind: "link_only", outboundUrl: song.creativeTvUrl.trim() };
-  }
-
-  return { kind: "link_only" };
+  return { kind: "link_only", outboundUrl };
 }
 
 export type TrackPlaybackStatus = "playable" | "embed" | "link_only" | "missing";
