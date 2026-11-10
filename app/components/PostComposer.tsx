@@ -18,7 +18,7 @@ export default function PostComposer({ mixes, initialMixId, onClose }: {
   initialMixId?: number;
   onClose: () => void;
 }) {
-  const lens = useLensPublishing();
+  const lens = useLensPublishing({ restorePendingPost: true });
   const [platform, setPlatform] = useState<SocialPlatform>("x");
   const [text, setText] = useState("");
   const [mixId, setMixId] = useState(initialMixId ? String(initialMixId) : "");

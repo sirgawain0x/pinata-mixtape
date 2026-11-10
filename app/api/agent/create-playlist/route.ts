@@ -22,7 +22,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "The assistant is unavailable right now. You can create your playlist with the form below." }, { status: 503 });
   }
   try {
-    const result = await createPlaylistDraft(parsed.data.messages, request.signal);
+    const previousDraft = parsed.data.previousDraft ?? null;
+    const result = await createPlaylistDraft(parsed.data.messages, request.signal, previousDraft);
     return Response.json(result);
   } catch {
     // Provider errors can contain request details. Keep them out of the public response.

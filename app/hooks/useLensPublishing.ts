@@ -16,7 +16,10 @@ type PendingChange = { id: string; action: "edit" | "delete"; hash: string };
 
 type AvailableAccount = { address: string; label: string; owner: string };
 
-export function useLensPublishing() {
+type UseLensPublishingOptions = { restorePendingPost?: boolean };
+
+export function useLensPublishing(options: UseLensPublishingOptions = {}) {
+  const { restorePendingPost = false } = options;
   const { authenticated, login } = usePrivy();
   const { wallets } = useWallets();
   const [walletAddress, setWalletAddress] = useState("");
@@ -34,13 +37,16 @@ export function useLensPublishing() {
     try {
       const change = JSON.parse(sessionStorage.getItem("mixtape:pending-lens-change") || "null");
       if (change && /^0x[0-9a-f]{64}$/i.test(change.hash) && typeof change.id === "string" && ["edit", "delete"].includes(change.action)) setPendingChange(change);
-      const saved = JSON.parse(sessionStorage.getItem("mixtape:pending-lens-post") || "null");
-      if (saved && /^0x[0-9a-f]{64}$/i.test(saved.hash) && typeof saved.content === "string") {
-        setPendingHash(saved.hash); setPendingContent(saved.content);
-        setStatus("A post was already submitted. Check its confirmation before publishing again.");
+      if (restorePendingPost) {
+        const saved = JSON.parse(sessionStorage.getItem("mixtape:pending-lens-post") || "null");
+        if (saved && /^0x[0-9a-f]{64}$/i.test(saved.hash) && typeof saved.content === "string") {
+          setPendingHash(saved.hash);
+          setPendingContent(saved.content);
+          setStatus("A post was already submitted. Check its confirmation before publishing again.");
+        }
       }
     } catch { /* Recovery storage is optional. */ }
-  }, []);
+  }, [restorePendingPost]);
 
   useEffect(() => {
     setSession(null);

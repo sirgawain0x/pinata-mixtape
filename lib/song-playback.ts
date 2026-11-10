@@ -1,5 +1,12 @@
+import type { EmbedSourceKind } from "./embed-sources";
 import { youtubeVideoId } from "./youtube";
-import { preferredRecordingLink, publicRecordingUrl, recordingEmbedUrl, streamingAppLinks } from "./recording-links";
+import {
+  isYoutubeSearchUrl,
+  preferredRecordingLink,
+  publicRecordingUrl,
+  recordingEmbedUrl,
+  streamingAppLinks,
+} from "./recording-links";
 
 export type PlaybackSourceKind = "pinata" | "livepeer" | "youtube" | "iframe" | "link_only";
 
@@ -16,6 +23,25 @@ export type SongPlaybackFields = {
   title?: string;
   artist?: string;
 };
+
+/** Infer embed fields for assistant-generated tracks from resolved listen URLs. */
+export function inferAssistantTrackEmbed(listenUrl?: string, youtubeUrl?: string): {
+  embedSourceKind: EmbedSourceKind;
+  embedIframeUrl: string;
+  youtubeUrl: string;
+} {
+  const listen = listenUrl?.trim() ?? "";
+  const yt = youtubeUrl?.trim() ?? "";
+  const candidate = listen || yt;
+  if (isYoutubeSearchUrl(listen) || isYoutubeSearchUrl(yt)) {
+    return { embedSourceKind: "link_only", embedIframeUrl: "", youtubeUrl: yt || listen };
+  }
+  const videoId = youtubeVideoId(listen) || youtubeVideoId(yt);
+  if (videoId) {
+    return { embedSourceKind: "youtube", embedIframeUrl: "", youtubeUrl: candidate };
+  }
+  return { embedSourceKind: "link_only", embedIframeUrl: "", youtubeUrl: yt || listen };
+}
 
 export type ResolvedPlaybackSource = {
   kind: PlaybackSourceKind;
