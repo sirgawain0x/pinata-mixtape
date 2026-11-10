@@ -5,6 +5,7 @@ import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode } from "react";
 import { queryClient } from "../config";
+import { MIXTAPE_PRIVY_LOGIN_METHODS } from "../lib/privy-client-config";
 
 type Props = {
   children: ReactNode;
@@ -33,7 +34,7 @@ export function Providers({ children }: Props) {
             createOnLogin: "users-without-wallets",
           },
         },
-        loginMethods: ["email", "wallet", "farcaster", "google"],
+        loginMethods: [...MIXTAPE_PRIVY_LOGIN_METHODS],
       }}
     >
       <QueryClientProvider client={queryClient}>
