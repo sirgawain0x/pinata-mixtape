@@ -8,6 +8,7 @@ import {
   type ResolvedPlaybackSource,
   type SongPlaybackFields
 } from "../../lib/song-playback";
+import { isTrackHiddenFromPublicPlayback } from "../../lib/track-playback-policy";
 import { youtubeVideoId } from "../../lib/youtube";
 
 export type MixYtPlayer = {
@@ -54,7 +55,8 @@ type Options = {
   onLastTrackEnded?: () => void;
 };
 
-function isPlayableSource(source: ResolvedPlaybackSource): boolean {
+function isPlayableSource(source: ResolvedPlaybackSource, track: MixTrackFields): boolean {
+  if (isTrackHiddenFromPublicPlayback(track)) return false;
   return source.kind !== "link_only";
 }
 
@@ -75,7 +77,7 @@ export function useMixPlayback({
         trackIndex,
         track,
         source,
-        playable: isPlayableSource(source)
+        playable: isPlayableSource(source, track)
       };
     });
   }, [tracks]);

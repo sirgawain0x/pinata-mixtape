@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import type { EmbedSourceKind } from "../../lib/embed-sources";
 import { buildYoutubeSearchUrl, isYoutubeSearchUrl } from "../../lib/recording-links";
+import { legacyStreamingEditorNote } from "../../lib/track-playback-policy";
 import type { Mix, Track } from "../mixtape-app";
 import MusicBrainzLookup, { type MbRecording } from "./MusicBrainzLookup";
 import TrackPreview from "./TrackPreview";
@@ -307,6 +308,7 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: P
               <li key={`${track.artist}-${track.title}-${index}`}>
                 <span>
                   {String(index + 1).padStart(2, "0")} {track.title} — {track.artist}
+                  {legacyStreamingEditorNote(track) ? ` · ${legacyStreamingEditorNote(track)}` : ""}
                 </span>
                 <span className="editor-track-actions">
                   <button onClick={() => setPreviewTrackIndex(previewTrackIndex === index ? null : index)} type="button">
