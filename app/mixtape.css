@@ -325,3 +325,182 @@
 #mixtape-ui .mt-lens-post { padding: 24px; border: 1px solid #e7e2ec; border-radius: 20px; background: #fff; overflow-wrap: anywhere; }
 #mixtape-ui .mt-lens-post time { display: block; margin-top: 6px; font-size: 12px; color: #686379; }
 #mixtape-ui .mt-lens-post p { white-space: pre-wrap; line-height: 1.6; }
+
+/* Stitch discovery screen */
+#mixtape-ui.mt-discovery {
+  --discovery-accent: #bb2956;
+  --discovery-gradient: linear-gradient(110deg, #ff2a6d, #ff8a5c);
+}
+#mixtape-ui.mt-discovery .mt-page {
+  max-width: 1056px;
+  padding-bottom: 168px;
+}
+#mixtape-ui.mt-discovery .mt-brand .mt-mark { width: 54px; }
+#mixtape-ui.mt-discovery .mt-create-bar {
+  width: 100%;
+  margin: 0 0 24px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border: 0;
+  border-radius: 18px;
+  background: var(--discovery-gradient);
+  box-shadow: 0 8px 16px #ed5e5633;
+}
+#mixtape-ui.mt-discovery .mt-create-bar :is(button, a) {
+  min-width: 0;
+  position: relative;
+  gap: 4px;
+  padding: 4px 0;
+  color: #29131a;
+  font-weight: 750;
+}
+#mixtape-ui.mt-discovery .mt-create-bar > :not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 24%;
+  height: 52%;
+  border-left: 1px solid #ffffff60;
+}
+#mixtape-ui.mt-discovery .mt-create-bar svg { width: 34px; height: 34px; }
+#mixtape-ui.mt-discovery .mt-section { margin: 18px 0 24px; }
+#mixtape-ui.mt-discovery .mt-section-heading { margin-bottom: 9px; }
+#mixtape-ui.mt-discovery .mt-section-heading :is(h1, h2) {
+  font-size: 17px;
+  letter-spacing: -.02em;
+  font-weight: 850;
+}
+#mixtape-ui.mt-discovery .mt-section-heading :is(a, button) {
+  color: var(--discovery-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+#mixtape-ui.mt-discovery .mt-playlist-rail {
+  background: none;
+  border-radius: 0;
+  margin: 0;
+  padding: 3px 0 9px;
+  gap: 10px;
+}
+#mixtape-ui.mt-discovery .mt-playlist-card {
+  aspect-ratio: 3 / 4;
+  border-radius: 18px;
+}
+#mixtape-ui.mt-discovery .mt-card-overlay {
+  background: linear-gradient(180deg, #17131caa, #17131c10 47%, #111016eb);
+}
+#mixtape-ui.mt-discovery .mt-card-top strong { overflow-wrap: anywhere; }
+#mixtape-ui.mt-discovery .mt-card-bottom { border-top: 1px solid #ffffff45; padding-top: 8px; }
+#mixtape-ui.mt-discovery .mt-search-trigger {
+  min-height: 40px;
+  margin: 0;
+  border: 1px solid #e5e5ea;
+  border-radius: 999px;
+  box-shadow: 0 2px 5px #191e310d;
+}
+#mixtape-ui.mt-discovery .mt-search-trigger span { color: var(--text); }
+#mixtape-ui.mt-discovery .mt-search-trigger svg { width: 18px; height: 18px; }
+#mixtape-ui.mt-discovery .mt-song-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+#mixtape-ui.mt-discovery .mt-song-tile {
+  min-width: 0;
+  gap: 6px;
+  padding-right: 6px;
+  border-radius: 10px;
+  color: white;
+  background: linear-gradient(105deg, #ab2352, #c72455);
+}
+#mixtape-ui.mt-discovery .mt-song-tile:hover { background: #95204a; }
+#mixtape-ui.mt-discovery .mt-song-tile > .mt-art { width: 44px; height: 50px; }
+#mixtape-ui.mt-discovery .mt-song-tile > span:nth-child(2) { gap: 2px; }
+#mixtape-ui.mt-discovery .mt-song-tile strong {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+#mixtape-ui.mt-discovery .mt-song-tile small { font-size: 10px; }
+#mixtape-ui.mt-discovery .mt-song-tile svg { display: none; }
+#mixtape-ui.mt-discovery .mt-lens-posts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+#mixtape-ui.mt-discovery .mt-lens-posts:empty { display: none; }
+#mixtape-ui.mt-discovery .mt-lens-post {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: #fff7f9;
+}
+#mixtape-ui.mt-discovery .mt-lens-post time { margin-top: 0; }
+#mixtape-ui.mt-discovery .mt-lens-post .mt-post-actions { margin-top: auto; }
+#mixtape-ui.mt-discovery #on-air { scroll-margin-top: 16px; }
+#mixtape-ui .mt-home-dock {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  box-shadow: 0 -4px 20px #191e3112;
+  padding: 8px 16px max(4px, env(safe-area-inset-bottom));
+}
+#mixtape-ui .mt-featured-track {
+  display: flex;
+  justify-content: flex-start;
+  width: min(100%, 560px);
+  min-height: 56px;
+  margin: 0 auto 5px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: #1c2432;
+  color: white;
+  gap: 10px;
+}
+#mixtape-ui .mt-featured-track:hover { background: #2c3546; }
+#mixtape-ui .mt-featured-track > .mt-art { width: 36px; height: 36px; border-radius: 9px; flex: none; }
+#mixtape-ui .mt-featured-copy { flex: 1; min-width: 0; display: grid; font-size: 13px; }
+#mixtape-ui .mt-featured-copy > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#mixtape-ui .mt-featured-copy small { color: #cad0dc; }
+#mixtape-ui .mt-featured-action {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--discovery-gradient);
+  color: #29131a;
+}
+#mixtape-ui .mt-featured-action svg { width: 20px; height: 20px; }
+#mixtape-ui .mt-home-nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  margin: 0 auto;
+  max-width: 560px;
+}
+#mixtape-ui .mt-home-nav :is(a, button) { font-size: 12px; padding: 4px; }
+#mixtape-ui .mt-home-nav [aria-current="page"] { color: var(--discovery-accent); font-weight: 700; }
+#mixtape-ui .mt-home-nav .mt-home-create {
+  border-radius: 50%;
+  width: 40px;
+  background: #151d2d;
+  color: white;
+  font-size: 25px;
+  line-height: 1;
+}
+#mixtape-ui .mt-home-nav .mt-home-create:hover { background: #303b50; }
+@media (max-width: 760px) {
+  #mixtape-ui.mt-discovery .mt-header { margin-bottom: 14px; }
+  #mixtape-ui.mt-discovery .mt-playlist-card { flex-basis: 176px; width: 176px; }
+  #mixtape-ui.mt-discovery .mt-playlist-grid .mt-playlist-card { width: 100%; }
+  #mixtape-ui.mt-discovery .mt-playlists { margin-bottom: 12px; }
+  #mixtape-ui.mt-discovery .mt-lens-posts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 350px) {
+  #mixtape-ui.mt-discovery .mt-song-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #mixtape-ui.mt-discovery .mt-lens-posts { grid-template-columns: minmax(0, 1fr); }
+}

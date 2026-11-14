@@ -29,6 +29,7 @@ export default function MixtapeHome({ initialMixes, initialCreator, profileCreat
   const params = useSearchParams();
   const page = params.get("page") ?? "home";
   const selectedMix = initialMixes.find((mix) => mix.id === Number(params.get("mix")));
+  const isHome = page === "home" && !selectedMix;
   const [creator, setCreator] = useState(initialCreator);
   const [editor, setEditor] = useState<{ mix: Mix | null; draft?: Partial<Mix> } | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -94,7 +95,12 @@ export default function MixtapeHome({ initialMixes, initialCreator, profileCreat
   const visibleSearchMixes = results?.mixes.filter((mix) => !mine && !profile || mix.creatorId === owner?.id) ?? [];
   const visibleSearchSongs = results?.songs.filter((song) => !mine && !profile || visibleSearchMixes.some((mix) => song.mixIds.includes(mix.id))) ?? [];
 
-  return <main id="mixtape-ui" className="mixtape-ui">
+  const featuredTrack = isHome ? tracks[0] : undefined;
+  const feed = !selectedMix && page !== "tracks" && (!(mine || profile) || owner) ? (
+    <LensFeed refreshKey={postRefresh} creatorId={mine || profile ? owner?.id : undefined}/>
+  ) : null;
+
+  return <main id="mixtape-ui" className={isHome ? "mixtape-ui mt-discovery" : "mixtape-ui"}>
     <div className="mt-page">
       <header className="mt-header">
         <Link href="/" className="mt-brand" aria-label="Creative Mixtape home"><MixtapeMark/><span>MIXTAPE</span></Link>
@@ -123,9 +129,10 @@ export default function MixtapeHome({ initialMixes, initialCreator, profileCreat
           {mine && creator ? <button type="button" onClick={() => setProfileOpen(true)}>Edit profile</button> : null}
           {mine && !creator ? <p className="mt-note">Sign in above to see and create your playlists.</p> : null}
         </section> : null}
-        {page !== "tracks" ? <section className="mt-section" aria-labelledby="playlist-heading">
-          <div className="mt-section-heading"><h2 id="playlist-heading">{mine ? <em>ME </em> : null}PLAYLISTS</h2>
-            {page !== "playlists" ? <Link href={mine ? "/?page=me&all=1" : "/?page=playlists"}>View all ↗</Link> : <span>{mixes.length} in rotation</span>}
+        {page !== "tracks" ? <section className="mt-section mt-playlists" aria-labelledby="playlist-heading">
+          <div className="mt-section-heading">
+            {isHome ? <h1 id="playlist-heading">PLAYLISTS</h1> : <h2 id="playlist-heading">{mine ? <em>ME </em> : null}PLAYLISTS</h2>}
+            {page !== "playlists" ? <Link href={mine ? "/?page=me&all=1" : "/?page=playlists"}>{isHome ? "See all" : "View all ↗"}</Link> : <span>{mixes.length} in rotation</span>}
           </div>
           <div className={page === "playlists" || params.get("all") === "1" ? "mt-playlist-grid" : "mt-playlist-rail"}>
             {mixes.map((mix) => <Link key={mix.id} className="mt-playlist-card" href={`/?mix=${mix.id}`}>
@@ -137,24 +144,42 @@ export default function MixtapeHome({ initialMixes, initialCreator, profileCreat
             {!mixes.length ? <div className="mt-empty"><h3>{mine ? "Your next favorite mix starts here." : "No playlists yet."}</h3><p>Create a playlist and give it your own spin.</p><button type="button" onClick={() => setAssistantOpen(true)}>Create a playlist ＋</button></div> : null}
           </div>
         </section> : null}
-        <button className="mt-search-trigger" type="button" onClick={openSearch}><MixtapeIcon name="search"/><span>Search playlists, artists, tracks</span><MixtapeIcon name="arrow"/></button>
+        <button className="mt-search-trigger" type="button" aria-haspopup="dialog" onClick={openSearch}><MixtapeIcon name="search"/><span>{isHome ? "Search" : "Search playlists, artists, tracks"}</span><MixtapeIcon name="arrow"/></button>
         <section className="mt-section" aria-labelledby="track-heading">
-          <div className="mt-section-heading"><h2 id="track-heading">{mine ? <em>ME </em> : null}TRACKS</h2><span>{tracks.length} discoveries</span></div>
+          <div className="mt-section-heading"><h2 id="track-heading">{mine ? <em>ME </em> : null}TRACKS</h2>
+            {isHome && tracks.length ? <Link href="/?page=tracks">View all</Link> : <span>{tracks.length} discoveries</span>}
+          </div>
           <div className="mt-song-grid">{(page === "tracks" ? tracks : tracks.slice(0, 6)).map(({ track, mix, index }) => <Link key={track.songId ?? `${mix.id}-${index}`} className="mt-song-tile" href={`/?mix=${mix.id}&track=${index}`}>
             <PlaylistArt compact title={track.title} id={track.songId ?? index}/><span><strong>{track.title}</strong><small>{track.artist}</small></span><MixtapeIcon name="track"/>
           </Link>)}</div>
           {!tracks.length ? <p className="mt-empty-copy">Tracks you add to playlists will appear here.</p> : null}
         </section>
+        {isHome ? feed : null}
         {page !== "tracks" ? <>
-          <section className="mt-section"><div className="mt-section-heading"><h2>ON AIR</h2><Link href="/dashboard">Host a station ↗</Link></div>
+          <section className="mt-section" id="on-air" aria-labelledby="on-air-heading"><div className="mt-section-heading"><h2 id="on-air-heading">ON AIR</h2><Link href="/dashboard">Host a station ↗</Link></div>
             <div className="mt-station-grid">{initialStations.filter((station) => !mine && !profile || station.creatorId === owner?.id).map((station) => <Link key={station.id} href={`/s/${station.handle}`} className="mt-station-card"><MixtapeIcon name="live"/><span><strong>{station.name}</strong><small>{station.tagline || `@${station.handle}`}</small></span><span>Listen ↗</span></Link>)}</div>
             {!initialStations.filter((station) => !mine && !profile || station.creatorId === owner?.id).length ? <p className="mt-empty-copy">The airwaves are open. Create a station to start broadcasting.</p> : null}
           </section>
         </> : null}
       </>}
-      {!selectedMix && page !== "tracks" && (!(mine || profile) || owner) ? <LensFeed refreshKey={postRefresh} creatorId={mine || profile ? owner?.id : undefined}/> : null}
+      {isHome ? null : feed}
       <footer className="mt-footer"><MixtapeMark small/><span>Made for the love of the mix.</span><Link href="/dashboard">Creator studio ↗</Link></footer>
     </div>
+    {isHome ? <div className="mt-home-dock">
+      {featuredTrack ? <Link className="mt-featured-track" href={`/?mix=${featuredTrack.mix.id}&track=${featuredTrack.index}`}
+        aria-label={`Open player for ${featuredTrack.track.title} by ${featuredTrack.track.artist}`}>
+        <PlaylistArt compact title={featuredTrack.track.title} id={featuredTrack.track.songId ?? featuredTrack.index}/>
+        <span className="mt-featured-copy"><strong>{featuredTrack.track.title}</strong><small>{featuredTrack.track.artist}</small></span>
+        <span className="mt-featured-action"><MixtapeIcon name="arrow"/></span>
+      </Link> : null}
+      <nav className="mt-home-nav" aria-label="Mixtape">
+        <Link href="/" aria-current="page">Home</Link>
+        <button type="button" aria-haspopup="dialog" onClick={openSearch}>Discover</button>
+        <button type="button" className="mt-home-create" aria-label="Create a playlist" aria-haspopup="dialog" onClick={() => setAssistantOpen(true)}>+</button>
+        <a href="#on-air">Live</a>
+        <Link href="/?page=me">Library</Link>
+      </nav>
+    </div> : null}
     {editor ? <MixtapeEditor mix={editor.mix} initialDraft={editor.draft} onClose={() => setEditor(null)} onSaved={saved}/> : null}
     {assistantOpen ? <PlaylistAssistant signedIn={Boolean(creator)} onClose={() => setAssistantOpen(false)} onReview={(draft) => { setAssistantOpen(false); setEditor({ mix: null, draft }); }} onForm={() => { setAssistantOpen(false); setEditor({ mix: null }); }}/> : null}
     {postOpen ? <PostComposer mixes={initialMixes} initialMixId={selectedMix?.isPublic ? selectedMix.id : undefined} onClose={() => { setPostOpen(false); setPostRefresh((value) => value + 1); }}/> : null}
