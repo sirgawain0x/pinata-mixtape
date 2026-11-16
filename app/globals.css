@@ -100,9 +100,7 @@ p {
 
 .shell {
   min-height: 100vh;
-  max-width: 1900px;
-  margin: 0 auto;
-  padding: 20px;
+  padding: clamp(12px, 2vw, 24px);
 }
 
 .hero {
@@ -393,6 +391,7 @@ h2 {
   margin: 10px 0 22px;
   position: relative;
   width: 640px;
+  max-width: 100%;
   height: 400px;
   margin-left: auto;
   margin-right: auto;
@@ -836,6 +835,7 @@ h2 {
 
 .broadcast-rail {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding: 18px;
   align-content: start;
@@ -858,6 +858,10 @@ h2 {
 .broadcast-module-slot small {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.broadcast-qr-block small {
+  overflow-wrap: anywhere;
 }
 
 .broadcast-module-slot p {
@@ -1304,7 +1308,7 @@ h2 {
   .columns,
   .track-grid,
   .broadcast-deck {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sidebar,
@@ -1318,9 +1322,8 @@ h2 {
 }
 
 @media (max-width: 720px) {
-  .shell,
   .broadcast-shell {
-    padding: 14px;
+    padding: clamp(12px, 2vw, 24px);
   }
 
   .hero {
@@ -1336,9 +1339,8 @@ h2 {
   }
 
   .cassette {
-    width: 520px;
+    width: min(100%, 520px);
     height: 325px;
-    max-width: 100%;
   }
 
   .cassette-window {
@@ -1349,16 +1351,17 @@ h2 {
   }
 
   .cassette-reel {
-    width: 88px;
-    height: 88px;
+    width: min(27%, 88px);
+    height: auto;
+    aspect-ratio: 1;
   }
 
   .cassette-reel-left {
-    left: 34px;
+    left: min(12%, 34px);
   }
 
   .cassette-reel-right {
-    right: 34px;
+    right: min(12%, 34px);
   }
 
   .cassette-tape {
@@ -1431,11 +1434,6 @@ h2 {
 
 .hero-single {
   grid-template-columns: 1fr;
-}
-
-.station-editor .hero-copy,
-.station-editor .composer {
-  max-width: min(100%, 960px);
 }
 
 .signin {
@@ -3118,6 +3116,7 @@ input:not(:where(#privy-dialog, #privy-dialog *))[type="radio"] {
 /* ---- Mix playback / cassette / editor / nav additions -------------------- */
 .cassette-player-wrap {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   justify-items: center;
   margin: 8px 0 18px;
@@ -3137,7 +3136,7 @@ input:not(:where(#privy-dialog, #privy-dialog *))[type="radio"] {
   display: grid;
   gap: 4px;
   justify-items: center;
-  max-width: 420px;
+  max-width: min(100%, 420px);
   text-align: center;
 }
 
@@ -3344,7 +3343,7 @@ a:not(:where(#privy-dialog, #privy-dialog *)).mix-card:hover {
 }
 
 .broadcast-nav {
-  margin-bottom: 14px;
+  grid-column: 1 / -1;
 }
 
 .song-back-link {
