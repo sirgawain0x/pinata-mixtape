@@ -2,7 +2,11 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import MixtapePageFrame from "../../components/MixtapePageFrame";
+import { PlaylistArt } from "../../components/MixtapeIcons";
 import SongPlayerShell from "../../components/SongPlayerShell";
+import { getCurrentCreator } from "../../../lib/auth";
+import { canViewMix } from "../../../lib/mixtape-access";
 import { buildCrateUrl, findTrackIndexInMix } from "../../../lib/mixtape-nav";
 import { appAbsoluteUrl } from "../../../lib/seo";
 import { ensureCreativeTvPlaybackForSong, getMix, getSong } from "../../../lib/mixtapes";
@@ -46,61 +50,55 @@ export default async function SongPage({ params, searchParams }: PageProps) {
   const proto = headerStore.get("x-forwarded-proto") ?? "https";
   const embedOrigin = host ? `${proto}://${host}` : "";
 
-  const mixLinks = await Promise.all(
-    song.mixIds.map(async (mixId) => {
-      const mix = await getMix(mixId);
-      const trackIndex = mix ? findTrackIndexInMix(mix, id) : -1;
-      return {
-        id: mixId,
-        title: mix?.title ?? `Mix #${mixId}`,
-        href: buildCrateUrl({ mixId, trackIndex: trackIndex >= 0 ? trackIndex : null })
-      };
-    })
+  const [creator, mixes] = await Promise.all([
+    getCurrentCreator(),
+    Promise.all(song.mixIds.map((mixId) => getMix(mixId)))
+  ]);
+  const visibleMixes = mixes.filter((mix): mix is NonNullable<typeof mix> =>
+    mix !== null && canViewMix(mix, creator?.id ?? null)
   );
-
-  let backMix: { id: number; title: string; trackIndex?: number | null } | undefined;
-  if (fromMixId && Number.isInteger(fromMixId)) {
-    const mix = await getMix(fromMixId);
-    if (mix) {
-      backMix = {
-        id: mix.id,
-        title: mix.title,
-        trackIndex: Number.isInteger(trackParam) ? trackParam : findTrackIndexInMix(mix, id)
-      };
-    }
-  }
+  const originMix = visibleMixes.find((mix) => mix.id === fromMixId);
+  const backMix = originMix ? {
+    id: originMix.id,
+    title: originMix.title,
+    trackIndex: trackParam !== null && originMix.tracks[trackParam]?.songId === id
+      ? trackParam : findTrackIndexInMix(originMix, id)
+  } : undefined;
+  const releaseDetails = [song.albumTitle, song.releaseDate || song.releaseYear, song.duration].filter(Boolean).join(" · ");
 
   return (
-    <main className="shell song-page">
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="hero-mark">
-            {song.isCurated ? <span>Official audio</span> : null}
-            {song.creativeTvUrl ? <span>Creative TV</span> : null}
-          </p>
-          <h1>{song.title}</h1>
-          <p className="lede">{song.artist}</p>
-          <p className="muted">
-            {[song.releaseYear, song.duration].filter(Boolean).join(" · ")}
-          </p>
-          {song.moodTags.length > 0 ? <p className="muted">{song.moodTags.join(" · ")}</p> : null}
+    <MixtapePageFrame>
+      <div className="mt-section-heading">
+        <Link href={backMix ? buildCrateUrl({ mixId: backMix.id, trackIndex: backMix.trackIndex }) : "/"}>
+          {backMix ? `← Back to ${backMix.title}` : "← Browse Mixtape"}
+        </Link>
+      </div>
+      <div className="mt-album-layout">
+        <div className="mt-album-info mt-song-info">
+          <div className="mt-album-art"><PlaylistArt title={song.title} id={song.id} /></div>
+          <div className="mt-album-copy">
+            {song.isCurated ? <p className="mt-kicker">Official audio</p> : null}
+            <h1>{song.title}</h1>
+            <p>{song.artist}</p>
+            {releaseDetails ? <p className="mt-album-description">{releaseDetails}</p> : null}
+            {song.moodTags.length ? <p className="mt-album-description">{song.moodTags.join(" · ")}</p> : null}
+          </div>
         </div>
-      </section>
-
-      <SongPlayerShell backMix={backMix} embedOrigin={embedOrigin} song={song} />
-
-      {mixLinks.length > 0 ? (
-        <section className="workspace">
-          <h3>On mixtapes</h3>
-          <ul className="song-mix-list">
-            {mixLinks.map((mix) => (
-              <li key={mix.id}>
-                <Link href={mix.href}>{mix.title}</Link>
-              </li>
+        <SongPlayerShell embedOrigin={embedOrigin} song={song} />
+      </div>
+      {visibleMixes.length ? (
+        <section className="mt-section" aria-labelledby="on-mixtapes">
+          <div className="mt-section-heading"><h2 id="on-mixtapes">On mixtapes</h2></div>
+          <div className="mt-song-grid">
+            {visibleMixes.map((mix) => (
+              <Link className="mt-song-tile" key={mix.id} href={buildCrateUrl({ mixId: mix.id, trackIndex: findTrackIndexInMix(mix, id) })}>
+                <PlaylistArt compact title={mix.title} id={mix.id} />
+                <span><strong>{mix.title}</strong><small>{mix.genre || mix.vibe}</small></span>
+              </Link>
             ))}
-          </ul>
+          </div>
         </section>
       ) : null}
-    </main>
+    </MixtapePageFrame>
   );
 }

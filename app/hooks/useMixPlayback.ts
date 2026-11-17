@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { onYoutubeIframeApiReady } from "../../lib/youtube-iframe-api";
+import { mountYoutubePlayer } from "../../lib/youtube-iframe-api";
 import {
   resolvePlaybackSource,
   type PlaybackSourceKind,
@@ -114,8 +114,6 @@ export function useMixPlayback({
     setIsPlaying(false);
     setPlayerReady(false);
     setError(null);
-    ytPlayerRef.current?.destroy();
-    ytPlayerRef.current = null;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -150,8 +148,6 @@ export function useMixPlayback({
     setError(null);
     setIsPlaying(false);
     setPlayerReady(false);
-    ytPlayerRef.current?.destroy();
-    ytPlayerRef.current = null;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -180,8 +176,10 @@ export function useMixPlayback({
     const videoId = currentSource.youtubeVideoId;
     if (!videoId) return;
 
-    let cancelled = false;
+    const shell = document.getElementById(ytElementId);
+    if (!shell) return;
 
+<<<<<<< Updated upstream
     const setup = () => {
       if (cancelled || !window.YT?.Player) return;
       const shell = document.getElementById(ytElementId);
@@ -233,25 +231,54 @@ export function useMixPlayback({
           }
         }
       }) as MixYtPlayer;
+=======
+    let cancelled = false;
+    const reportError = (message: string) => {
+      if (cancelled) return;
+      pendingAutoplayRef.current = false;
+      setError({
+        title: currentItem.track.title,
+        artist: currentItem.track.artist,
+        url: currentSource.outboundUrl,
+        videoId,
+        message
+      });
+      setIsPlaying(false);
+>>>>>>> Stashed changes
     };
 
-    if (window.YT?.Player) {
-      setup();
-    } else {
-      const unsubscribe = onYoutubeIframeApiReady(setup);
-      return () => {
-        cancelled = true;
-        unsubscribe();
-        ytPlayerRef.current?.destroy();
-        ytPlayerRef.current = null;
-        setPlayerReady(false);
-      };
-    }
+    const unmount = mountYoutubePlayer(shell, videoId, currentItem.track.title, {
+      onReady: ({ target }) => {
+        if (cancelled) return;
+        ytPlayerRef.current = target as MixYtPlayer;
+        setPlayerReady(true);
+        setError(null);
+      },
+      onError: () => reportError("This YouTube video is unavailable or cannot be embedded."),
+      onAutoplayBlocked: () => reportError("Your browser blocked playback. Press Play in the video player."),
+      onStateChange: ({ data }) => {
+        const state = window.YT?.PlayerState;
+        if (cancelled || !state) return;
+        if (data === state.PLAYING) {
+          setIsPlaying(true);
+          setError(null);
+          notifyTrackPlaying(currentItem.trackIndex);
+        } else if (data === state.ENDED) {
+          setIsPlaying(false);
+          if (queuePosition >= playableQueue.length - 1) {
+            onLastTrackEndedRef.current?.();
+          }
+          advanceQueue();
+        } else if (data === state.PAUSED || data === state.CUED || data === state.UNSTARTED) {
+          setIsPlaying(false);
+        }
+      }
+    }, () => reportError("Could not connect to the YouTube controls. Use the video player’s Play button or open the listening link."));
 
     return () => {
       cancelled = true;
-      ytPlayerRef.current?.destroy();
       ytPlayerRef.current = null;
+      unmount();
       setPlayerReady(false);
     };
   }, [
@@ -325,23 +352,20 @@ export function useMixPlayback({
   }, [currentItem, currentSource, enabled]);
 
   const play = useCallback(() => {
-    setError(null);
     if (!currentItem || !currentSource) return;
 
     if (currentSource.kind === "youtube") {
       const player = ytPlayerRef.current;
       if (!player?.playVideo) {
-        setError({
-          title: currentItem.track.title,
-          artist: currentItem.track.artist,
-          message: "Player is still loading. Please try again in a moment."
-        });
+        pendingAutoplayRef.current = true;
         return;
       }
+      setError(null);
       player.playVideo();
       return;
     }
 
+    setError(null);
     if (currentSource.kind === "pinata") {
       const audio = audioRef.current;
       if (!audio) {
@@ -399,6 +423,10 @@ export function useMixPlayback({
     if (position < 0) return;
     if (position === queuePosition) { play(); return; }
     pause();
+<<<<<<< Updated upstream
+=======
+    setError(null);
+>>>>>>> Stashed changes
     setIsPlaying(false);
     setPlayerReady(false);
     pendingAutoplayRef.current = true;

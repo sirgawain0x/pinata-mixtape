@@ -269,9 +269,44 @@ function voiceClonesNeedsProviderUniqueMigrationSql(dbLike: Pick<SqliteDb, "prep
   return sql.includes("UNIQUE(provider, external_voice_id)") && !sql.includes("UNIQUE(creator_id,");
 }
 
+const PLAYLIST_DRAFT_PAYMENTS_DDL = `
+  CREATE TABLE IF NOT EXISTS playlist_draft_payments (
+    id TEXT PRIMARY KEY,
+    request_hash TEXT NOT NULL,
+    authorization_id TEXT NOT NULL UNIQUE,
+    proof_hash TEXT NOT NULL,
+    payer TEXT NOT NULL,
+    requirements TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('generating', 'declined', 'ready', 'settling', 'paid')),
+    lease_until INTEGER NOT NULL,
+    lease_token TEXT NOT NULL,
+    draft TEXT,
+    settlement TEXT,
+    settlement_block TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+`;
+
 export function bootstrapSqlite(database: SqliteDb): void {
   database.exec(MIX_SCHEMA_DDL);
   database.exec(STATION_SCHEMA_DDL);
+  database.exec(PLAYLIST_DRAFT_PAYMENTS_DDL);
+
+  const mixColumns = database.prepare("PRAGMA table_info(mixes)").all() as { name: string }[];
+  for (const [name, definition] of [
+    ["creators", "TEXT NOT NULL DEFAULT '[]'"],
+    ["genre", "TEXT NOT NULL DEFAULT ''"],
+    ["source_url", "TEXT NOT NULL DEFAULT ''"]
+  ]) {
+    if (!mixColumns.some((column) => column.name === name)) {
+      try {
+        database.exec(`ALTER TABLE mixes ADD COLUMN ${name} ${definition}`);
+      } catch (error) {
+        const columns = database.prepare("PRAGMA table_info(mixes)").all() as { name: string }[];
+        if (!columns.some((column) => column.name === name)) throw error;
+      }
+    }
+  }
 
   const mixColumns = database.prepare("PRAGMA table_info(mixes)").all() as { name: string }[];
   for (const [name, definition] of [
@@ -382,7 +417,7 @@ export function bootstrapSqlite(database: SqliteDb): void {
 }
 
 export async function bootstrapLibsql(client: Client): Promise<void> {
-  await client.executeMultiple(MIX_SCHEMA_DDL + STATION_SCHEMA_DDL);
+  await client.executeMultiple(MIX_SCHEMA_DDL + STATION_SCHEMA_DDL + PLAYLIST_DRAFT_PAYMENTS_DDL);
 
   const tryAlter = async (sql: string) => {
     try {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { onYoutubeIframeApiReady } from "../../lib/youtube-iframe-api";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { mountYoutubePlayer } from "../../lib/youtube-iframe-api";
 import { resolvePlaybackSource, type PlaybackSourceKind, type SongPlaybackFields } from "../../lib/song-playback";
 import LivepeerSongBridge from "../components/LivepeerSongBridge";
 
@@ -45,7 +45,7 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
   const source = useMemo(() => resolvePlaybackSource(song), [song]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ytPlayerRef = useRef<YtPlayerInstance | null>(null);
-  const ytContainerId = useMemo(() => `yt-song-${source.youtubeVideoId || "none"}`, [source.youtubeVideoId]);
+  const ytContainerId = useId();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -123,8 +123,17 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
   useEffect(() => {
     if (source.kind !== "youtube" || !source.youtubeVideoId) return;
 
-    let cancelled = false;
+    const shell = document.getElementById(ytContainerId);
+    if (!shell) return;
 
+    let cancelled = false;
+    const reportError = (message: string) => {
+      if (cancelled) return;
+      setError(message);
+      setIsPlaying(false);
+    };
+
+<<<<<<< Updated upstream
     const setup = () => {
       if (cancelled || !window.YT?.Player) return;
       const shell = document.getElementById(ytContainerId);
@@ -154,49 +163,43 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
             if (event.data === YT.PlayerState.PLAYING) setIsPlaying(true);
             if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) setIsPlaying(false);
           }
+=======
+    const unmount = mountYoutubePlayer(shell, source.youtubeVideoId, song.title ?? "YouTube player", {
+      onReady: ({ target }) => {
+        if (cancelled) return;
+        ytPlayerRef.current = target as YtPlayerInstance;
+        setPlayerReady(true);
+        setError(null);
+      },
+      onError: () => reportError("This YouTube video is unavailable or cannot be embedded."),
+      onAutoplayBlocked: () => reportError("Your browser blocked playback. Try the YouTube listening link."),
+      onStateChange: ({ data }) => {
+        const state = window.YT?.PlayerState;
+        if (cancelled || !state) return;
+        if (data === state.PLAYING) {
+          setIsPlaying(true);
+          setError(null);
+>>>>>>> Stashed changes
         }
-      }) as unknown as YtPlayerInstance;
-    };
+        if (data === state.PAUSED || data === state.ENDED) setIsPlaying(false);
+      }
+    }, () => reportError("Could not connect to the YouTube controls. Try the YouTube listening link."));
 
-    setPlayerReady(false);
-
-    let tick = 0;
-
-    const cleanup = () => {
-      cancelled = true;
-      window.clearInterval(tick);
-      ytPlayerRef.current?.destroy();
-      ytPlayerRef.current = null;
-      setPlayerReady(false);
-    };
-
-    if (window.YT?.Player) {
-      setup();
-    } else {
-      const unsubscribe = onYoutubeIframeApiReady(setup);
-      tick = window.setInterval(() => {
-        const player = ytPlayerRef.current;
-        if (!player?.getCurrentTime) return;
-        setProgress(player.getCurrentTime());
-        setDuration(player.getDuration() || 0);
-      }, 500);
-      return () => {
-        unsubscribe();
-        cleanup();
-      };
-    }
-
-    tick = window.setInterval(() => {
+    const tick = window.setInterval(() => {
       const player = ytPlayerRef.current;
-      if (!player?.getCurrentTime) return;
+      if (!player) return;
       setProgress(player.getCurrentTime());
       setDuration(player.getDuration() || 0);
     }, 500);
 
     return () => {
-      cleanup();
+      cancelled = true;
+      window.clearInterval(tick);
+      ytPlayerRef.current = null;
+      unmount();
+      setPlayerReady(false);
     };
-  }, [source.kind, source.youtubeVideoId, ytContainerId]);
+  }, [song.title, source.kind, source.youtubeVideoId, ytContainerId]);
 
   useEffect(() => {
     if (source.kind === "iframe" && source.iframeUrl) {
@@ -227,10 +230,7 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
     }
     if (source.kind === "youtube") {
       const player = ytPlayerRef.current;
-      if (!player) {
-        setError("Player still loading. Try again in a moment.");
-        return;
-      }
+      if (!player) return;
       const state = player.getPlayerState();
       if (state === window.YT?.PlayerState.PLAYING) player.pauseVideo();
       else player.playVideo();
