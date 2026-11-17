@@ -308,22 +308,6 @@ export function bootstrapSqlite(database: SqliteDb): void {
     }
   }
 
-  const mixColumns = database.prepare("PRAGMA table_info(mixes)").all() as { name: string }[];
-  for (const [name, definition] of [
-    ["creators", "TEXT NOT NULL DEFAULT '[]'"],
-    ["genre", "TEXT NOT NULL DEFAULT ''"],
-    ["source_url", "TEXT NOT NULL DEFAULT ''"]
-  ]) {
-    if (!mixColumns.some((column) => column.name === name)) {
-      try {
-        database.exec(`ALTER TABLE mixes ADD COLUMN ${name} ${definition}`);
-      } catch (error) {
-        const columns = database.prepare("PRAGMA table_info(mixes)").all() as { name: string }[];
-        if (!columns.some((column) => column.name === name)) throw error;
-      }
-    }
-  }
-
   try {
     database.exec(`ALTER TABLE songs ADD COLUMN musicbrainz_id TEXT`);
   } catch {

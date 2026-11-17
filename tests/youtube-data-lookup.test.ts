@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, mock } from "node:test";
 import { findRecordingListeningLink } from "../lib/recording-discovery";
+import { findMusicBrainzRecordingLink } from "../lib/musicbrainz";
 import {
   buildYoutubeDataSearchQuery,
   findYoutubeVideoForRecording,
@@ -115,6 +116,24 @@ test("public recording lookups cannot spend YouTube API quota", async (t) => {
     if (previous) process.env.YOUTUBE_API_KEY = previous;
     else delete process.env.YOUTUBE_API_KEY;
   }
+});
+
+test("MusicBrainz link lookup skips catalog links and YouTube searches for a playable video", async (t) => {
+  const catalogRelations = [
+    { url: { resource: "https://open.spotify.com/track/6y0dZd4lh0Zd0dZd4lh0Zd" } },
+    { url: { resource: "https://music.apple.com/us/album/example/123?i=456" } },
+    { url: { resource: "https://www.youtube.com/results?search_query=Artist+Song" } },
+  ];
+  let includeVideo = true;
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    relations: includeVideo
+      ? [...catalogRelations, { url: { resource: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } }]
+      : catalogRelations,
+  }));
+  const id = "12345678-1234-1234-1234-123456789abc";
+  assert.equal(await findMusicBrainzRecordingLink(id), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  includeVideo = false;
+  assert.equal(await findMusicBrainzRecordingLink(id), undefined);
 });
 
 test("parseYoutubeSearchResponse normalizes arrays", () => {

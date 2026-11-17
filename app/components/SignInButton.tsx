@@ -58,8 +58,7 @@ export function SignInButton({
   const menuRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-<<<<<<< Updated upstream
-  const sessionAddressRef = useRef<string | null>(null);
+  const sessionAddressRef = useRef<string | null>(initialCreator?.address.toLowerCase() ?? null);
   const drawerVisible = isOpen && !privyModalOpen;
 
   useEffect(() => {
@@ -75,9 +74,6 @@ export function SignInButton({
     setIsOpen(true);
     setPanel("menu");
   }, [privyModalOpen]);
-=======
-  const sessionAddressRef = useRef<string | null>(initialCreator?.address.toLowerCase() ?? null);
->>>>>>> Stashed changes
 
   useEffect(() => {
     if (ready) return;

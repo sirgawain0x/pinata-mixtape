@@ -2,13 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentCreator } from "../../../lib/auth";
 import { canViewMix } from "../../../lib/mixtape-access";
-<<<<<<< Updated upstream
-import { buildCrateUrl, buildSongUrl } from "../../../lib/mixtape-nav";
 import { appAbsoluteUrl } from "../../../lib/seo";
-=======
 import MixtapePageFrame from "../../components/MixtapePageFrame";
 import PlaylistDetail from "../../components/PlaylistDetail";
->>>>>>> Stashed changes
 import { getMixBySlug } from "../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +44,7 @@ export default async function PublicMixPage({ params }: PageProps) {
 
   return (
     <MixtapePageFrame>
-      <PlaylistDetail mix={mix} trackIndex={0} sharedPage />
+      <PlaylistDetail mix={mix} trackIndex={0} canEdit={false} />
     </MixtapePageFrame>
   );
 }

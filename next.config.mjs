@@ -135,7 +135,6 @@ const allMediaHosts = mergeCspHosts([
   "https://gateway.pinata.cloud",
   ...(process.env.NEXT_PUBLIC_PINATA_GATEWAY ? [new URL(process.env.NEXT_PUBLIC_PINATA_GATEWAY).origin] : [])
 ], "MIXTAPE_CSP_MEDIA_HOSTS");
-<<<<<<< Updated upstream
 
 /**
  * Next.js forbids internal rewrites outside basePath (`/app`).
@@ -170,8 +169,6 @@ function marketingRewriteDestination() {
 function rootSeoRewrite(path) {
   return `${absoluteOrigin()}/app${path}`;
 }
-=======
->>>>>>> Stashed changes
 
 const nextConfig = {
   basePath: "/app",
