@@ -54,10 +54,11 @@ export function SignInButton({
   const [meTokenStatus, setMeTokenStatus] = useState("");
   const [meTokenSaving, setMeTokenSaving] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionReady, setSessionReady] = useState(Boolean(initialCreator));
   const menuRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+<<<<<<< Updated upstream
   const sessionAddressRef = useRef<string | null>(null);
   const drawerVisible = isOpen && !privyModalOpen;
 
@@ -74,6 +75,9 @@ export function SignInButton({
     setIsOpen(true);
     setPanel("menu");
   }, [privyModalOpen]);
+=======
+  const sessionAddressRef = useRef<string | null>(initialCreator?.address.toLowerCase() ?? null);
+>>>>>>> Stashed changes
 
   useEffect(() => {
     if (ready) return;
@@ -187,6 +191,7 @@ export function SignInButton({
   }, [signerWallet, authenticated, resolveSmartWallet]);
 
   useEffect(() => {
+    if (!ready) return;
     if (!authenticated) {
       onChange?.(null);
       setSessionReady(false);
@@ -198,7 +203,7 @@ export function SignInButton({
       authenticated: true,
       sessionReady
     });
-  }, [authenticated, displayAddress, onChange, sessionReady]);
+  }, [ready, authenticated, displayAddress, onChange, sessionReady]);
 
   useEffect(() => {
     if (!authenticated || !signerWallet?.address || !isAddress(signerWallet.address)) return;

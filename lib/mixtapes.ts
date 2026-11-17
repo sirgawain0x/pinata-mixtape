@@ -1089,9 +1089,7 @@ export async function createMix(input: MixInput): Promise<Mix> {
 
   const details = parsePlaylistDetails(input);
   const tracks = (input.tracks ?? []).map(normalizeTrack);
-  const slug = input.slug?.trim()
-    ? slugifyMixTitle(input.slug)
-    : await ensureUniqueMixSlug(title);
+  const slug = await ensureUniqueMixSlug(input.slug?.trim() || title);
   const isPublic = input.isPublic === undefined ? true : Boolean(input.isPublic);
   const publishedAt = input.publish === false ? null : new Date().toISOString();
 

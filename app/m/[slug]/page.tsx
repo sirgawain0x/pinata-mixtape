@@ -2,8 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getCurrentCreator } from "../../../lib/auth";
 import { canViewMix } from "../../../lib/mixtape-access";
+<<<<<<< Updated upstream
 import { buildCrateUrl, buildSongUrl } from "../../../lib/mixtape-nav";
 import { appAbsoluteUrl } from "../../../lib/seo";
+=======
+import MixtapePageFrame from "../../components/MixtapePageFrame";
+import PlaylistDetail from "../../components/PlaylistDetail";
+>>>>>>> Stashed changes
 import { getMixBySlug } from "../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
@@ -31,81 +36,19 @@ export default async function PublicMixPage({ params }: PageProps) {
 
   if (!mix || !canViewMix(mix, creator?.id ?? null)) {
     return (
-      <main className="shell">
-        <section className="hero">
-          <div className="hero-copy">
-            <h1>Mixtape not found</h1>
-            <p className="muted">This tape is private or does not exist.</p>
-            <Link className="button" href="/">
-              Browse tapes
-            </Link>
-          </div>
+      <MixtapePageFrame>
+        <section className="mt-empty mt-missing">
+          <h1>Mixtape not found</h1>
+          <p>This tape is private or does not exist.</p>
+          <Link className="mt-primary" href="/">Browse Mixtape</Link>
         </section>
-      </main>
+      </MixtapePageFrame>
     );
   }
 
   return (
-    <main className="shell">
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="hero-mark">
-            <span>Public mixtape</span>
-          </p>
-          <h1>{mix.title}</h1>
-          <p className="lede">{mix.description}</p>
-          <p className="muted">
-            {[mix.vibe, mix.useCase, mix.djPersona].filter(Boolean).join(" · ")}
-          </p>
-          <p>
-            <Link className="button" href={buildCrateUrl({ mixId: mix.id })}>
-              Open in crate →
-            </Link>
-            <Link className="button secondary-button" href={buildCrateUrl({ mixId: mix.id, view: "broadcast" })}>
-              Broadcast deck
-            </Link>
-          </p>
-        </div>
-      </section>
-
-      <section className="workspace">
-        <div className="track-grid">
-          {mix.tracks.map((track, index) => (
-            <article className="track" key={`${track.artist}-${track.title}-${index}`}>
-              <div className="track-head">
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <h4>{track.title}</h4>
-                  <p>{track.artist}</p>
-                </div>
-              </div>
-              {track.songId ? (
-                <p>
-                  <Link href={buildSongUrl(track.songId, { fromMix: mix.id, track: index })}>Open player →</Link>
-                </p>
-              ) : null}
-              {track.notes ? <p>{track.notes}</p> : null}
-              <div className="link-row">
-                {track.youtubeUrl ? (
-                  <a href={track.youtubeUrl} rel="noreferrer" target="_blank">
-                    Listen
-                  </a>
-                ) : null}
-                {track.listenUrl ? (
-                  <a href={track.listenUrl} rel="noreferrer" target="_blank">
-                    Search
-                  </a>
-                ) : null}
-                {track.musicbrainzUrl ? (
-                  <a href={track.musicbrainzUrl} rel="noreferrer" target="_blank">
-                    MusicBrainz
-                  </a>
-                ) : null}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-    </main>
+    <MixtapePageFrame>
+      <PlaylistDetail mix={mix} trackIndex={0} sharedPage />
+    </MixtapePageFrame>
   );
 }

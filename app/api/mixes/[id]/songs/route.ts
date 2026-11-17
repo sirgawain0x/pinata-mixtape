@@ -39,7 +39,7 @@ export async function POST(request: Request, context: Context) {
     const status = (error as Error & { status?: number }).status ?? 400;
     return Response.json(
       { error: error instanceof Error ? error.message : "Could not add song to mix." },
-      { status: status >= 500 ? 500 : 400 }
+      { status }
     );
   }
 }

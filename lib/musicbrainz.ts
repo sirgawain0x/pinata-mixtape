@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import { publicRecordingUrl } from "./recording-links";
+=======
+import { publicRecordingUrl, recordingEmbedUrl } from "./recording-links";
+>>>>>>> Stashed changes
 import { youtubeVideoId } from "./youtube";
 
 type MusicBrainzRecordingSearchOptions = {
@@ -58,8 +62,15 @@ export async function findMusicBrainzRecordingLink(id: string, signal?: AbortSig
   for (const relation of data.relations ?? []) {
     const url = publicRecordingUrl(relation.url?.resource);
     if (!url) continue;
+<<<<<<< Updated upstream
     const videoId = youtubeVideoId(url.href);
     if (videoId) return url.href;
+=======
+    const isCatalogLink = ["open.spotify.com", "music.apple.com", "embed.music.apple.com"].includes(url.hostname);
+    if ((isCatalogLink && recordingEmbedUrl(url.href)) || /^[A-Za-z0-9_-]{11}$/.test(youtubeVideoId(url.href))) {
+      return url.href;
+    }
+>>>>>>> Stashed changes
   }
 }
 

@@ -1,9 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
+import { useLogin, usePrivy } from "@privy-io/react-auth";
 import type { EmbedSourceKind } from "../../lib/embed-sources";
 import { buildYoutubeSearchUrl, isYoutubeSearchUrl } from "../../lib/recording-links";
+<<<<<<< Updated upstream
 import { legacyStreamingEditorNote } from "../../lib/track-playback-policy";
+=======
+>>>>>>> Stashed changes
 import type { Mix, Track } from "../mixtape-app";
 import MusicBrainzLookup, { type MbRecording } from "./MusicBrainzLookup";
 import TrackPreview from "./TrackPreview";
@@ -37,6 +41,10 @@ type Props = {
   onClose: () => void;
   onSaved: (mix: Mix) => void;
   initialDraft?: Partial<Mix>;
+<<<<<<< Updated upstream
+=======
+  canSave?: boolean;
+>>>>>>> Stashed changes
 };
 
 function trackToDraft(track: Track): DraftTrack {
@@ -84,11 +92,19 @@ const emptyDraft = (): DraftTrack => ({
 });
 
 async function readJson<T>(response: Response): Promise<T & { error?: string }> {
-  return (await response.json()) as T & { error?: string };
+  return (await response.json().catch(() => ({}))) as T & { error?: string };
 }
 
+<<<<<<< Updated upstream
 export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: Props) {
   const source = mix ?? initialDraft;
+=======
+export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, canSave = true }: Props) {
+  const source = mix ?? initialDraft;
+  const { ready, authenticated } = usePrivy();
+  const { login } = useLogin();
+  const saving = useRef(false);
+>>>>>>> Stashed changes
   const [creators, setCreators] = useState(source?.creators?.join(", ") ?? "");
   const [genre, setGenre] = useState(source?.genre ?? "");
   const [sourceUrl, setSourceUrl] = useState(source?.sourceUrl ?? "");
@@ -150,6 +166,13 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: P
         setDraft(applyListeningLink);
         setTracks((current) => current.map(applyListeningLink));
       }).catch(() => {});
+<<<<<<< Updated upstream
+=======
+  }
+
+  function withListeningLink(track: DraftTrack) {
+    return { ...track, listenUrl: track.listenUrl || buildYoutubeSearchUrl(track.title, track.artist) };
+>>>>>>> Stashed changes
   }
 
   function addDraftTrack() {
@@ -157,10 +180,14 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: P
       setError("Each track needs a title and artist.");
       return;
     }
+<<<<<<< Updated upstream
     setTracks((current) => [...current, {
       ...draft,
       listenUrl: draft.listenUrl || buildYoutubeSearchUrl(draft.title, draft.artist)
     }]);
+=======
+    setTracks((current) => [...current, withListeningLink(draft)]);
+>>>>>>> Stashed changes
     if (!draft.musicbrainzId && !draft.youtubeUrl && !draft.creativeTvUrl && !draft.embedIframeUrl &&
       (!draft.listenUrl || isYoutubeSearchUrl(draft.listenUrl))) findListeningLink(draft);
     setDraft(emptyDraft());
@@ -190,11 +217,22 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: P
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (saving.current || !canSave) return;
     if (!title.trim()) {
       setError("Mix title is required.");
       return;
     }
 
+<<<<<<< Updated upstream
+=======
+    const pendingTrack = Boolean(draft.title.trim() || draft.artist.trim());
+    if (pendingTrack && (!draft.title.trim() || !draft.artist.trim())) {
+      setError("Enter both a title and an artist for the unfinished track, or clear those fields.");
+      return;
+    }
+    const tracksToSave = pendingTrack ? [...tracks, withListeningLink(draft)] : tracks;
+    saving.current = true;
+>>>>>>> Stashed changes
     setBusy(true);
     setError("");
     try {
@@ -210,7 +248,7 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: P
         isPublic,
         slug: slug.trim() || undefined,
         publish: isPublic,
-        tracks: tracks.map((track) => ({
+        tracks: tracksToSave.map((track) => ({
           title: track.title,
           artist: track.artist,
           releaseYear: track.releaseYear,
@@ -245,18 +283,27 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: P
           });
 
       const data = await readJson<{ mix: Mix }>(response);
-      if (!response.ok || !data.mix) throw new Error(data.error ?? "Save failed.");
+      if (response.status === 401 && !authenticated) {
+        login();
+        throw new Error("Sign in, then save your playlist again.");
+      }
+      if (!response.ok || !data.mix) throw new Error(data.error ?? "Could not save the playlist. Your edits are still here.");
       onSaved(data.mix);
       onClose();
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
 
   return (
+<<<<<<< Updated upstream
     <DesignDialog title={mix ? "Edit playlist" : "Create a playlist"} onClose={onClose} className="mt-editor-dialog">
+=======
+    <DesignDialog title={mix ? "Edit playlist" : "Create a playlist"} onClose={() => { if (!saving.current) onClose(); }} className="mt-editor-dialog">
+>>>>>>> Stashed changes
       <form className="confirm-modal mixtape-editor-modal" onSubmit={save}>
         <p className="eyebrow">{mix ? "Make it yours" : "Start a new rotation"}</p>
 
@@ -407,15 +454,26 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: P
           </div>
         </div>
 
-        {error ? <p className="signin-error">{error}</p> : null}
+        {error ? <p className="signin-error" role="alert">{error}</p> : null}
+        {!canSave && authenticated ? <p role="status">Connecting your Mixtape account…</p> : null}
 
         <div className="modal-actions">
-          <button className="secondary-button" onClick={onClose} type="button">
+          <button className="secondary-button" disabled={busy} onClick={onClose} type="button">
             Cancel
           </button>
+<<<<<<< Updated upstream
           <button disabled={busy} type="submit">
             {busy ? "Saving…" : mix ? "Save playlist" : "Mix it"}
           </button>
+=======
+          {!canSave && !authenticated ? (
+            <button disabled={!ready} onClick={login} type="button">Sign in to save</button>
+          ) : (
+            <button disabled={busy || !canSave} type="submit">
+              {busy ? "Saving…" : "Save playlist"}
+            </button>
+          )}
+>>>>>>> Stashed changes
         </div>
       </form>
     </DesignDialog>

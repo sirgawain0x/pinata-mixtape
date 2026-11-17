@@ -1,10 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
+<<<<<<< Updated upstream
 import Link from "next/link";
 import CassettePlayer from "./CassettePlayer";
+=======
+import CassettePlayer from "./CassettePlayer";
+import StreamingAppLinks from "./StreamingAppLinks";
+import { streamingAppLinks } from "../../lib/recording-links";
+>>>>>>> Stashed changes
 import { SongPlaybackMedia, useSongPlayback } from "../hooks/useSongPlayback";
-import { buildCrateUrl } from "../../lib/mixtape-nav";
 import type { SongPlaybackFields } from "../../lib/song-playback";
 
 export type SongPlayerSong = SongPlaybackFields & {
@@ -23,7 +28,6 @@ export type SongPlayerSong = SongPlaybackFields & {
 type Props = {
   song: SongPlayerSong;
   embedOrigin?: string;
-  backMix?: { id: number; title: string; trackIndex?: number | null };
 };
 
 function formatTime(seconds: number): string {
@@ -33,7 +37,7 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Props) {
+export default function SongPlayerShell({ song, embedOrigin = "" }: Props) {
   const playbackSong = useMemo(
     () => ({
       title: song.title,
@@ -53,10 +57,17 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
 
   const controls = useSongPlayback({ song: playbackSong, embedOrigin });
   const isLinkOnly = controls.sourceKind === "link_only";
+<<<<<<< Updated upstream
+=======
+  const appLinks = streamingAppLinks(song.listenUrl, song.embedIframeUrl);
+  const hasAppLinks = Boolean(appLinks.appleMusic || appLinks.spotify);
+
+>>>>>>> Stashed changes
   const progressPct =
     controls.duration > 0 ? Math.min(100, (controls.progress / controls.duration) * 100) : 0;
 
   return (
+<<<<<<< Updated upstream
     <section className="song-player-shell">
       {backMix ? (
         <p className="song-back-link">
@@ -70,6 +81,9 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
         </p>
       )}
 
+=======
+    <section className="mt-album-deck song-player-shell" aria-label="Track player">
+>>>>>>> Stashed changes
       {controls.sourceKind === "pinata" ? <CassettePlayer
         artist={song.artist}
         isPlaying={controls.isPlaying}
@@ -83,6 +97,7 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
         onLivepeerPlaying={controls.onLivepeerPlaying}
         onLivepeerTime={controls.onLivepeerTime}
       />
+<<<<<<< Updated upstream
       <div className="song-player-controls">
         {isLinkOnly ? (
           <button className="button" disabled={!controls.outboundUrl} onClick={controls.openOutbound} type="button">
@@ -90,6 +105,17 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
           </button>
         ) : isLinkOnly || ["pinata", "iframe"].includes(controls.sourceKind) ? null : (
           <button className="button" disabled={!controls.playerReady} onClick={controls.togglePlay} type="button">
+=======
+      <StreamingAppLinks {...appLinks} inlinePlayerUrl={controls.iframeUrl}/>
+
+      <div className="song-player-controls">
+        {isLinkOnly && !hasAppLinks ? (
+          controls.outboundUrl
+            ? <button className="mt-primary" onClick={controls.openOutbound} type="button">Open listening link ↗</button>
+            : null
+        ) : isLinkOnly || ["pinata", "iframe"].includes(controls.sourceKind) ? null : (
+          <button className="mt-primary" disabled={!controls.playerReady} onClick={controls.togglePlay} type="button">
+>>>>>>> Stashed changes
             {!controls.playerReady ? "Loading…" : controls.isPlaying ? "Pause" : "Play"}
           </button>
         )}
@@ -100,29 +126,22 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
               {formatTime(controls.progress)} / {formatTime(controls.duration)}
             </span>
           </div>
-        ) : (
-          <span className="muted">
-            Source: {controls.sourceKind.replace("_", " ")}
-            {controls.outboundUrl ? (
-              <>
-                {" "}
-                ·{" "}
-                <a href={controls.outboundUrl} rel="noreferrer" target="_blank">
-                  {controls.outboundUrl.replace(/^https?:\/\//, "").slice(0, 48)}
-                </a>
-              </>
-            ) : null}
-          </span>
-        )}
+        ) : null}
       </div>
 
+<<<<<<< Updated upstream
       {isLinkOnly ? (
         <p className="muted song-link-only-note">
           Find this recording on your listening service.
+=======
+      {isLinkOnly && !hasAppLinks && !controls.outboundUrl ? (
+        <p className="muted">
+          Playback is unavailable for this track.
+>>>>>>> Stashed changes
         </p>
       ) : null}
 
-      {controls.error ? <p className="signin-error">{controls.error}</p> : null}
+      {controls.error ? <p className="mt-error" role="alert">{controls.error}</p> : null}
 
       <div className="link-row">
         {song.creativeTvUrl ? (
@@ -140,7 +159,7 @@ export default function SongPlayerShell({ song, embedOrigin = "", backMix }: Pro
             MusicBrainz
           </a>
         ) : null}
-        {song.listenUrl ? (
+        {song.listenUrl && !hasAppLinks ? (
           <a href={song.listenUrl} rel="noreferrer" target="_blank">
             Listen
           </a>
