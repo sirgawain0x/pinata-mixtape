@@ -1,6 +1,5 @@
 import type { EmbedSourceKind } from "./embed-sources";
 import { youtubeVideoId } from "./youtube";
-<<<<<<< Updated upstream
 import {
   isYoutubeSearchUrl,
   preferredRecordingLink,
@@ -8,9 +7,6 @@ import {
   recordingEmbedUrl,
   streamingAppLinks,
 } from "./recording-links";
-=======
-import { preferredRecordingLink, publicRecordingUrl, recordingEmbedUrl, streamingAppLinks } from "./recording-links";
->>>>>>> Stashed changes
 
 export type PlaybackSourceKind = "pinata" | "livepeer" | "youtube" | "iframe" | "link_only";
 

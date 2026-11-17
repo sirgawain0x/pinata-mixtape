@@ -4,10 +4,7 @@ import { FormEvent, useRef, useState } from "react";
 import { useLogin, usePrivy } from "@privy-io/react-auth";
 import type { EmbedSourceKind } from "../../lib/embed-sources";
 import { buildYoutubeSearchUrl, isYoutubeSearchUrl } from "../../lib/recording-links";
-<<<<<<< Updated upstream
 import { legacyStreamingEditorNote } from "../../lib/track-playback-policy";
-=======
->>>>>>> Stashed changes
 import type { Mix, Track } from "../mixtape-app";
 import MusicBrainzLookup, { type MbRecording } from "./MusicBrainzLookup";
 import TrackPreview from "./TrackPreview";
@@ -41,10 +38,7 @@ type Props = {
   onClose: () => void;
   onSaved: (mix: Mix) => void;
   initialDraft?: Partial<Mix>;
-<<<<<<< Updated upstream
-=======
   canSave?: boolean;
->>>>>>> Stashed changes
 };
 
 function trackToDraft(track: Track): DraftTrack {
@@ -95,16 +89,11 @@ async function readJson<T>(response: Response): Promise<T & { error?: string }> 
   return (await response.json().catch(() => ({}))) as T & { error?: string };
 }
 
-<<<<<<< Updated upstream
-export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft }: Props) {
-  const source = mix ?? initialDraft;
-=======
 export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, canSave = true }: Props) {
   const source = mix ?? initialDraft;
   const { ready, authenticated } = usePrivy();
   const { login } = useLogin();
   const saving = useRef(false);
->>>>>>> Stashed changes
   const [creators, setCreators] = useState(source?.creators?.join(", ") ?? "");
   const [genre, setGenre] = useState(source?.genre ?? "");
   const [sourceUrl, setSourceUrl] = useState(source?.sourceUrl ?? "");
@@ -166,13 +155,10 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, can
         setDraft(applyListeningLink);
         setTracks((current) => current.map(applyListeningLink));
       }).catch(() => {});
-<<<<<<< Updated upstream
-=======
   }
 
   function withListeningLink(track: DraftTrack) {
     return { ...track, listenUrl: track.listenUrl || buildYoutubeSearchUrl(track.title, track.artist) };
->>>>>>> Stashed changes
   }
 
   function addDraftTrack() {
@@ -180,14 +166,7 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, can
       setError("Each track needs a title and artist.");
       return;
     }
-<<<<<<< Updated upstream
-    setTracks((current) => [...current, {
-      ...draft,
-      listenUrl: draft.listenUrl || buildYoutubeSearchUrl(draft.title, draft.artist)
-    }]);
-=======
     setTracks((current) => [...current, withListeningLink(draft)]);
->>>>>>> Stashed changes
     if (!draft.musicbrainzId && !draft.youtubeUrl && !draft.creativeTvUrl && !draft.embedIframeUrl &&
       (!draft.listenUrl || isYoutubeSearchUrl(draft.listenUrl))) findListeningLink(draft);
     setDraft(emptyDraft());
@@ -223,8 +202,6 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, can
       return;
     }
 
-<<<<<<< Updated upstream
-=======
     const pendingTrack = Boolean(draft.title.trim() || draft.artist.trim());
     if (pendingTrack && (!draft.title.trim() || !draft.artist.trim())) {
       setError("Enter both a title and an artist for the unfinished track, or clear those fields.");
@@ -232,7 +209,6 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, can
     }
     const tracksToSave = pendingTrack ? [...tracks, withListeningLink(draft)] : tracks;
     saving.current = true;
->>>>>>> Stashed changes
     setBusy(true);
     setError("");
     try {
@@ -299,11 +275,7 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, can
   }
 
   return (
-<<<<<<< Updated upstream
-    <DesignDialog title={mix ? "Edit playlist" : "Create a playlist"} onClose={onClose} className="mt-editor-dialog">
-=======
     <DesignDialog title={mix ? "Edit playlist" : "Create a playlist"} onClose={() => { if (!saving.current) onClose(); }} className="mt-editor-dialog">
->>>>>>> Stashed changes
       <form className="confirm-modal mixtape-editor-modal" onSubmit={save}>
         <p className="eyebrow">{mix ? "Make it yours" : "Start a new rotation"}</p>
 
@@ -461,11 +433,6 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, can
           <button className="secondary-button" disabled={busy} onClick={onClose} type="button">
             Cancel
           </button>
-<<<<<<< Updated upstream
-          <button disabled={busy} type="submit">
-            {busy ? "Saving…" : mix ? "Save playlist" : "Mix it"}
-          </button>
-=======
           {!canSave && !authenticated ? (
             <button disabled={!ready} onClick={login} type="button">Sign in to save</button>
           ) : (
@@ -473,7 +440,6 @@ export default function MixtapeEditor({ mix, onClose, onSaved, initialDraft, can
               {busy ? "Saving…" : "Save playlist"}
             </button>
           )}
->>>>>>> Stashed changes
         </div>
       </form>
     </DesignDialog>
