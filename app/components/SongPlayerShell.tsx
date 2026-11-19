@@ -50,7 +50,6 @@ export default function SongPlayerShell({ song, embedOrigin = "" }: Props) {
 
   const controls = useSongPlayback({ song: playbackSong, embedOrigin });
   const isLinkOnly = controls.sourceKind === "link_only";
-
   const progressPct =
     controls.duration > 0 ? Math.min(100, (controls.progress / controls.duration) * 100) : 0;
 

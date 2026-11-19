@@ -215,7 +215,7 @@ export function useMixPlayback({
             onLastTrackEndedRef.current?.();
           }
           advanceQueue();
-        } else if (data === state.PAUSED || data === state.CUED || data === state.UNSTARTED) {
+        } else if (data === state.PAUSED || data === state.BUFFERING || data === state.CUED || data === state.UNSTARTED) {
           setIsPlaying(false);
         }
       }
