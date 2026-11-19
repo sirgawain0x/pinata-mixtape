@@ -1,5 +1,5 @@
 import { authorizeMixtapeRequest } from "../../../../../lib/mixtape-write";
-import { isPinataConfigured, uploadFile } from "../../../../../lib/pinata";
+import { isGroveConfigured, uploadGroveFile } from "../../../../../lib/grove";
 import { getSong, setSongAdminAudio } from "../../../../../lib/mixtapes";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +17,8 @@ export async function POST(request: Request, context: Context) {
     return Response.json({ error: "Admin token required for song audio upload." }, { status: 403 });
   }
 
-  if (!isPinataConfigured()) {
-    return Response.json({ error: "PINATA_JWT not configured." }, { status: 503 });
+  if (!isGroveConfigured()) {
+    return Response.json({ error: "Lens Grove storage is disabled." }, { status: 503 });
   }
 
   const params = await context.params;
@@ -47,7 +47,7 @@ export async function POST(request: Request, context: Context) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const upload = await uploadFile(buffer, {
+  const upload = await uploadGroveFile(buffer, {
     name: (file as File).name || `song-${songId}-${Date.now()}`,
     mimeType: file.type || "audio/mpeg"
   });

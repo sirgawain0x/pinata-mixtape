@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { dbReady } from "./db";
-import { isPinataConfigured, uploadFile } from "./pinata";
+import { isGroveConfigured, uploadGroveFile } from "./grove";
 import { sqlGet, sqlRun } from "./sql-bridge";
 
 export type DjHostedTrack = {
@@ -247,7 +247,7 @@ export async function persistDjHostedArtifacts(mixId: number): Promise<DjHostedM
   const manifest = readDjHostedManifestFromDisk(mixId);
   if (!manifest) return null;
 
-  if (isPinataConfigured()) {
+  if (isGroveConfigured()) {
     const dir = mixDir(mixId);
     const uploadedClips: Record<string, string> = {};
 
@@ -257,7 +257,7 @@ export async function persistDjHostedArtifacts(mixId: number): Promise<DjHostedM
       try {
         const buffer = await fs.promises.readFile(filePath);
         const ext = path.extname(filePath).slice(1) || "mp3";
-        const upload = await uploadFile(buffer, {
+        const upload = await uploadGroveFile(buffer, {
           name: `mix-${mixId}-dj-${clipName}.${ext}`,
           mimeType: ext === "mp3" ? "audio/mpeg" : undefined
         });
@@ -274,7 +274,7 @@ export async function persistDjHostedArtifacts(mixId: number): Promise<DjHostedM
     if (compiled) {
       try {
         const buffer = await fs.promises.readFile(compiled);
-        const upload = await uploadFile(buffer, {
+        const upload = await uploadGroveFile(buffer, {
           name: `mix-${mixId}-dj-broadcast.mp3`,
           mimeType: "audio/mpeg"
         });

@@ -1,6 +1,6 @@
 import { withCreator } from "../../../lib/auth";
 import { createMosiVoiceClone, isMosiConfigured, uploadMosiReference } from "../../../lib/tts/mosi";
-import { isPinataConfigured, uploadFile } from "../../../lib/pinata";
+import { isGroveConfigured, uploadGroveFile } from "../../../lib/grove";
 import { createVoiceClone, listVoiceClones } from "../../../lib/stations";
 
 export const dynamic = "force-dynamic";
@@ -36,9 +36,9 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     let sourceCid = "";
-    if (isPinataConfigured()) {
+    if (isGroveConfigured()) {
       try {
-        const upload = await uploadFile(buffer, {
+        const upload = await uploadGroveFile(buffer, {
           name: (file as File).name || `voice-reference-${Date.now()}.wav`,
           mimeType: file.type || "audio/wav"
         });

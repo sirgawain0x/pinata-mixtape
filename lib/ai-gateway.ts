@@ -15,6 +15,7 @@ export function resolveAiGatewayModel(): string {
  * On Vercel, OIDC may arrive on the request header even when VERCEL_OIDC_TOKEN is unset in project env.
  */
 export function isAiGatewayConfigured(): boolean {
+  if (process.env.HERMES_API_KEY?.trim()) return true;
   if (process.env.AI_GATEWAY_API_KEY?.trim()) return true;
   if (process.env.VERCEL_OIDC_TOKEN?.trim()) return true;
   if (process.env.VERCEL === "1") return true;

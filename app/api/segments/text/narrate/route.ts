@@ -1,5 +1,5 @@
 import { withCreator } from "../../../../../lib/auth";
-import { isPinataConfigured, uploadFile } from "../../../../../lib/pinata";
+import { isGroveConfigured, uploadGroveFile } from "../../../../../lib/grove";
 import {
   findGlobalCachedTts,
   getSegment,
@@ -50,8 +50,8 @@ export async function POST(request: Request) {
       return Response.json({ segment: updated, cached: true });
     }
 
-    if (!isPinataConfigured()) {
-      return Response.json({ error: "PINATA_JWT not configured." }, { status: 503 });
+    if (!isGroveConfigured()) {
+      return Response.json({ error: "Lens Grove storage is disabled." }, { status: 503 });
     }
 
     let synthesized;
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
           : "mp3";
     let upload;
     try {
-      upload = await uploadFile(synthesized.audio, {
+      upload = await uploadGroveFile(synthesized.audio, {
         name: `narration-${segment.id}.${ext}`,
         mimeType: normalizedMimeType
       });

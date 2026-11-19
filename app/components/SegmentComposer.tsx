@@ -214,7 +214,7 @@ function TextTab({
           });
         } catch (narrateErr) {
           setError(
-            `Text saved, but narration failed: ${(narrateErr as Error).message}. Fix the issue (e.g. set PINATA_JWT for uploads; if you see ENOENT for voices/*.bin, restart dev so Kokoro loads from node_modules), then remove this text card and tap “Save & narrate” again.`
+            `Text saved, but narration failed: ${(narrateErr as Error).message}. Fix the issue (e.g. verify Lens Grove storage connectivity; if you see ENOENT for voices/*.bin, restart dev so Kokoro loads from node_modules), then remove this text card and tap “Save & narrate” again.`
           );
           onAdded();
           return;

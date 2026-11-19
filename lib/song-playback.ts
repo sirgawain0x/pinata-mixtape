@@ -1,6 +1,5 @@
 import type { EmbedSourceKind } from "./embed-sources";
 import { youtubeVideoId } from "./youtube";
-<<<<<<< Updated upstream
 import {
   isYoutubeSearchUrl,
   preferredRecordingLink,
@@ -8,9 +7,6 @@ import {
   recordingEmbedUrl,
   streamingAppLinks,
 } from "./recording-links";
-=======
-import { preferredRecordingLink, publicRecordingUrl, recordingEmbedUrl, streamingAppLinks } from "./recording-links";
->>>>>>> Stashed changes
 
 export type PlaybackSourceKind = "pinata" | "livepeer" | "youtube" | "iframe" | "link_only";
 
@@ -64,7 +60,14 @@ export function resolvePlaybackSource(song: SongPlaybackFields): ResolvedPlaybac
     song.listenUrl, song.youtubeUrl, song.creativeTvUrl, song.embedIframeUrl) || undefined;
 
   if (isCurated && (audioCid || audioUrl)) {
-    return { kind: "pinata", audioUrl: audioUrl || `https://gateway.pinata.cloud/ipfs/${encodeURIComponent(audioCid)}`, outboundUrl };
+    const resolvedCidUrl = audioCid.startsWith("lens://")
+      ? `https://api.grove.storage/${encodeURIComponent(audioCid.slice("lens://".length))}`
+      : audioCid.startsWith("https://") || audioCid.startsWith("http://")
+        ? audioCid
+        : audioCid.startsWith("ipfs://")
+          ? `https://ipfs.io/ipfs/${encodeURIComponent(audioCid.slice("ipfs://".length))}`
+          : `https://ipfs.io/ipfs/${encodeURIComponent(audioCid)}`;
+    return { kind: "pinata", audioUrl: audioUrl || resolvedCidUrl, outboundUrl };
   }
 
   const youtubeUrl = publicRecordingUrl(song.youtubeUrl)?.toString() ?? "";

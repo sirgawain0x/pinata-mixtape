@@ -15,7 +15,7 @@ export default function PlaylistDetail({ mix, trackIndex, canEdit, onEdit }: {
   mix: Mix;
   trackIndex: number;
   canEdit: boolean;
-  onEdit: () => void;
+  onEdit?: () => void;
 }) {
   const playback = useMixPlayback({
     tracks: mix.tracks,

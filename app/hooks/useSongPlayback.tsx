@@ -133,37 +133,6 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
       setIsPlaying(false);
     };
 
-<<<<<<< Updated upstream
-    const setup = () => {
-      if (cancelled || !window.YT?.Player) return;
-      const shell = document.getElementById(ytContainerId);
-      if (!shell) return;
-      const target = document.createElement("div");
-      shell.replaceChildren(target);
-      ytPlayerRef.current = new window.YT.Player(target, {
-        height: "100%",
-        width: "100%",
-        videoId: source.youtubeVideoId,
-        playerVars: { autoplay: 0, playsinline: 1, origin: window.location.origin },
-        events: {
-          onReady: () => {
-            if (!cancelled) setPlayerReady(true);
-          },
-          onError: () => {
-            if (!cancelled) {
-              setError(
-                `YouTube video unavailable${source.youtubeVideoId ? ` (${source.youtubeVideoId})` : ""}. Check the URL or embedding settings.`
-              );
-              setIsPlaying(false);
-            }
-          },
-          onStateChange: (event: { data: number }) => {
-            const YT = window.YT;
-            if (!YT) return;
-            if (event.data === YT.PlayerState.PLAYING) setIsPlaying(true);
-            if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) setIsPlaying(false);
-          }
-=======
     const unmount = mountYoutubePlayer(shell, source.youtubeVideoId, song.title ?? "YouTube player", {
       onReady: ({ target }) => {
         if (cancelled) return;
@@ -179,7 +148,6 @@ export function useSongPlayback({ song, embedOrigin = "", onPlayingChange, onPro
         if (data === state.PLAYING) {
           setIsPlaying(true);
           setError(null);
->>>>>>> Stashed changes
         }
         if (data === state.PAUSED || data === state.ENDED) setIsPlaying(false);
       }

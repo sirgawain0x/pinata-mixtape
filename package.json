@@ -14,17 +14,11 @@
     "pm2:stop": "pm2 delete creative-mixtape",
     "pm2:logs": "pm2 logs creative-mixtape --lines 100",
     "typecheck": "tsc --noEmit",
-<<<<<<< Updated upstream
-    "test:mixtape": "tsx --test tests/playlist-metadata.test.ts tests/ai-gateway.test.ts tests/playlist-draft-merge.test.ts tests/assistant-track-embed.test.ts tests/youtube-data-lookup.test.ts tests/track-playback-policy.test.ts",
+    "test:mixtape": "tsx --test tests/playlist-metadata.test.ts tests/ai-gateway.test.ts tests/playlist-draft-merge.test.ts tests/assistant-track-embed.test.ts tests/youtube-data-lookup.test.ts tests/track-playback-policy.test.ts tests/lens-grove.test.ts tests/hermes-mixtape.test.ts",
     "test:social": "tsx --test tests/social-composer.test.ts",
     "test:lens": "tsx --test tests/lens-operation.test.ts tests/lens-release-fixes.test.ts tests/lens-mutation-result.test.ts",
-    "test:auth": "tsx --test tests/privy-config.test.ts tests/privy-session.test.ts tests/privy-recovery-login.test.ts"
-=======
-    "test:mixtape": "tsx --test tests/playlist-metadata.test.ts",
-    "test:social": "tsx --test tests/social-composer.test.ts",
-    "test:lens": "tsx --test tests/lens-operation.test.ts",
+    "test:auth": "tsx --test tests/privy-config.test.ts tests/privy-session.test.ts tests/privy-recovery-login.test.ts",
     "test:payments": "tsx --test tests/playlist-payments.test.ts"
->>>>>>> Stashed changes
   },
   "dependencies": {
     "@account-kit/core": "^4.88.1",
@@ -32,14 +26,11 @@
     "@account-kit/react": "^4.88.1",
     "@alchemy/wallet-apis": "^5.0.6",
     "@coinbase/cdp-sdk": "^1.56.0",
+    "@farcaster/mini-app-solana": "1.1.3",
     "@farcaster/miniapp-sdk": "^0.3.0",
-<<<<<<< Updated upstream
+    "@lens-chain/storage-client": "^1.0.6",
     "@lens-protocol/client": "0.0.0-canary-20250820102520",
     "@lens-protocol/env": "0.0.0-canary-20250820102520",
-=======
-    "@lens-protocol/client": "^0.0.0-canary-20250820102520",
-    "@lens-protocol/env": "^0.0.0-canary-20250820102520",
->>>>>>> Stashed changes
     "@lens-protocol/metadata": "^2.1.0",
     "@libsql/client": "^0.15.15",
     "@livepeer/react": "^4.3.6",
@@ -48,13 +39,12 @@
     "@privy-io/server-auth": "^1.32.5",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "@stripe/crypto": "1.1.3",
+    "@stripe/stripe-js": "1.54.2",
     "@tanstack/react-query": "^5.100.4",
     "@wagmi/core": "^3.5.5",
-<<<<<<< Updated upstream
-=======
     "@x402/core": "^2.31.0",
     "@x402/evm": "^2.31.0",
->>>>>>> Stashed changes
     "ai": "^7.0.164",
     "better-sqlite3": "^12.4.1",
     "kokoro-js": "^1.2.1",
@@ -68,13 +58,10 @@
     "viem": "^2.54.0",
     "wagmi": "^2.19.5",
     "zod": "^4.6.7"
-<<<<<<< Updated upstream
   },
   "overrides": {
     "@lens-protocol/client": "0.0.0-canary-20250820102520",
     "@lens-protocol/env": "0.0.0-canary-20250820102520"
-=======
->>>>>>> Stashed changes
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

@@ -179,59 +179,6 @@ export function useMixPlayback({
     const shell = document.getElementById(ytElementId);
     if (!shell) return;
 
-<<<<<<< Updated upstream
-    const setup = () => {
-      if (cancelled || !window.YT?.Player) return;
-      const shell = document.getElementById(ytElementId);
-      if (!shell) return;
-      // YouTube replaces its target with an iframe. Keep the React-owned shell intact.
-      const target = document.createElement("div");
-      shell.replaceChildren(target);
-      ytPlayerRef.current = new window.YT.Player(target, {
-        videoId,
-        playerVars: { rel: 0, playsinline: 1, origin: window.location.origin },
-        events: {
-          onReady: () => {
-            if (!cancelled) {
-              setPlayerReady(true);
-              setError(null);
-            }
-          },
-          onError: () => {
-            if (cancelled) return;
-            setError({
-              title: currentItem.track.title,
-              artist: currentItem.track.artist,
-              url: currentItem.track.youtubeUrl,
-              videoId,
-              message: "This YouTube video is unavailable or cannot be embedded."
-            });
-            setIsPlaying(false);
-          },
-          onStateChange: (event: { data: number }) => {
-            if (cancelled || !window.YT) return;
-            if (event.data === window.YT.PlayerState.PLAYING) {
-              setIsPlaying(true);
-              setError(null);
-              notifyTrackPlaying(currentItem.trackIndex);
-            } else if (
-              event.data === window.YT.PlayerState.PAUSED ||
-              event.data === window.YT.PlayerState.BUFFERING ||
-              event.data === window.YT.PlayerState.CUED ||
-              event.data === window.YT.PlayerState.UNSTARTED
-            ) {
-              setIsPlaying(false);
-            } else if (event.data === window.YT.PlayerState.ENDED) {
-              setIsPlaying(false);
-              if (queuePosition >= playableQueue.length - 1) {
-                onLastTrackEndedRef.current?.();
-              }
-              advanceQueue();
-            }
-          }
-        }
-      }) as MixYtPlayer;
-=======
     let cancelled = false;
     const reportError = (message: string) => {
       if (cancelled) return;
@@ -244,7 +191,6 @@ export function useMixPlayback({
         message
       });
       setIsPlaying(false);
->>>>>>> Stashed changes
     };
 
     const unmount = mountYoutubePlayer(shell, videoId, currentItem.track.title, {
@@ -423,10 +369,7 @@ export function useMixPlayback({
     if (position < 0) return;
     if (position === queuePosition) { play(); return; }
     pause();
-<<<<<<< Updated upstream
-=======
     setError(null);
->>>>>>> Stashed changes
     setIsPlaying(false);
     setPlayerReady(false);
     pendingAutoplayRef.current = true;

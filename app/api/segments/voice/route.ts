@@ -1,5 +1,5 @@
 import { withCreator } from "../../../../lib/auth";
-import { isPinataConfigured, uploadFile } from "../../../../lib/pinata";
+import { isGroveConfigured, uploadGroveFile } from "../../../../lib/grove";
 import { addSegment, getStation } from "../../../../lib/stations";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +9,8 @@ const MAX_BYTES = 50 * 1024 * 1024;
 
 export async function POST(request: Request) {
   return withCreator(async (creator) => {
-    if (!isPinataConfigured()) {
-      return Response.json({ error: "PINATA_JWT not configured." }, { status: 503 });
+    if (!isGroveConfigured()) {
+      return Response.json({ error: "Lens Grove storage is disabled." }, { status: 503 });
     }
 
     const form = await request.formData().catch(() => null);
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     if (station.creatorId !== creator.id) return Response.json({ error: "Forbidden." }, { status: 403 });
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const upload = await uploadFile(buffer, {
+    const upload = await uploadGroveFile(buffer, {
       name: (file as File).name || `${kind}-${Date.now()}`,
       mimeType: file.type || "audio/webm"
     });

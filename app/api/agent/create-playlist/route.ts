@@ -1,5 +1,6 @@
 import { isAiGatewayConfigured } from "../../../../lib/ai-gateway";
 import { getCurrentCreator } from "../../../../lib/auth";
+import { createHermesPlaylistDraft, isHermesMixtapeConfigured } from "../../../../lib/hermes-mixtape";
 import { createPlaylistDraft, playlistConversationSchema } from "../../../../lib/playlist-agent";
 import { rateLimitHit } from "../../../../lib/rate-limit";
 
@@ -23,7 +24,9 @@ export async function POST(request: Request) {
   }
   try {
     const previousDraft = parsed.data.previousDraft ?? null;
-    const result = await createPlaylistDraft(parsed.data.messages, request.signal, previousDraft);
+    const result = isHermesMixtapeConfigured()
+      ? await createHermesPlaylistDraft(parsed.data.messages, request.signal, previousDraft)
+      : await createPlaylistDraft(parsed.data.messages, request.signal, previousDraft);
     return Response.json(result);
   } catch {
     // Provider errors can contain request details. Keep them out of the public response.
